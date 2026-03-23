@@ -685,7 +685,7 @@ func (m diffViewModel) renderContentLine(line diffViewLine, _, contentWidth int,
 	// Wrap mode
 	if m.wrap {
 		return m.renderWrappedLine(gutter, line.content, gutterWidth, contentWidth,
-			nil, nil, selected || inVisual, nil)
+			nil, nil, selected || inVisual, &line)
 	}
 
 	// Scroll mode: apply horizontal offset, then clip
@@ -982,13 +982,14 @@ func padToWidth(s string, width int) string {
 
 // renderWrappedLine renders a single logical line wrapped across multiple screen lines.
 // Used by both renderDiffLine and renderContentLine in wrap mode.
-// When mdLine is non-nil and the file is markdown, markdown styling is used instead of syntax highlighting.
+// When mdLine is non-nil and the path indicates markdown (via isMarkdownFile for diffs,
+// or isMarkdownContent for content mode), markdown styling is used instead of syntax highlighting.
 func (m diffViewModel) renderWrappedLine(gutter, content string, gutterWidth, contentWidth int,
 	lineBg, changeBg color.Color, highlight bool, mdLine *diffViewLine) string {
 
 	chunks := wrapContent(content, contentWidth)
 	blankGutter := strings.Repeat(" ", gutterWidth)
-	isMd := mdLine != nil && isMarkdownFile(m.path)
+	isMd := mdLine != nil && (isMarkdownFile(m.path) || (m.contentMode && isMarkdownContent(m.path)))
 
 	var parts []string
 	for ci, chunk := range chunks {

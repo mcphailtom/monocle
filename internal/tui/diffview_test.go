@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -135,5 +136,125 @@ func TestScreenLinesForConsistency(t *testing.T) {
 			t.Errorf("line %d: screenLinesFor=%d but len(wrapContent)=%d (content=%q, width=%d)",
 				i, got, expected, line.content, cw)
 		}
+	}
+}
+
+func TestRenderWrappedLineMarkdownContent(t *testing.T) {
+	theme := DefaultTheme()
+	m := diffViewModel{
+		theme:       &theme,
+		hl:          newHighlighter(),
+		mdStyler:    newMarkdownStyler(theme),
+		contentMode: true,
+		path:        "some-plan-id", // extensionless — content mode treats as markdown
+		wrap:        true,
+		width:       80,
+	}
+
+	tests := []struct {
+		name    string
+		content string
+		// wantRaw is the raw markdown marker that should NOT appear in styled output
+		wantRaw string
+		// wantStyled is a substring that should appear in the styled output
+		wantStyled string
+	}{
+		{
+			name:       "header is styled",
+			content:    "# Hello World",
+			wantRaw:    "# ",
+			wantStyled: "Hello World",
+		},
+		{
+			name:       "bullet is styled",
+			content:    "- list item",
+			wantRaw:    "- ",
+			wantStyled: "list item",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			line := diffViewLine{content: tt.content, newLineNum: 1}
+			result := m.renderWrappedLine("1   ", tt.content, 4, 76,
+				nil, nil, false, &line)
+			if strings.Contains(result, tt.wantRaw) {
+				t.Errorf("expected raw markdown %q to be styled away, got: %s", tt.wantRaw, result)
+			}
+			if !strings.Contains(result, tt.wantStyled) {
+				t.Errorf("expected styled output to contain %q, got: %s", tt.wantStyled, result)
+			}
+		})
+	}
+}
+
+func TestRenderWrappedLineMarkdownFile(t *testing.T) {
+	theme := DefaultTheme()
+	m := diffViewModel{
+		theme:       &theme,
+		hl:          newHighlighter(),
+		mdStyler:    newMarkdownStyler(theme),
+		contentMode: false,
+		path:        "README.md",
+		wrap:        true,
+		width:       80,
+	}
+
+	line := diffViewLine{content: "# Header", newLineNum: 1}
+	result := m.renderWrappedLine("1   ", "# Header", 4, 76,
+		nil, nil, false, &line)
+
+	if strings.Contains(result, "# ") {
+		t.Errorf("expected markdown header to be styled, got raw: %s", result)
+	}
+	if !strings.Contains(result, "Header") {
+		t.Errorf("expected output to contain 'Header', got: %s", result)
+	}
+}
+
+func TestRenderWrappedLineNonMarkdown(t *testing.T) {
+	theme := DefaultTheme()
+	m := diffViewModel{
+		theme:       &theme,
+		hl:          newHighlighter(),
+		mdStyler:    newMarkdownStyler(theme),
+		contentMode: false,
+		path:        "main.go",
+		wrap:        true,
+		width:       80,
+	}
+
+	// "# comment" in a Go file should NOT be styled as a markdown header
+	line := diffViewLine{content: "# comment", newLineNum: 1}
+	result := m.renderWrappedLine("1   ", "# comment", 4, 76,
+		nil, nil, false, &line)
+
+	// The raw content should pass through (not transformed into a styled header)
+	if !strings.Contains(result, "#") {
+		t.Errorf("non-markdown file should preserve raw content, got: %s", result)
+	}
+}
+
+func TestRenderContentLineWrapModeMarkdown(t *testing.T) {
+	theme := DefaultTheme()
+	m := diffViewModel{
+		theme:       &theme,
+		hl:          newHighlighter(),
+		mdStyler:    newMarkdownStyler(theme),
+		contentMode: true,
+		path:        "plan-id",
+		wrap:        true,
+		width:       80,
+		focused:     true,
+	}
+
+	line := diffViewLine{content: "## Section Title", newLineNum: 1}
+	result := m.renderContentLine(line, 0, 76, false, false)
+
+	if strings.Contains(result, "## ") {
+		t.Errorf("expected markdown header to be styled in wrap mode, got raw: %s", result)
+	}
+	if !strings.Contains(result, "Section Title") {
+		t.Errorf("expected output to contain 'Section Title', got: %s", result)
 	}
 }
