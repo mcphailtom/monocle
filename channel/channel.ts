@@ -236,7 +236,7 @@ const mcp = new Server(
       "Events from the monocle channel arrive as <channel source=\"monocle\" event=\"...\">.",
       "These are review events from your human reviewer who is watching your code changes in real-time using Monocle.",
       "",
-      "When you receive a feedback_submitted event, use the get_feedback tool to retrieve the detailed review feedback.",
+      "When you receive a feedback_submitted event, the full review feedback is included in the notification content. Read and act on it directly — do not call get_feedback.",
       "When you receive a pause_requested event, your reviewer wants you to stop and wait. Use the get_feedback tool with wait=true to block until they submit their review.",
       "",
       "You can submit plans or architecture decisions for your reviewer to see using the submit_plan tool.",
