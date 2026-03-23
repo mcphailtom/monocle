@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/anthropics/monocle/internal/types"
@@ -79,6 +80,7 @@ func (rf *ReviewFormatter) Format(session *types.ReviewSession, comments []types
 	// Group comments by target
 	fileComments := map[string][]types.ReviewComment{}
 	contentComments := map[string][]types.ReviewComment{}
+	additionalFileComments := map[string][]types.ReviewComment{}
 	for _, c := range comments {
 		if c.Outdated || c.Resolved {
 			continue
@@ -88,6 +90,8 @@ func (rf *ReviewFormatter) Format(session *types.ReviewSession, comments []types
 			fileComments[c.TargetRef] = append(fileComments[c.TargetRef], c)
 		case types.TargetContent:
 			contentComments[c.TargetRef] = append(contentComments[c.TargetRef], c)
+		case types.TargetAdditionalFile:
+			additionalFileComments[c.TargetRef] = append(additionalFileComments[c.TargetRef], c)
 		}
 	}
 
@@ -173,6 +177,46 @@ func (rf *ReviewFormatter) Format(session *types.ReviewSession, comments []types
 						end = c.LineStart
 					}
 					return extractLines(content, c.LineStart, end)
+				})
+			}
+
+			b.WriteString(c.Body)
+			b.WriteString("\n\n---\n\n")
+		}
+	}
+
+	// Additional file comments
+	for filePath, cmts := range additionalFileComments {
+		for _, c := range cmts {
+			typeLabel := strings.ToUpper(string(c.Type))
+
+			lineRef := ""
+			if c.LineStart > 0 {
+				if c.LineEnd > c.LineStart {
+					lineRef = fmt.Sprintf(":%d-%d", c.LineStart, c.LineEnd)
+				} else {
+					lineRef = fmt.Sprintf(":%d", c.LineStart)
+				}
+			}
+
+			b.WriteString(fmt.Sprintf("### [%s] Additional: %s%s\n", typeLabel, filePath, lineRef))
+
+			if rf.formatCfg.IncludeSnippets {
+				filePathCopy := filePath
+				rf.writeSnippet(&b, c, func() string {
+					if c.LineStart <= 0 {
+						return ""
+					}
+					// Read the additional file content directly
+					data, err := os.ReadFile(filePathCopy)
+					if err != nil {
+						return ""
+					}
+					end := c.LineEnd
+					if end == 0 {
+						end = c.LineStart
+					}
+					return extractLines(string(data), c.LineStart, end)
 				})
 			}
 

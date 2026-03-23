@@ -31,8 +31,9 @@ const (
 type TargetType string
 
 const (
-	TargetFile    TargetType = "file"
-	TargetContent TargetType = "content"
+	TargetFile           TargetType = "file"
+	TargetContent        TargetType = "content"
+	TargetAdditionalFile TargetType = "additional_file"
 )
 
 type SubmitAction string
@@ -43,24 +44,31 @@ const (
 )
 
 type ReviewSession struct {
-	ID             string
-	Agent          string
-	AgentStatus    AgentStatus
-	RepoRoot       string
-	BaseRef        string
-	ChangedFiles   []ChangedFile
-	ContentItems   []ContentItem
-	Comments       []ReviewComment
-	FileStatuses   map[string]bool // path -> reviewed
-	IgnorePatterns []string
-	ReviewRound    int
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID              string
+	Agent           string
+	AgentStatus     AgentStatus
+	RepoRoot        string
+	BaseRef         string
+	ChangedFiles    []ChangedFile
+	ContentItems    []ContentItem
+	AdditionalFiles []AdditionalFile
+	Comments        []ReviewComment
+	FileStatuses    map[string]bool // path -> reviewed
+	IgnorePatterns  []string
+	ReviewRound     int
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type ChangedFile struct {
 	Path     string
 	Status   FileChangeStatus
+	Reviewed bool
+}
+
+type AdditionalFile struct {
+	Path     string // absolute filesystem path
+	Name     string // display name (basename or relative path)
 	Reviewed bool
 }
 
@@ -131,13 +139,14 @@ type DiffResult struct {
 }
 
 type ReviewSummary struct {
-	Session         *ReviewSession
-	FileComments    map[string][]ReviewComment // path -> comments
-	ContentComments map[string][]ReviewComment // item id -> comments
-	IssueCt         int
-	SuggestionCt    int
-	NoteCt          int
-	PraiseCt        int
+	Session                *ReviewSession
+	FileComments           map[string][]ReviewComment // path -> comments
+	ContentComments        map[string][]ReviewComment // item id -> comments
+	AdditionalFileComments map[string][]ReviewComment // additional file path -> comments
+	IssueCt                int
+	SuggestionCt           int
+	NoteCt                 int
+	PraiseCt               int
 }
 
 type SessionSummary struct {

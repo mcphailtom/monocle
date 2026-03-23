@@ -49,9 +49,9 @@ func TestStackedSidebarHeight(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := stackedSidebarHeight(tt.totalHeight, tt.fileCount, tt.contentItemCount)
+			got := stackedSidebarHeight(tt.totalHeight, tt.fileCount, tt.contentItemCount, 0)
 			if got != tt.want {
-				t.Errorf("stackedSidebarHeight(%d, %d, %d) = %d, want %d",
+				t.Errorf("stackedSidebarHeight(%d, %d, %d, 0) = %d, want %d",
 					tt.totalHeight, tt.fileCount, tt.contentItemCount, got, tt.want)
 			}
 		})

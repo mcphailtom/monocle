@@ -2,6 +2,9 @@ package core
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -220,6 +223,146 @@ func (e *Engine) GetContentItem(id string) (*types.ContentItem, error) {
 	return e.database.GetContentItem(id)
 }
 
+// -- Additional files --
+
+func (e *Engine) GetAdditionalFiles() []types.AdditionalFile {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.current == nil {
+		return nil
+	}
+	return e.current.AdditionalFiles
+}
+
+func (e *Engine) AddAdditionalPaths(paths []string) ([]types.AdditionalFile, error) {
+	e.mu.Lock()
+	if e.current == nil {
+		e.mu.Unlock()
+		return nil, fmt.Errorf("no active session")
+	}
+	session := e.current
+
+	// Build set of existing paths for dedup
+	existing := make(map[string]bool, len(session.AdditionalFiles))
+	for _, af := range session.AdditionalFiles {
+		existing[af.Path] = true
+	}
+
+	var added []types.AdditionalFile
+	for _, p := range paths {
+		absPath, err := filepath.Abs(p)
+		if err != nil {
+			continue
+		}
+
+		info, err := os.Stat(absPath)
+		if err != nil {
+			continue
+		}
+
+		if info.IsDir() {
+			_ = filepath.WalkDir(absPath, func(path string, d os.DirEntry, err error) error {
+				if err != nil {
+					return nil
+				}
+				name := d.Name()
+				if d.IsDir() {
+					// Skip hidden and noisy directories
+					if strings.HasPrefix(name, ".") || name == "node_modules" {
+						return filepath.SkipDir
+					}
+					return nil
+				}
+				// Skip hidden files and .DS_Store
+				if strings.HasPrefix(name, ".") {
+					return nil
+				}
+				if !d.Type().IsRegular() {
+					return nil
+				}
+				if existing[path] {
+					return nil
+				}
+				relName, _ := filepath.Rel(absPath, path)
+				if relName == "" {
+					relName = filepath.Base(path)
+				}
+				af := types.AdditionalFile{
+					Path: path,
+					Name: relName,
+				}
+				session.AdditionalFiles = append(session.AdditionalFiles, af)
+				existing[path] = true
+				added = append(added, af)
+				return nil
+			})
+		} else {
+			if existing[absPath] {
+				continue
+			}
+			af := types.AdditionalFile{
+				Path: absPath,
+				Name: filepath.Base(absPath),
+			}
+			session.AdditionalFiles = append(session.AdditionalFiles, af)
+			existing[absPath] = true
+			added = append(added, af)
+		}
+	}
+	e.mu.Unlock()
+
+	for _, af := range added {
+		e.emit(EventAdditionalFileAdded, EventPayload{
+			Kind: EventAdditionalFileAdded,
+			Path: af.Path,
+		})
+	}
+
+	return added, nil
+}
+
+func (e *Engine) GetAdditionalFileContent(absPath string) (string, error) {
+	e.mu.RLock()
+	found := false
+	if e.current != nil {
+		for _, af := range e.current.AdditionalFiles {
+			if af.Path == absPath {
+				found = true
+				break
+			}
+		}
+	}
+	e.mu.RUnlock()
+
+	if !found {
+		return "", fmt.Errorf("path not in additional files: %s", absPath)
+	}
+
+	data, err := os.ReadFile(absPath)
+	if err != nil {
+		return "", fmt.Errorf("read additional file: %w", err)
+	}
+	return string(data), nil
+}
+
+func (e *Engine) handleAddAdditionalFiles(msg *protocol.AddAdditionalFilesMsg) *protocol.AddAdditionalFilesResponse {
+	added, err := e.AddAdditionalPaths(msg.Paths)
+	if err != nil {
+		return &protocol.AddAdditionalFilesResponse{
+			Type:    protocol.TypeAddAdditionalFilesResponse,
+			Success: false,
+			Message: err.Error(),
+		}
+	}
+
+	return &protocol.AddAdditionalFilesResponse{
+		Type:    protocol.TypeAddAdditionalFilesResponse,
+		Success: true,
+		Message: fmt.Sprintf("Added %d file(s) for review", len(added)),
+		Count:   len(added),
+	}
+}
+
 // -- Commenting --
 
 func (e *Engine) AddComment(target CommentTarget, commentType types.CommentType, body string) (*types.ReviewComment, error) {
@@ -394,6 +537,14 @@ func (e *Engine) MarkReviewed(path string) error {
 		return fmt.Errorf("no active session")
 	}
 
+	// Check additional files first (in-memory only, no DB)
+	for i := range e.current.AdditionalFiles {
+		if e.current.AdditionalFiles[i].Path == path {
+			e.current.AdditionalFiles[i].Reviewed = true
+			return nil
+		}
+	}
+
 	if err := e.database.MarkFileReviewed(e.current.ID, path, true); err != nil {
 		return fmt.Errorf("mark reviewed: %w", err)
 	}
@@ -415,6 +566,14 @@ func (e *Engine) UnmarkReviewed(path string) error {
 
 	if e.current == nil {
 		return fmt.Errorf("no active session")
+	}
+
+	// Check additional files first (in-memory only, no DB)
+	for i := range e.current.AdditionalFiles {
+		if e.current.AdditionalFiles[i].Path == path {
+			e.current.AdditionalFiles[i].Reviewed = false
+			return nil
+		}
 	}
 
 	if err := e.database.MarkFileReviewed(e.current.ID, path, false); err != nil {
@@ -487,9 +646,10 @@ func (e *Engine) GetReviewSummary() (*types.ReviewSummary, error) {
 	}
 
 	summary := &types.ReviewSummary{
-		Session:         e.current,
-		FileComments:    make(map[string][]types.ReviewComment),
-		ContentComments: make(map[string][]types.ReviewComment),
+		Session:                e.current,
+		FileComments:           make(map[string][]types.ReviewComment),
+		ContentComments:        make(map[string][]types.ReviewComment),
+		AdditionalFileComments: make(map[string][]types.ReviewComment),
 	}
 
 	for _, c := range e.current.Comments {
@@ -501,6 +661,8 @@ func (e *Engine) GetReviewSummary() (*types.ReviewSummary, error) {
 			summary.FileComments[c.TargetRef] = append(summary.FileComments[c.TargetRef], c)
 		case types.TargetContent:
 			summary.ContentComments[c.TargetRef] = append(summary.ContentComments[c.TargetRef], c)
+		case types.TargetAdditionalFile:
+			summary.AdditionalFileComments[c.TargetRef] = append(summary.AdditionalFileComments[c.TargetRef], c)
 		}
 		switch c.Type {
 		case types.CommentIssue:

@@ -33,6 +33,8 @@ func Decode(data []byte) (any, error) {
 		msg = &SubmitContentMsg{}
 	case TypeSubscribe:
 		msg = &SubscribeMsg{}
+	case TypeAddAdditionalFiles:
+		msg = &AddAdditionalFilesMsg{}
 	case TypeGetReviewStatusResponse:
 		msg = &GetReviewStatusResponse{}
 	case TypePollFeedbackResponse:
@@ -43,6 +45,8 @@ func Decode(data []byte) (any, error) {
 		msg = &SubscribeResponse{}
 	case TypeEventNotification:
 		msg = &EventNotification{}
+	case TypeAddAdditionalFilesResponse:
+		msg = &AddAdditionalFilesResponse{}
 	default:
 		return nil, fmt.Errorf("protocol decode: unknown type %q", envelope.Type)
 	}

@@ -11,15 +11,16 @@ import (
 )
 
 type sidebarModel struct {
-	files        []types.ChangedFile
-	contentItems []types.ContentItem
-	cursor       int
-	offset       int // scroll offset for viewport
-	width        int
-	height       int
-	focused      bool
-	recentPaths  map[string]bool
-	keys         *KeyMap
+	files           []types.ChangedFile
+	contentItems    []types.ContentItem
+	additionalFiles []types.AdditionalFile
+	cursor          int
+	offset          int // scroll offset for viewport
+	width           int
+	height          int
+	focused         bool
+	recentPaths     map[string]bool
+	keys            *KeyMap
 
 	// Tree mode state
 	treeMode     bool
@@ -37,9 +38,10 @@ func newSidebarModel(keys *KeyMap) sidebarModel {
 }
 
 type sidebarSelectMsg struct {
-	path      string
-	isContent bool
-	contentID string
+	path             string
+	isContent        bool
+	contentID        string
+	isAdditionalFile bool
 }
 
 type recentFadeMsg struct {
@@ -167,6 +169,10 @@ func (m sidebarModel) View() string {
 		linesUsed++
 	}
 
+	fileItemCt := m.fileItemCount()
+	additionalStart := contentItemCt + fileItemCt
+	additionalCt := len(m.additionalFiles)
+
 	for idx := m.offset; idx < totalItems && linesUsed < availableLines; idx++ {
 		// Files section header (when crossing from content items to files)
 		if idx == contentItemCt && contentItemCt > 0 {
@@ -198,10 +204,35 @@ func (m sidebarModel) View() string {
 			}
 		}
 
+		// Additional Files section header
+		if idx == additionalStart && additionalCt > 0 {
+			if linesUsed > 0 {
+				if linesUsed+1 > availableLines {
+					break
+				}
+				b.WriteString("\n")
+				linesUsed++
+			}
+
+			reviewedCount := 0
+			for _, af := range m.additionalFiles {
+				if af.Reviewed {
+					reviewedCount++
+				}
+			}
+			header := fmt.Sprintf(" Additional Files  %d / %d", reviewedCount, additionalCt)
+			b.WriteString(sectionStyle.Render(header))
+			b.WriteString("\n")
+			linesUsed++
+			if linesUsed >= availableLines {
+				break
+			}
+		}
+
 		var line string
 		if idx < contentItemCt {
 			line = m.renderContentItem(m.contentItems[idx], idx == m.cursor)
-		} else {
+		} else if idx < additionalStart {
 			fileIdx := idx - contentItemCt
 			if m.treeMode {
 				item := m.visibleItems[fileIdx]
@@ -213,6 +244,9 @@ func (m sidebarModel) View() string {
 			} else {
 				line = m.renderFileItem(m.files[fileIdx], idx == m.cursor)
 			}
+		} else {
+			additionalIdx := idx - additionalStart
+			line = m.renderAdditionalFileItem(m.additionalFiles[additionalIdx], idx == m.cursor)
 		}
 
 		b.WriteString(line)
@@ -477,8 +511,49 @@ func (m sidebarModel) renderContentItem(item types.ContentItem, selected bool) s
 	return fmt.Sprintf("%s%-*s%s", prefix, nameW, name, right)
 }
 
+func (m sidebarModel) renderAdditionalFileItem(af types.AdditionalFile, selected bool) string {
+	reviewChar := "○"
+	if af.Reviewed {
+		reviewChar = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ea043")).Render("✓")
+	}
+
+	icon := fileIcon(af.Path)
+	glyph := iconLookup(af.Path).glyph
+	const iconSlack = 2
+
+	if selected && m.focused {
+		plainReview := "○"
+		if af.Reviewed {
+			plainReview = "✓"
+		}
+		right := " " + plainReview + " "
+		prefix := fmt.Sprintf("  %s ", glyph)
+		nameW := m.width - lipgloss.Width(prefix) - lipgloss.Width(right) - iconSlack
+		if nameW < 1 {
+			nameW = 1
+		}
+		name := fmt.Sprintf("%-*s", nameW, truncatePath(af.Name, nameW))
+		padded := prefix + name + right
+		return lipgloss.NewStyle().Reverse(true).Render(padded)
+	}
+
+	leftPad := " "
+	if selected {
+		leftPad = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render("▎")
+	}
+
+	right := " " + reviewChar + " "
+	prefix := fmt.Sprintf("%s %s ", leftPad, icon)
+	nameW := m.width - lipgloss.Width(prefix) - lipgloss.Width(right) - iconSlack
+	if nameW < 1 {
+		nameW = 1
+	}
+	name := fmt.Sprintf("%-*s", nameW, truncatePath(af.Name, nameW))
+	return prefix + name + right
+}
+
 func (m sidebarModel) totalItems() int {
-	return m.fileItemCount() + len(m.contentItems)
+	return m.fileItemCount() + len(m.contentItems) + len(m.additionalFiles)
 }
 
 // fileItemCount returns the number of file-related items (files in flat mode,
@@ -519,6 +594,16 @@ func (m sidebarModel) selectCurrent() tea.Cmd {
 			return sidebarSelectMsg{path: path}
 		}
 	}
+
+	// Then additional files
+	additionalIdx := m.cursor - contentCount - m.fileItemCount()
+	if additionalIdx >= 0 && additionalIdx < len(m.additionalFiles) {
+		af := m.additionalFiles[additionalIdx]
+		return func() tea.Msg {
+			return sidebarSelectMsg{path: af.Path, isAdditionalFile: true}
+		}
+	}
+
 	return nil
 }
 
@@ -550,6 +635,18 @@ func (m sidebarModel) selectedFile() *types.ChangedFile {
 		return item.node.File
 	}
 	return &m.files[fileIdx]
+}
+
+// selectedAdditionalFile returns the AdditionalFile at the current cursor position,
+// or nil if the cursor is not on an additional file.
+func (m sidebarModel) selectedAdditionalFile() *types.AdditionalFile {
+	contentCount := len(m.contentItems)
+	fileCount := m.fileItemCount()
+	additionalIdx := m.cursor - contentCount - fileCount
+	if additionalIdx < 0 || additionalIdx >= len(m.additionalFiles) {
+		return nil
+	}
+	return &m.additionalFiles[additionalIdx]
 }
 
 // navigateFile moves the cursor to the next (dir=+1) or previous (dir=-1)
@@ -673,6 +770,10 @@ func (m sidebarModel) viewportHeight() int {
 		headerLines += 1 // "Files" header
 	} else {
 		headerLines += 1 // "Files" header only
+	}
+	if len(m.additionalFiles) > 0 {
+		headerLines += 1 // blank line before additional section
+		headerLines += 1 // "Additional Files" header
 	}
 	h := m.height - headerLines
 	if h < 0 {

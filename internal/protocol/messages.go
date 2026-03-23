@@ -2,19 +2,21 @@ package protocol
 
 // Inbound message types (from CLI subcommands to engine via socket)
 const (
-	TypeGetReviewStatus = "get_review_status"
-	TypePollFeedback    = "poll_feedback"
-	TypeSubmitContent   = "submit_content"
-	TypeSubscribe       = "subscribe"
+	TypeGetReviewStatus    = "get_review_status"
+	TypePollFeedback       = "poll_feedback"
+	TypeSubmitContent      = "submit_content"
+	TypeSubscribe          = "subscribe"
+	TypeAddAdditionalFiles = "add_additional_files"
 )
 
 // Outbound message types (from engine to CLI subcommands)
 const (
-	TypeGetReviewStatusResponse = "get_review_status_response"
-	TypePollFeedbackResponse    = "poll_feedback_response"
-	TypeSubmitContentResponse   = "submit_content_response"
-	TypeSubscribeResponse       = "subscribe_response"
-	TypeEventNotification       = "event_notification"
+	TypeGetReviewStatusResponse    = "get_review_status_response"
+	TypePollFeedbackResponse       = "poll_feedback_response"
+	TypeSubmitContentResponse      = "submit_content_response"
+	TypeSubscribeResponse          = "subscribe_response"
+	TypeEventNotification          = "event_notification"
+	TypeAddAdditionalFilesResponse = "add_additional_files_response"
 )
 
 // GetReviewStatusMsg requests the current review state from the engine.
@@ -77,4 +79,18 @@ type EventNotification struct {
 	Type    string         `json:"type"`
 	Event   string         `json:"event"`
 	Payload map[string]any `json:"payload"`
+}
+
+// AddAdditionalFilesMsg sends file/directory paths to add for review.
+type AddAdditionalFilesMsg struct {
+	Type  string   `json:"type"`
+	Paths []string `json:"paths"`
+}
+
+// AddAdditionalFilesResponse acknowledges additional files submission.
+type AddAdditionalFilesResponse struct {
+	Type    string `json:"type"`
+	Success bool   `json:"success"`
+	Message string `json:"message,omitempty"`
+	Count   int    `json:"count"`
 }

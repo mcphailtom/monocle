@@ -15,6 +15,7 @@ const (
 	EventPauseChanged          EventKind = "pause_changed"
 	EventFeedbackSubmitted     EventKind = "feedback_submitted"
 	EventConnectionChanged     EventKind = "connection_changed"
+	EventAdditionalFileAdded   EventKind = "additional_file_added"
 )
 
 // EventPayload carries data for an engine event.
@@ -70,6 +71,11 @@ type EngineAPI interface {
 	GetFileDiff(path string) (*types.DiffResult, error)
 	GetFileContent(path string) (string, error)
 	GetContentItem(id string) (*types.ContentItem, error)
+
+	// Additional files
+	GetAdditionalFiles() []types.AdditionalFile
+	AddAdditionalPaths(paths []string) ([]types.AdditionalFile, error)
+	GetAdditionalFileContent(absPath string) (string, error)
 
 	// Commenting
 	AddComment(target CommentTarget, commentType types.CommentType, body string) (*types.ReviewComment, error)

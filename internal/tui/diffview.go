@@ -75,6 +75,9 @@ type diffViewModel struct {
 	contentTitle string
 	mdStyler    *markdownStyler
 
+	// Additional file mode (external files, no diff)
+	additionalFilePath string
+
 	keys *KeyMap
 }
 
@@ -104,6 +107,13 @@ type loadFileContentMsg struct {
 	comments []types.ReviewComment
 }
 
+type loadAdditionalFileMsg struct {
+	path     string
+	content  string
+	err      error
+	comments []types.ReviewComment
+}
+
 func (m diffViewModel) Init() tea.Cmd {
 	return nil
 }
@@ -114,6 +124,7 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 		m.contentMode = false
 		m.contentID = ""
 		m.contentTitle = ""
+		m.additionalFilePath = ""
 		sameFile := msg.path == m.path
 		if msg.result != nil {
 			m.hunks = msg.result.Hunks
@@ -146,6 +157,7 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 		m.contentMode = true
 		m.contentID = msg.id
 		m.contentTitle = msg.title
+		m.additionalFilePath = ""
 		if msg.contentType != "" {
 			ext := msg.contentType
 			if !strings.HasPrefix(ext, ".") {
@@ -187,6 +199,25 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 			m.cursor = m.nearestSelectable(0, 1)
 			m.offset = 0
 		}
+		m.hOffset = 0
+		m.visualMode = false
+		return m, nil
+
+	case loadAdditionalFileMsg:
+		if msg.err != nil {
+			return m, nil
+		}
+		m.contentMode = false
+		m.contentID = ""
+		m.contentTitle = ""
+		m.additionalFilePath = msg.path
+		m.path = msg.path
+		m.hunks = nil
+		m.comments = msg.comments
+		m.style = diffStyleFile
+		m.buildFileViewLines(msg.content)
+		m.cursor = m.nearestSelectable(0, 1)
+		m.offset = 0
 		m.hOffset = 0
 		m.visualMode = false
 		return m, nil
@@ -233,7 +264,7 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 			}
 			m.ensureVisible()
 		case Matches(key, m.keys.ToggleDiff):
-			if m.contentMode {
+			if m.contentMode || m.additionalFilePath != "" {
 				return m, nil
 			}
 			switch m.style {
@@ -264,19 +295,28 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 					return m, openCommentCmd(m.contentID, line, line, types.TargetContent)
 				}
 			} else {
+				targetType := types.TargetFile
+				targetRef := m.path
+				if m.additionalFilePath != "" {
+					targetType = types.TargetAdditionalFile
+					targetRef = m.additionalFilePath
+				}
 				if m.visualMode {
 					start, end := m.visualRange()
-					return m, openCommentCmd(m.path, start, end, types.TargetFile)
+					return m, openCommentCmd(targetRef, start, end, targetType)
 				}
 				line := m.currentDiffLine()
 				if line > 0 {
-					return m, openCommentCmd(m.path, line, line, types.TargetFile)
+					return m, openCommentCmd(targetRef, line, line, targetType)
 				}
 			}
 		case Matches(key, m.keys.FileComment):
 			// File-level comment
 			if m.contentMode {
 				return m, openFileCommentCmd(m.contentID, types.TargetContent)
+			}
+			if m.additionalFilePath != "" {
+				return m, openFileCommentCmd(m.additionalFilePath, types.TargetAdditionalFile)
 			}
 			if m.path != "" {
 				return m, openFileCommentCmd(m.path, types.TargetFile)

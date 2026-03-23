@@ -65,6 +65,10 @@ type contentItemMsg struct {
 	id string
 }
 
+type additionalFileAddedMsg struct {
+	path string
+}
+
 type connectionChangedMsg struct {
 	count int
 }
@@ -88,8 +92,9 @@ type deleteCommentMsg struct {
 type submitSuccessMsg struct{}
 
 type commentsClearedMsg struct {
-	reloadPath string
-	isContent  bool
+	reloadPath       string
+	isContent        bool
+	isAdditionalFile bool
 }
 
 type resolveCommentMsg struct {
@@ -224,7 +229,8 @@ func (m appModel) Init() tea.Cmd {
 		func() tea.Msg {
 			files := m.engine.GetChangedFiles()
 			items := m.engine.GetContentItems()
-			return initialLoadMsg{files: files, items: items}
+			additional := m.engine.GetAdditionalFiles()
+			return initialLoadMsg{files: files, items: items, additionalFiles: additional}
 		},
 		refreshTick(),
 	}
@@ -238,8 +244,9 @@ func (m appModel) Init() tea.Cmd {
 
 // initialLoadMsg carries the initial file and content item lists.
 type initialLoadMsg struct {
-	files []types.ChangedFile
-	items []types.ContentItem
+	files           []types.ChangedFile
+	items           []types.ContentItem
+	additionalFiles []types.AdditionalFile
 }
 
 // Update handles all incoming messages and routes them appropriately.
@@ -280,7 +287,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				contentW = 0
 			}
 
-			sidebarH := stackedSidebarHeight(contentHeight, len(m.sidebar.files), len(m.sidebar.contentItems))
+			sidebarH := stackedSidebarHeight(contentHeight, len(m.sidebar.files), len(m.sidebar.contentItems), len(m.sidebar.additionalFiles))
 			diffH := contentHeight - sidebarH - borderH // account for sidebar border
 			if diffH < 0 {
 				diffH = 0
@@ -336,6 +343,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case initialLoadMsg:
 		m.sidebar.files = msg.files
 		m.sidebar.contentItems = msg.items
+		m.sidebar.additionalFiles = msg.additionalFiles
 		m.sidebar.rebuildTree()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
@@ -356,6 +364,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(msg.items) > 0 {
 			m.sidebar.selectContentByID(msg.items[0].ID)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{isContent: true, contentID: msg.items[0].ID})
+		}
+		if len(msg.additionalFiles) > 0 {
+			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.additionalFiles[0].Path, isAdditionalFile: true})
 		}
 		return m, nil
 
@@ -428,6 +439,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.diffView.path == "" && len(m.sidebar.files) == 0 && msg.id != "" {
 			m.sidebar.selectContentByID(msg.id)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{isContent: true, contentID: msg.id})
+		}
+		return m, nil
+
+	case additionalFileAddedMsg:
+		m.sidebar.additionalFiles = m.engine.GetAdditionalFiles()
+		m.sidebar.clampOffset()
+		recalcStackedLayout(&m)
+		// Auto-select only if nothing else is showing
+		if m.diffView.path == "" && len(m.sidebar.files) == 0 && len(m.sidebar.contentItems) == 0 && msg.path != "" {
+			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.path, isAdditionalFile: true})
 		}
 		return m, nil
 
@@ -528,6 +549,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.diffView, cmd = m.diffView.Update(msg)
 		return m, cmd
 
+	// Additional file loaded
+	case loadAdditionalFileMsg:
+		var cmd tea.Cmd
+		m.diffView, cmd = m.diffView.Update(msg)
+		return m, cmd
+
 	// Sidebar selection → load diff (focus stays where it is)
 	case sidebarSelectMsg:
 		return m, m.handleSidebarSelect(msg)
@@ -548,10 +575,27 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		id := msg.commentID
 		currentPath := m.diffView.path
 		isContent := m.diffView.contentMode
+		additionalPath := m.diffView.additionalFilePath
 		return m, func() tea.Msg {
 			_ = engine.DeleteComment(id)
 			if isContent {
 				return fileChangedMsg{}
+			}
+			if additionalPath != "" {
+				content, err := engine.GetAdditionalFileContent(additionalPath)
+				if err != nil {
+					return loadAdditionalFileMsg{path: additionalPath, err: err}
+				}
+				session := engine.GetSession()
+				var comments []types.ReviewComment
+				if session != nil {
+					for _, c := range session.Comments {
+						if c.TargetRef == additionalPath && c.TargetType == types.TargetAdditionalFile {
+							comments = append(comments, c)
+						}
+					}
+				}
+				return loadAdditionalFileMsg{path: additionalPath, content: content, comments: comments}
 			}
 			result, _ := engine.GetFileDiff(currentPath)
 			session := engine.GetSession()
@@ -588,10 +632,27 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		id := msg.commentID
 		currentPath := m.diffView.path
 		isContent := m.diffView.contentMode
+		additionalPath := m.diffView.additionalFilePath
 		return m, func() tea.Msg {
 			_ = engine.ResolveComment(id)
 			if isContent {
 				return fileChangedMsg{}
+			}
+			if additionalPath != "" {
+				content, err := engine.GetAdditionalFileContent(additionalPath)
+				if err != nil {
+					return loadAdditionalFileMsg{path: additionalPath, err: err}
+				}
+				session := engine.GetSession()
+				var comments []types.ReviewComment
+				if session != nil {
+					for _, c := range session.Comments {
+						if c.TargetRef == additionalPath && c.TargetType == types.TargetAdditionalFile {
+							comments = append(comments, c)
+						}
+					}
+				}
+				return loadAdditionalFileMsg{path: additionalPath, content: content, comments: comments}
 			}
 			// Reload diff to update comment display
 			result, _ := engine.GetFileDiff(currentPath)
@@ -694,7 +755,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				isContent := m.diffView.contentMode
 				return m, func() tea.Msg {
 					_ = engine.ClearComments()
-					return commentsClearedMsg{reloadPath: currentPath, isContent: isContent}
+					return commentsClearedMsg{reloadPath: currentPath, isContent: isContent, isAdditionalFile: m.diffView.additionalFilePath != ""}
 				}
 			case "never":
 				// Do nothing — keep comments
@@ -718,7 +779,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case confirmClearAfterSubmit, confirmDiscard:
 			return m, func() tea.Msg {
 				_ = engine.ClearComments()
-				return commentsClearedMsg{reloadPath: currentPath, isContent: isContent}
+				return commentsClearedMsg{reloadPath: currentPath, isContent: isContent, isAdditionalFile: m.diffView.additionalFilePath != ""}
 			}
 		}
 		return m, nil
@@ -788,6 +849,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Reload current view to remove inline comment markers
 		if msg.reloadPath != "" && msg.isContent {
 			return m, m.handleSidebarSelect(sidebarSelectMsg{isContent: true, contentID: msg.reloadPath})
+		} else if msg.reloadPath != "" && msg.isAdditionalFile {
+			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.reloadPath, isAdditionalFile: true})
 		} else if msg.reloadPath != "" {
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.reloadPath})
 		}
@@ -1182,9 +1245,9 @@ type baseRefChangedMsg struct {
 // stackedSidebarHeight returns the height for the sidebar in stacked mode.
 // It accounts for the header line plus one line per file/content item, with a
 // minimum of 4 rows and at most 40% of totalHeight.
-func stackedSidebarHeight(totalHeight, fileCount, contentItemCount int) int {
+func stackedSidebarHeight(totalHeight, fileCount, contentItemCount, additionalFileCount int) int {
 	// 1 header line + 1 per item
-	h := 1 + fileCount + contentItemCount
+	h := 1 + fileCount + contentItemCount + additionalFileCount
 	if h < 4 {
 		h = 4
 	}
@@ -1214,7 +1277,7 @@ func recalcStackedLayout(m *appModel) {
 		contentHeight = 0
 	}
 
-	sidebarH := stackedSidebarHeight(contentHeight, len(m.sidebar.files), len(m.sidebar.contentItems))
+	sidebarH := stackedSidebarHeight(contentHeight, len(m.sidebar.files), len(m.sidebar.contentItems), len(m.sidebar.additionalFiles))
 	diffH := contentHeight - sidebarH - borderH
 	if diffH < 0 {
 		diffH = 0
@@ -1232,6 +1295,14 @@ func (m appModel) diffViewShowsValidFile() bool {
 	}
 	if m.diffView.contentMode {
 		return true // content items are always valid
+	}
+	if m.diffView.additionalFilePath != "" {
+		for _, af := range m.sidebar.additionalFiles {
+			if af.Path == m.diffView.additionalFilePath {
+				return true
+			}
+		}
+		return false
 	}
 	for _, f := range m.sidebar.files {
 		if f.Path == m.diffView.path {
@@ -1264,6 +1335,28 @@ func (m appModel) handleSidebarSelect(msg sidebarSelectMsg) tea.Cmd {
 				content:     item.Content,
 				contentType: item.ContentType,
 				comments:    comments,
+			}
+		}
+	}
+	if msg.isAdditionalFile {
+		return func() tea.Msg {
+			content, err := m.engine.GetAdditionalFileContent(msg.path)
+			if err != nil {
+				return loadAdditionalFileMsg{path: msg.path, err: err}
+			}
+			session := m.engine.GetSession()
+			var comments []types.ReviewComment
+			if session != nil {
+				for _, c := range session.Comments {
+					if c.TargetRef == msg.path && c.TargetType == types.TargetAdditionalFile {
+						comments = append(comments, c)
+					}
+				}
+			}
+			return loadAdditionalFileMsg{
+				path:     msg.path,
+				content:  content,
+				comments: comments,
 			}
 		}
 	}
@@ -1303,6 +1396,28 @@ func (m appModel) handleSaveComment(msg saveCommentMsg) tea.Cmd {
 			_, _ = m.engine.EditComment(msg.editingID, msg.body)
 		} else {
 			_, _ = m.engine.AddComment(target, msg.commentType, msg.body)
+		}
+
+		// Additional files: reload as additional file view
+		if msg.targetType == types.TargetAdditionalFile {
+			content, err := m.engine.GetAdditionalFileContent(msg.path)
+			if err != nil {
+				return loadAdditionalFileMsg{path: msg.path, err: err}
+			}
+			session := m.engine.GetSession()
+			var comments []types.ReviewComment
+			if session != nil {
+				for _, c := range session.Comments {
+					if c.TargetRef == msg.path && c.TargetType == types.TargetAdditionalFile {
+						comments = append(comments, c)
+					}
+				}
+			}
+			return loadAdditionalFileMsg{
+				path:     msg.path,
+				content:  content,
+				comments: comments,
+			}
 		}
 
 		// Content items: reload as content, not as diff
@@ -1371,24 +1486,40 @@ func (m appModel) handleMarkReviewed() tea.Cmd {
 	// File
 	var filePath string
 	var reviewed bool
+	var isAdditional bool
 
 	switch m.focus {
 	case focusSidebar:
-		file := m.sidebar.selectedFile()
-		if file == nil {
+		if af := m.sidebar.selectedAdditionalFile(); af != nil {
+			filePath = af.Path
+			reviewed = af.Reviewed
+			isAdditional = true
+		} else if file := m.sidebar.selectedFile(); file != nil {
+			filePath = file.Path
+			reviewed = file.Reviewed
+		} else {
 			return nil
 		}
-		filePath = file.Path
-		reviewed = file.Reviewed
 	case focusMain:
 		if m.diffView.path == "" {
 			return nil
 		}
-		filePath = m.diffView.path
-		for _, f := range m.sidebar.files {
-			if f.Path == filePath {
-				reviewed = f.Reviewed
-				break
+		if m.diffView.additionalFilePath != "" {
+			filePath = m.diffView.additionalFilePath
+			isAdditional = true
+			for _, af := range m.sidebar.additionalFiles {
+				if af.Path == filePath {
+					reviewed = af.Reviewed
+					break
+				}
+			}
+		} else {
+			filePath = m.diffView.path
+			for _, f := range m.sidebar.files {
+				if f.Path == filePath {
+					reviewed = f.Reviewed
+					break
+				}
 			}
 		}
 	default:
@@ -1399,6 +1530,9 @@ func (m appModel) handleMarkReviewed() tea.Cmd {
 			_ = m.engine.UnmarkReviewed(filePath)
 		} else {
 			_ = m.engine.MarkReviewed(filePath)
+		}
+		if isAdditional {
+			return additionalFileAddedMsg{path: filePath}
 		}
 		return fileChangedMsg{path: filePath}
 	}
@@ -1427,6 +1561,7 @@ func (m appModel) refreshFiles() tea.Cmd {
 	engine := m.engine
 	currentPath := m.diffView.path
 	inContentMode := m.diffView.contentMode
+	inAdditionalFileMode := m.diffView.additionalFilePath != ""
 	return func() tea.Msg {
 		// Refresh the file list from git
 		files, err := engine.RefreshChangedFiles()
@@ -1435,10 +1570,10 @@ func (m appModel) refreshFiles() tea.Cmd {
 		}
 		session := engine.GetSession()
 
-		// Don't reload diff when viewing a content item — it's not a file
+		// Don't reload diff when viewing a content item or additional file — they're not git files
 		var result *types.DiffResult
 		var comments []types.ReviewComment
-		if currentPath != "" && !inContentMode {
+		if currentPath != "" && !inContentMode && !inAdditionalFileMode {
 			result, _ = engine.GetFileDiff(currentPath)
 			if session != nil {
 				for _, c := range session.Comments {
@@ -1670,6 +1805,9 @@ func BridgeEngineEvents(engine core.EngineAPI, p *tea.Program) {
 	})
 	engine.On(core.EventContentItemAdded, func(e core.EventPayload) {
 		p.Send(contentItemMsg{id: e.ItemID})
+	})
+	engine.On(core.EventAdditionalFileAdded, func(e core.EventPayload) {
+		p.Send(additionalFileAddedMsg{path: e.Path})
 	})
 	engine.On(core.EventPauseChanged, func(e core.EventPayload) {
 		p.Send(pauseChangedMsg{status: e.Status})

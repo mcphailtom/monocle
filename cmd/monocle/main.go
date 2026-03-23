@@ -27,7 +27,8 @@ type CLI struct {
 }
 
 type RunCmd struct {
-	Socket string `help:"Override socket path for MCP channel connection" env:"MONOCLE_SOCKET" default:""`
+	Socket         string   `help:"Override socket path for MCP channel connection" env:"MONOCLE_SOCKET" default:""`
+	AdditionalPath []string `help:"Additional file or directory paths to include for review (repeatable)" name:"additional-path" short:"a" type:"path"`
 }
 
 type RegisterCmd struct {
@@ -61,7 +62,7 @@ func main() {
 }
 
 func (cmd *RunCmd) Run() error {
-	return runTUI(cmd.Socket)
+	return runTUI(cmd.Socket, cmd.AdditionalPath)
 }
 
 func (cmd *RegisterCmd) Run() error {
@@ -139,7 +140,7 @@ func (cmd *UninstallCmd) Run() error {
 	return (&UnregisterCmd{Global: cmd.Global}).Run()
 }
 
-func runTUI(socketOverride string) error {
+func runTUI(socketOverride string, additionalPaths []string) error {
 	// Load config
 	cfg, err := core.LoadConfig()
 	if err != nil {
@@ -173,6 +174,13 @@ func runTUI(socketOverride string) error {
 	}
 	if _, err := engine.StartSession(opts); err != nil {
 		return fmt.Errorf("start session: %w", err)
+	}
+
+	// Add additional file paths if provided
+	if len(additionalPaths) > 0 {
+		if _, err := engine.AddAdditionalPaths(additionalPaths); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not add additional paths: %v\n", err)
+		}
 	}
 
 	// Start socket server

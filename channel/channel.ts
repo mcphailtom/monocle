@@ -75,6 +75,7 @@ class EngineConnection {
             "feedback_submitted",
             "pause_changed",
             "content_item_added",
+            "additional_file_added",
           ],
         });
         this.conn!.write(sub + "\n");
@@ -278,6 +279,9 @@ const engine = new EngineConnection(socketPath, (event, payload) => {
     case "content_item_added":
       // Informational — no push needed, the agent submitted this
       break;
+    case "additional_file_added":
+      // Informational — no push needed, the agent added this
+      break;
   }
 });
 
@@ -334,6 +338,23 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
         },
         required: ["title", "content"],
+      },
+    },
+    {
+      name: "add_files",
+      description:
+        "Add additional files for your reviewer to see in Monocle. Accepts absolute file or directory paths from anywhere on the filesystem.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          paths: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Absolute file or directory paths to add for review",
+          },
+        },
+        required: ["paths"],
       },
     },
   ],
@@ -396,6 +417,27 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
             {
               type: "text" as const,
               text: resp.message || "Content submitted for review.",
+            },
+          ],
+        };
+      } catch {
+        return {
+          content: [{ type: "text" as const, text: "No reviewer connected." }],
+        };
+      }
+    }
+
+    case "add_files": {
+      try {
+        const resp = await engine.request({
+          type: "add_additional_files",
+          paths: args.paths || [],
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: resp.message || "Files added for review.",
             },
           ],
         };

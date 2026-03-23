@@ -228,6 +228,8 @@ func (s *SocketServer) handleMessage(msg any) any {
 		return s.engine.handlePollFeedback(m)
 	case *protocol.SubmitContentMsg:
 		return s.engine.handleSubmitContent(m)
+	case *protocol.AddAdditionalFilesMsg:
+		return s.engine.handleAddAdditionalFiles(m)
 	default:
 		return nil
 	}
