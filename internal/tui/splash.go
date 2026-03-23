@@ -35,7 +35,7 @@ func splashFull() []string {
 		"",
 		dim.Render("Run " + cmd.Render("monocle register") + dim.Render(" to set up the MCP channel.")),
 		dim.Render("Then launch Claude Code in this repo with:"),
-		dim.Render("  " + cmd.Render("claude --dangerously-allow-channels")),
+		dim.Render("  " + cmd.Render("claude --dangerously-load-development-channels server:monocle")),
 		"",
 		dim.Render("Diffs appear here as Claude Code works."),
 		"",

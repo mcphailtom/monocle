@@ -15,7 +15,7 @@ func TestRenderSplashFullTier(t *testing.T) {
 	if !strings.Contains(result, "monocle register") {
 		t.Error("full splash should contain register instruction")
 	}
-	if !strings.Contains(result, "dangerously-allow-channels") {
+	if !strings.Contains(result, "dangerously-load-development-channels server:monocle") {
 		t.Error("full splash should contain channels flag")
 	}
 	if !strings.Contains(result, "to submit your review") {
