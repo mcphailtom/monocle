@@ -242,6 +242,13 @@ const mcp = new Server(
       "",
       "You can submit plans or architecture decisions for your reviewer to see using the submit_plan tool.",
       "You can check the current review status at any time using the review_status tool.",
+      "",
+      "IMPORTANT — Plan mode workflow:",
+      "When you are in plan mode and have written your plan, use submit_plan_and_wait instead of submit_plan.",
+      "This submits the plan to your reviewer AND blocks until they respond with feedback.",
+      "If the reviewer approves, proceed to call ExitPlanMode.",
+      "If the reviewer requests changes, update your plan and call submit_plan_and_wait again.",
+      "Only call ExitPlanMode after your reviewer has approved the plan via submit_plan_and_wait.",
     ].join("\n"),
   },
 );
@@ -357,6 +364,37 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ["paths"],
       },
     },
+    {
+      name: "submit_plan_and_wait",
+      description:
+        "Submit a plan for review AND block until your reviewer responds with feedback. " +
+        "Use this in plan mode instead of submit_plan. " +
+        "If the reviewer approves, proceed to ExitPlanMode. " +
+        "If they request changes, update the plan and call this again.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          title: {
+            type: "string",
+            description: "Title for the plan",
+          },
+          content: {
+            type: "string",
+            description: "The plan body (markdown supported)",
+          },
+          id: {
+            type: "string",
+            description: "Optional ID for updating existing content",
+          },
+          content_type: {
+            type: "string",
+            description:
+              "File extension for syntax highlighting (e.g. 'md', 'go', 'py', 'ts')",
+          },
+        },
+        required: ["title", "content"],
+      },
+    },
   ],
 }));
 
@@ -419,6 +457,35 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
               text: resp.message || "Content submitted for review.",
             },
           ],
+        };
+      } catch {
+        return {
+          content: [{ type: "text" as const, text: "No reviewer connected." }],
+        };
+      }
+    }
+
+    case "submit_plan_and_wait": {
+      try {
+        // Step 1: Submit the plan
+        await engine.request({
+          type: "submit_content",
+          id: args.id || "",
+          title: args.title,
+          content: args.content,
+          content_type: args.content_type || "",
+        });
+
+        // Step 2: Block until reviewer submits feedback
+        const feedback = await blockingGetFeedback(socketPath);
+
+        if (feedback.has_feedback) {
+          return {
+            content: [{ type: "text" as const, text: feedback.feedback }],
+          };
+        }
+        return {
+          content: [{ type: "text" as const, text: "Reviewer approved with no comments." }],
         };
       } catch {
         return {

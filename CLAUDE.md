@@ -101,10 +101,11 @@ User reviews, adds comments, submits → FeedbackQueue releases → notification
 
 ## Monocle Integration
 
-When in plan mode and the Monocle MCP channel is connected:
-- After writing or updating the plan file, also call the `submit_plan` MCP tool with the plan title and content
+When the Monocle MCP channel is connected:
+- Use the `submit_plan` MCP tool to send plans or content for the reviewer to see
 - Use the plan filename as the `id` parameter so updates replace the previous version
-- This makes the plan visible in Monocle's TUI for real-time reviewer feedback
+
+**Plan mode (important):** When in plan mode, use `submit_plan_and_wait` instead of `submit_plan`. This tool submits the plan AND blocks until the reviewer responds with feedback. If the reviewer approves, proceed to call ExitPlanMode. If they request changes, update the plan and call `submit_plan_and_wait` again. Only call ExitPlanMode after the reviewer has approved.
 
 ## Documentation
 
