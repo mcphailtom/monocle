@@ -73,6 +73,10 @@ type pauseChangedMsg struct {
 	status string
 }
 
+type contentReviewedMsg struct {
+	id string
+}
+
 type editCommentMsg struct {
 	comment *types.ReviewComment
 }
@@ -346,9 +350,11 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusBar.feedbackStatus = m.engine.GetFeedbackStatus()
 		// Auto-select the first file, or first content item if no files
 		if len(msg.files) > 0 {
+			m.sidebar.selectPath(msg.files[0].Path)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.files[0].Path})
 		}
 		if len(msg.items) > 0 {
+			m.sidebar.selectContentByID(msg.items[0].ID)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{isContent: true, contentID: msg.items[0].ID})
 		}
 		return m, nil
@@ -372,6 +378,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Auto-select first file if current view is stale
 		if len(msg.files) > 0 && !m.diffViewShowsValidFile() {
+			m.sidebar.selectPath(msg.files[0].Path)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.files[0].Path})
 		}
 		return m, nil
@@ -390,8 +397,14 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Auto-select first file if the current view is empty or stale
 		if len(m.sidebar.files) > 0 && !m.diffViewShowsValidFile() {
+			m.sidebar.selectPath(m.sidebar.files[0].Path)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: m.sidebar.files[0].Path})
 		}
+		return m, nil
+
+	case contentReviewedMsg:
+		m.sidebar.contentItems = m.engine.GetContentItems()
+		m.sidebar.clampOffset()
 		return m, nil
 
 	case agentStatusMsg:
@@ -408,10 +421,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case contentItemMsg:
 		m.sidebar.contentItems = m.engine.GetContentItems()
+		m.sidebar.rebuildTree()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
 		// Auto-select only if nothing else is available (no files, no current view)
 		if m.diffView.path == "" && len(m.sidebar.files) == 0 && msg.id != "" {
+			m.sidebar.selectContentByID(msg.id)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{isContent: true, contentID: msg.id})
 		}
 		return m, nil
@@ -1336,8 +1351,24 @@ func (m appModel) handleSaveComment(msg saveCommentMsg) tea.Cmd {
 	}
 }
 
-// handleMarkReviewed toggles the reviewed status of the currently selected file.
+// handleMarkReviewed toggles the reviewed status of the currently selected file or content item.
 func (m appModel) handleMarkReviewed() tea.Cmd {
+	// Content item: check diff viewer content mode first, then sidebar cursor
+	if item := m.contentItemForReview(); item != nil {
+		engine := m.engine
+		id := item.ID
+		reviewed := item.Reviewed
+		return func() tea.Msg {
+			if reviewed {
+				_ = engine.UnmarkContentReviewed(id)
+			} else {
+				_ = engine.MarkContentReviewed(id)
+			}
+			return contentReviewedMsg{id: id}
+		}
+	}
+
+	// File
 	var filePath string
 	var reviewed bool
 
@@ -1350,7 +1381,7 @@ func (m appModel) handleMarkReviewed() tea.Cmd {
 		filePath = file.Path
 		reviewed = file.Reviewed
 	case focusMain:
-		if m.diffView.path == "" || m.diffView.contentMode {
+		if m.diffView.path == "" {
 			return nil
 		}
 		filePath = m.diffView.path
@@ -1371,6 +1402,24 @@ func (m appModel) handleMarkReviewed() tea.Cmd {
 		}
 		return fileChangedMsg{path: filePath}
 	}
+}
+
+// contentItemForReview returns the content item that should be toggled, or nil.
+func (m appModel) contentItemForReview() *types.ContentItem {
+	// Main pane showing content
+	if m.focus == focusMain && m.diffView.contentMode {
+		for i := range m.sidebar.contentItems {
+			if m.sidebar.contentItems[i].ID == m.diffView.contentID {
+				return &m.sidebar.contentItems[i]
+			}
+		}
+		return nil
+	}
+	// Sidebar cursor on content item
+	if m.focus == focusSidebar {
+		return m.sidebar.selectedContentItem()
+	}
+	return nil
 }
 
 // refreshFiles returns a Cmd that refreshes the file list and current diff from git.

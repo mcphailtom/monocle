@@ -19,6 +19,8 @@ func (s *stubEngine) GetConfig() *types.Config          { return s.cfg }
 func (s *stubEngine) GetSession() *types.ReviewSession   { return s.session }
 func (s *stubEngine) GetFeedbackStatus() string          { return "" }
 func (s *stubEngine) GetChangedFiles() []types.ChangedFile { return nil }
+func (s *stubEngine) MarkContentReviewed(id string) error   { return nil }
+func (s *stubEngine) UnmarkContentReviewed(id string) error { return nil }
 func (s *stubEngine) ClearComments() error {
 	s.cleared = true
 	return nil

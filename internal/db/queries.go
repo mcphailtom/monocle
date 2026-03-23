@@ -130,6 +130,15 @@ func (d *DB) MarkFileReviewed(sessionID, path string, reviewed bool) error {
 	return err
 }
 
+// MarkContentItemReviewed sets the reviewed flag for a content item.
+func (d *DB) MarkContentItemReviewed(sessionID, id string, reviewed bool) error {
+	_, err := d.Exec(
+		`UPDATE content_items SET reviewed = ? WHERE session_id = ? AND id = ?`,
+		boolToInt(reviewed), sessionID, id,
+	)
+	return err
+}
+
 // UpsertContentItem inserts or updates a content item.
 func (d *DB) UpsertContentItem(sessionID string, item *types.ContentItem) error {
 	_, err := d.Exec(

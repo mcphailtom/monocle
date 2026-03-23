@@ -82,6 +82,8 @@ type EngineAPI interface {
 	// Review status
 	MarkReviewed(path string) error
 	UnmarkReviewed(path string) error
+	MarkContentReviewed(id string) error
+	UnmarkContentReviewed(id string) error
 
 	// Submission
 	GetReviewSummary() (*types.ReviewSummary, error)

@@ -73,11 +73,13 @@ func (m sidebarModel) Update(msg tea.Msg) (sidebarModel, tea.Cmd) {
 		case Matches(key, m.keys.Top):
 			m.cursor = 0
 			m.ensureVisible()
+			return m, m.selectCurrent()
 		case Matches(key, m.keys.Bottom):
 			if total := m.totalItems(); total > 0 {
 				m.cursor = total - 1
 			}
 			m.ensureVisible()
+			return m, m.selectCurrent()
 		case Matches(key, m.keys.Select):
 			if m.treeMode {
 				idx := m.cursor - len(m.contentItems)
@@ -520,6 +522,15 @@ func (m sidebarModel) selectCurrent() tea.Cmd {
 	return nil
 }
 
+// selectedContentItem returns the ContentItem at the current cursor position,
+// or nil if the cursor is on a file or directory.
+func (m sidebarModel) selectedContentItem() *types.ContentItem {
+	if m.cursor < 0 || m.cursor >= len(m.contentItems) {
+		return nil
+	}
+	return &m.contentItems[m.cursor]
+}
+
 // selectedFile returns the ChangedFile at the current cursor position,
 // or nil if the cursor is on a directory or content item.
 func (m sidebarModel) selectedFile() *types.ChangedFile {
@@ -578,6 +589,17 @@ func (m *sidebarModel) rebuildTree() {
 	}
 	m.treeRoots = buildFileTree(m.files)
 	m.visibleItems = flattenTree(m.treeRoots, m.collapsed)
+}
+
+// selectContentByID moves the cursor to the content item matching the given ID.
+func (m *sidebarModel) selectContentByID(id string) {
+	for i, item := range m.contentItems {
+		if item.ID == id {
+			m.cursor = i
+			m.ensureVisible()
+			return
+		}
+	}
 }
 
 // selectPath moves the cursor to the item matching the given file path.

@@ -432,6 +432,50 @@ func (e *Engine) UnmarkReviewed(path string) error {
 	return nil
 }
 
+func (e *Engine) MarkContentReviewed(id string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if e.current == nil {
+		return fmt.Errorf("no active session")
+	}
+
+	if err := e.database.MarkContentItemReviewed(e.current.ID, id, true); err != nil {
+		return fmt.Errorf("mark content reviewed: %w", err)
+	}
+
+	for i := range e.current.ContentItems {
+		if e.current.ContentItems[i].ID == id {
+			e.current.ContentItems[i].Reviewed = true
+			break
+		}
+	}
+
+	return nil
+}
+
+func (e *Engine) UnmarkContentReviewed(id string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if e.current == nil {
+		return fmt.Errorf("no active session")
+	}
+
+	if err := e.database.MarkContentItemReviewed(e.current.ID, id, false); err != nil {
+		return fmt.Errorf("unmark content reviewed: %w", err)
+	}
+
+	for i := range e.current.ContentItems {
+		if e.current.ContentItems[i].ID == id {
+			e.current.ContentItems[i].Reviewed = false
+			break
+		}
+	}
+
+	return nil
+}
+
 // -- Submission --
 
 func (e *Engine) GetReviewSummary() (*types.ReviewSummary, error) {
