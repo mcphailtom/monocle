@@ -121,13 +121,14 @@ devbox run -- make build
 
 ## Quick Start
 
-### 1. Register the MCP channel
+### 1. Install the plugin
 
-```bash
-monocle register
+In Claude Code, add Monocle as a plugin marketplace and install:
+
 ```
-
-This registers Monocle as an MCP server in your project's `.mcp.json`. Use `--global` to register in `~/.mcp.json` instead (applies to all projects).
+/plugin marketplace add josephschmitt/monocle
+/plugin install monocle@monocle
+```
 
 ### 2. Start reviewing
 
@@ -136,15 +137,15 @@ In one terminal, start Monocle:
 monocle
 ```
 
-In another, start Claude Code with the development channels flag (required during the [channels research preview](https://code.claude.com/docs/en/channels)):
+In another, start Claude Code with the channel enabled (the flag is required during the [channels research preview](https://code.claude.com/docs/en/channels)):
 
 ```bash
-claude --dangerously-load-development-channels server:monocle
+claude --dangerously-load-development-channels plugin:monocle@monocle
 ```
 
-This tells Claude Code to load the monocle MCP server as a channel. Claude Code gets three new tools (`review_status`, `get_feedback`, `submit_plan`) and starts receiving your review feedback as push notifications.
+Claude Code gets three new tools (`review_status`, `get_feedback`, `submit_plan`) and starts receiving your review feedback as push notifications.
 
-> **Note:** The `--dangerously-load-development-channels` flag is only needed during the channels research preview. Once channels are generally available, `monocle register` will be all you need.
+> **Note:** The `--dangerously-load-development-channels` flag is required during the [channels research preview](https://code.claude.com/docs/en/channels-reference).
 
 ### 3. The review loop
 

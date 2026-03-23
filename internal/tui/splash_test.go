@@ -12,11 +12,8 @@ func TestRenderSplashFullTier(t *testing.T) {
 	if !strings.Contains(result, "◉") {
 		t.Error("full splash should contain ◉ character")
 	}
-	if !strings.Contains(result, "monocle register") {
-		t.Error("full splash should contain register instruction")
-	}
-	if !strings.Contains(result, "dangerously-load-development-channels server:monocle") {
-		t.Error("full splash should contain channels flag")
+	if !strings.Contains(result, "plugin:monocle@monocle") {
+		t.Error("full splash should contain plugin launch instruction")
 	}
 	if !strings.Contains(result, "to submit your review") {
 		t.Error("full splash should contain review hint")
