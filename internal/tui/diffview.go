@@ -229,10 +229,18 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 		key := msg.String()
 		switch {
 		case Matches(key, m.keys.Down):
-			m.cursor = m.nextSelectable(m.cursor, 1)
+			if m.isCursorOffScreen() {
+				m.cursor = m.nearestSelectable(m.offset, 1)
+			} else {
+				m.cursor = m.nextSelectable(m.cursor, 1)
+			}
 			m.ensureVisible()
 		case Matches(key, m.keys.Up):
-			m.cursor = m.nextSelectable(m.cursor, -1)
+			if m.isCursorOffScreen() {
+				m.cursor = m.nearestSelectable(m.lastVisibleLine(), -1)
+			} else {
+				m.cursor = m.nextSelectable(m.cursor, -1)
+			}
 			m.ensureVisible()
 		case Matches(key, m.keys.Top):
 			m.cursor = m.nearestSelectable(0, 1)
@@ -1415,9 +1423,6 @@ func (m *diffViewModel) ScrollDown() {
 	}
 	if m.offset < maxOffset {
 		m.offset++
-		if m.cursor < m.offset {
-			m.cursor = m.nearestSelectable(m.offset, 1)
-		}
 	}
 }
 
@@ -1425,9 +1430,6 @@ func (m *diffViewModel) ScrollDown() {
 func (m *diffViewModel) ScrollUp() {
 	if m.offset > 0 {
 		m.offset--
-		if !m.wrap && m.cursor >= m.offset+m.height {
-			m.cursor = m.nearestSelectable(m.offset+m.height-1, -1)
-		}
 	}
 }
 
@@ -1463,9 +1465,6 @@ func (m *diffViewModel) ScrollDownHalfPage() {
 	if m.offset > maxOffset {
 		m.offset = maxOffset
 	}
-	if m.cursor < m.offset {
-		m.cursor = m.nearestSelectable(m.offset, 1)
-	}
 }
 
 // ScrollUpHalfPage scrolls the diff viewport up by half a page.
@@ -1478,9 +1477,48 @@ func (m *diffViewModel) ScrollUpHalfPage() {
 	if m.offset < 0 {
 		m.offset = 0
 	}
-	if !m.wrap && m.cursor >= m.offset+m.height {
-		m.cursor = m.nearestSelectable(m.offset+m.height-1, -1)
+}
+
+// isCursorOffScreen returns true if the cursor is outside the visible viewport.
+func (m diffViewModel) isCursorOffScreen() bool {
+	if m.cursor < m.offset {
+		return true
 	}
+	if !m.wrap {
+		return m.cursor >= m.offset+m.height
+	}
+	// Wrap mode: count screen lines from offset to cursor
+	screenLines := 0
+	for i := m.offset; i <= m.cursor && i < len(m.lines); i++ {
+		screenLines += m.screenLinesFor(i)
+		if screenLines > m.height {
+			return true
+		}
+	}
+	return false
+}
+
+// lastVisibleLine returns the index of the last line visible in the viewport.
+func (m diffViewModel) lastVisibleLine() int {
+	if !m.wrap {
+		last := m.offset + m.height - 1
+		if last >= len(m.lines) {
+			last = len(m.lines) - 1
+		}
+		return last
+	}
+	// Wrap mode: walk from offset, summing screen lines
+	screenLines := 0
+	last := m.offset
+	for i := m.offset; i < len(m.lines); i++ {
+		sl := m.screenLinesFor(i)
+		if screenLines+sl > m.height {
+			break
+		}
+		screenLines += sl
+		last = i
+	}
+	return last
 }
 
 func (m *diffViewModel) ensureVisible() {
