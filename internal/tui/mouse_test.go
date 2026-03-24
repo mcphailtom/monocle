@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -396,6 +397,48 @@ func TestDiffViewScreenLineToIndexWithComment(t *testing.T) {
 	// Screen line 5 -> lines[3]
 	if got := dv.screenLineToIndex(5); got != 3 {
 		t.Errorf("screenLineToIndex(5) = %d, want 3", got)
+	}
+}
+
+func TestComputePaneLayoutMatchesRenderedView(t *testing.T) {
+	m := NewApp(nil)
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	app := updated.(appModel)
+
+	// Set up diff content with a known marker line
+	marker := "MARKER_FIRST_LINE"
+	app.diffView.lines = []diffViewLine{
+		{content: marker, newLineNum: 1},
+		{content: "second line", newLineNum: 2},
+	}
+	app.diffView.offset = 0
+	app.diffView.path = "test.go"
+
+	// Render the full view
+	view := app.View()
+	viewLines := strings.Split(view.Content, "\n")
+
+	// Find the row containing our marker
+	markerRow := -1
+	for i, line := range viewLines {
+		if strings.Contains(line, marker) {
+			markerRow = i
+			break
+		}
+	}
+	if markerRow < 0 {
+		t.Fatal("marker line not found in rendered view")
+	}
+
+	// Compare with computed layout
+	layout := computePaneLayout(&app)
+	t.Logf("layout.diff.y = %d, actual marker row = %d", layout.diff.y, markerRow)
+	t.Logf("layout.diff.x = %d, layout.diff.w = %d, layout.diff.h = %d", layout.diff.x, layout.diff.w, layout.diff.h)
+	t.Logf("layout.sidebar.y = %d, sidebar.height = %d", layout.sidebar.y, app.sidebar.height)
+
+	if layout.diff.y != markerRow {
+		t.Errorf("computePaneLayout diff.y = %d, but first diff content renders at row %d (off by %d)",
+			layout.diff.y, markerRow, markerRow-layout.diff.y)
 	}
 }
 
