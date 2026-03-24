@@ -141,10 +141,11 @@ type appModel struct {
 	connectionInfo connectionInfoModel
 	history        historyModel
 
-	focus        focusTarget
-	overlay      overlayKind
-	layout       layoutMode
-	layoutConfig string
+	focus         focusTarget
+	overlay       overlayKind
+	layout        layoutMode
+	layoutConfig  string
+	sidebarHidden bool
 
 	commandMode   bool
 	commandBuffer string
@@ -281,7 +282,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		if m.layout == layoutStacked {
+		if m.sidebarHidden {
+			m.sidebar.width = 0
+			m.sidebar.height = 0
+			diffContentW := m.width - borderW
+			if diffContentW < 0 {
+				diffContentW = 0
+			}
+			m.diffView.width = diffContentW
+			m.diffView.height = contentHeight
+		} else if m.layout == layoutStacked {
 			contentW := m.width - borderW
 			if contentW < 0 {
 				contentW = 0
@@ -934,6 +944,9 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if pane, ok := km.FocusPaneN[key]; ok {
 		switch pane {
 		case 1:
+			if m.sidebarHidden {
+				return m, nil
+			}
 			m.focus = focusSidebar
 			m.sidebar.focused = true
 			m.diffView.focused = false
@@ -970,6 +983,9 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case Matches(key, km.FocusSwap):
+		if m.sidebarHidden {
+			return m, nil
+		}
 		if m.focus == focusSidebar {
 			m.focus = focusMain
 			m.sidebar.focused = false
@@ -980,6 +996,17 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.diffView.focused = false
 		}
 		return m, nil
+
+	case Matches(key, km.ToggleSidebar):
+		m.sidebarHidden = !m.sidebarHidden
+		if m.sidebarHidden {
+			m.focus = focusMain
+			m.sidebar.focused = false
+			m.diffView.focused = true
+		}
+		return m, func() tea.Msg {
+			return tea.WindowSizeMsg{Width: m.width, Height: m.height}
+		}
 
 	case Matches(key, km.FileComment):
 		// File-level comment from sidebar
@@ -1019,6 +1046,9 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return tea.WindowSizeMsg{Width: m.width, Height: m.height}
 		}
 
+	case Matches(key, km.Refresh):
+		return m, m.refreshFiles()
+
 	case Matches(key, km.BaseRef):
 		engine := m.engine
 		return m, func() tea.Msg {
@@ -1034,9 +1064,11 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case Matches(key, km.ScrollDown):
 		m.diffView.ScrollDown()
+		m.diffView.ScrollDown()
 		return m, nil
 
 	case Matches(key, km.ScrollUp):
+		m.diffView.ScrollUp()
 		m.diffView.ScrollUp()
 		return m, nil
 
@@ -1047,6 +1079,18 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case Matches(key, km.ScrollRight):
 		m.diffView.ScrollRight()
 		return m, nil
+
+	case Matches(key, km.ScrollHome):
+		m.diffView.ResetHScroll()
+		return m, nil
+
+	case Matches(key, km.Wrap):
+		m.diffView.ToggleWrap()
+		return m, nil
+
+	case Matches(key, km.ToggleDiff):
+		cmd := m.diffView.CycleDiffStyle()
+		return m, cmd
 
 	case Matches(key, km.HalfDown):
 		m.diffView.ScrollDownHalfPage()
@@ -1062,6 +1106,14 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case Matches(key, km.NextFile):
 		cmd := m.sidebar.navigateFile(+1)
+		return m, cmd
+
+	case Matches(key, km.PrevSection):
+		cmd := m.sidebar.jumpToPrevSection()
+		return m, cmd
+
+	case Matches(key, km.NextSection):
+		cmd := m.sidebar.jumpToNextSection()
 		return m, cmd
 
 	case Matches(key, km.Select):
@@ -1264,7 +1316,7 @@ func stackedSidebarHeight(totalHeight, fileCount, contentItemCount, additionalFi
 // recalcStackedLayout recalculates sidebar and diff view heights for stacked
 // mode based on the current file/content item counts. No-op in horizontal mode.
 func recalcStackedLayout(m *appModel) {
-	if m.layout != layoutStacked {
+	if m.layout != layoutStacked || m.sidebarHidden {
 		return
 	}
 	const borderH = 2
@@ -1632,7 +1684,13 @@ func (m appModel) View() tea.View {
 	const bw = 2 // border left + right
 	const bh = 2 // border top + bottom
 
-	if m.layout == layoutStacked {
+	if m.sidebarHidden {
+		mainView := mainStyle.
+			Width(m.diffView.width + bw).
+			Height(m.diffView.height + bh).
+			Render(m.diffView.View())
+		body = mainView
+	} else if m.layout == layoutStacked {
 		sidebarView := sidebarStyle.
 			Width(m.sidebar.width + bw).
 			Height(m.sidebar.height + bh).

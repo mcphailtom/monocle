@@ -678,6 +678,56 @@ func (m *sidebarModel) navigateFile(dir int) tea.Cmd {
 	return m.selectCurrent()
 }
 
+// sectionStarts returns the starting cursor indices of non-empty sections.
+func (m sidebarModel) sectionStarts() []int {
+	var starts []int
+	contentCt := len(m.contentItems)
+	fileCt := m.fileItemCount()
+	additionalCt := len(m.additionalFiles)
+	if contentCt > 0 {
+		starts = append(starts, 0)
+	}
+	if fileCt > 0 {
+		starts = append(starts, contentCt)
+	}
+	if additionalCt > 0 {
+		starts = append(starts, contentCt+fileCt)
+	}
+	return starts
+}
+
+// jumpToNextSection moves the cursor to the first item of the next section.
+func (m *sidebarModel) jumpToNextSection() tea.Cmd {
+	starts := m.sectionStarts()
+	if len(starts) == 0 {
+		return nil
+	}
+	for _, s := range starts {
+		if s > m.cursor {
+			m.cursor = s
+			m.ensureVisible()
+			return m.selectCurrent()
+		}
+	}
+	return nil
+}
+
+// jumpToPrevSection moves the cursor to the first item of the previous section.
+func (m *sidebarModel) jumpToPrevSection() tea.Cmd {
+	starts := m.sectionStarts()
+	if len(starts) == 0 {
+		return nil
+	}
+	for i := len(starts) - 1; i >= 0; i-- {
+		if starts[i] < m.cursor {
+			m.cursor = starts[i]
+			m.ensureVisible()
+			return m.selectCurrent()
+		}
+	}
+	return nil
+}
+
 // rebuildTree reconstructs the tree from the current file list and updates
 // visible items. Safe to call when treeMode is false (no-op).
 func (m *sidebarModel) rebuildTree() {

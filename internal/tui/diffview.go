@@ -255,29 +255,6 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 			m.ScrollLeft()
 		case key == "l" || key == "right":
 			m.ScrollRight()
-		case Matches(key, m.keys.ScrollHome):
-			m.hOffset = 0
-		case Matches(key, m.keys.Wrap):
-			m.wrap = !m.wrap
-			if m.wrap {
-				m.hOffset = 0
-			}
-			m.ensureVisible()
-		case Matches(key, m.keys.ToggleDiff):
-			if m.contentMode || m.additionalFilePath != "" {
-				return m, nil
-			}
-			switch m.style {
-			case diffStyleUnified:
-				m.style = diffStyleSplit
-				m.buildLines()
-			case diffStyleSplit:
-				path := m.path
-				return m, func() tea.Msg { return requestFileContentMsg{path: path} }
-			case diffStyleFile:
-				m.style = diffStyleUnified
-				m.buildLines()
-			}
 		case Matches(key, m.keys.Comment):
 			// If cursor is on a comment, edit it
 			if c := m.CursorComment(); c != nil {
@@ -1206,6 +1183,39 @@ func (m *diffViewModel) ScrollLeft() {
 	if m.hOffset < 0 {
 		m.hOffset = 0
 	}
+}
+
+// ResetHScroll resets the horizontal scroll offset to 0.
+func (m *diffViewModel) ResetHScroll() {
+	m.hOffset = 0
+}
+
+// ToggleWrap toggles line wrapping and resets horizontal scroll when enabling.
+func (m *diffViewModel) ToggleWrap() {
+	m.wrap = !m.wrap
+	if m.wrap {
+		m.hOffset = 0
+	}
+	m.ensureVisible()
+}
+
+// CycleDiffStyle cycles through unified → split → file display styles.
+func (m *diffViewModel) CycleDiffStyle() tea.Cmd {
+	if m.contentMode || m.additionalFilePath != "" {
+		return nil
+	}
+	switch m.style {
+	case diffStyleUnified:
+		m.style = diffStyleSplit
+		m.buildLines()
+	case diffStyleSplit:
+		path := m.path
+		return func() tea.Msg { return requestFileContentMsg{path: path} }
+	case diffStyleFile:
+		m.style = diffStyleUnified
+		m.buildLines()
+	}
+	return nil
 }
 
 // contentWidthFor returns the available content width (excluding gutter) for a line.

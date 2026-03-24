@@ -16,8 +16,9 @@ type KeyMap struct {
 	Select   []string
 
 	// Pane focus
-	FocusSwap   []string
-	FocusPaneN  map[string]int // key → pane number (1=sidebar, 2=diff)
+	FocusSwap      []string
+	FocusPaneN     map[string]int // key → pane number (1=sidebar, 2=diff)
+	ToggleSidebar  []string
 
 	// Diff view
 	ScrollDown  []string
@@ -32,6 +33,8 @@ type KeyMap struct {
 	TreeMode    []string
 	CollapseAll []string
 	ExpandAll   []string
+	PrevSection []string
+	NextSection []string
 
 	// Review actions
 	Comment     []string
@@ -45,6 +48,7 @@ type KeyMap struct {
 	// General
 	BaseRef     []string
 	CycleLayout []string
+	Refresh     []string
 	Help        []string
 	Quit        []string
 	CommandMode []string
@@ -63,8 +67,9 @@ func DefaultKeyMap() KeyMap {
 		NextFile: []string{"]"},
 		Select:   []string{"enter"},
 
-		FocusSwap:  []string{"tab"},
-		FocusPaneN: map[string]int{"1": 1, "2": 2},
+		FocusSwap:     []string{"tab"},
+		FocusPaneN:    map[string]int{"1": 1, "2": 2},
+		ToggleSidebar: []string{"\\"},
 
 		ScrollDown:  []string{"J"},
 		ScrollUp:    []string{"K"},
@@ -77,6 +82,8 @@ func DefaultKeyMap() KeyMap {
 		TreeMode:    []string{"f"},
 		CollapseAll: []string{"z"},
 		ExpandAll:   []string{"e"},
+		PrevSection: []string{"{"},
+		NextSection: []string{"}"},
 
 		Comment:         []string{"c"},
 		FileComment:     []string{"C"},
@@ -88,6 +95,7 @@ func DefaultKeyMap() KeyMap {
 
 		BaseRef:     []string{"b"},
 		CycleLayout: []string{"T"},
+		Refresh:     []string{"R"},
 		Help:        []string{"?"},
 		Quit:        []string{"q"},
 		CommandMode: []string{":"},
@@ -99,13 +107,13 @@ func DefaultKeyMap() KeyMap {
 var actionNames = []string{
 	"up", "down", "top", "bottom", "half_up", "half_down",
 	"prev_file", "next_file", "select",
-	"focus_swap",
+	"focus_swap", "toggle_sidebar",
 	"scroll_down", "scroll_up", "scroll_left", "scroll_right", "scroll_home",
 	"wrap", "toggle_diff",
-	"tree_mode", "collapse_all", "expand_all",
+	"tree_mode", "collapse_all", "expand_all", "prev_section", "next_section",
 	"comment", "file_comment", "visual", "reviewed",
 	"submit", "pause", "dismiss_outdated",
-	"base_ref", "cycle_layout", "help", "quit", "command_mode",
+	"base_ref", "cycle_layout", "refresh", "help", "quit", "command_mode",
 }
 
 // ApplyOverrides merges user-configured keybinding overrides into the keymap.
@@ -133,6 +141,8 @@ func (km KeyMap) ApplyOverrides(overrides map[string]string) KeyMap {
 			km.Select = []string{key}
 		case "focus_swap":
 			km.FocusSwap = []string{key}
+		case "toggle_sidebar":
+			km.ToggleSidebar = []string{key}
 		case "scroll_down":
 			km.ScrollDown = []string{key}
 		case "scroll_up":
@@ -153,6 +163,10 @@ func (km KeyMap) ApplyOverrides(overrides map[string]string) KeyMap {
 			km.CollapseAll = []string{key}
 		case "expand_all":
 			km.ExpandAll = []string{key}
+		case "prev_section":
+			km.PrevSection = []string{key}
+		case "next_section":
+			km.NextSection = []string{key}
 		case "comment":
 			km.Comment = []string{key}
 		case "file_comment":
@@ -171,6 +185,8 @@ func (km KeyMap) ApplyOverrides(overrides map[string]string) KeyMap {
 			km.BaseRef = []string{key}
 		case "cycle_layout":
 			km.CycleLayout = []string{key}
+		case "refresh":
+			km.Refresh = []string{key}
 		case "help":
 			km.Help = []string{key}
 		case "quit":

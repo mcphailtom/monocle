@@ -182,10 +182,12 @@ When the Monocle MCP channel is connected:
 | `h`/`l` | Scroll diff left/right |
 | `H`/`L` | Scroll diff left/right (any pane) |
 | `[`/`]` | Previous/next file (any pane) |
+| `{`/`}` | Previous/next sidebar section (any pane) |
 | `Enter` | Focus diff pane / toggle dir |
 | `Tab` | Switch pane focus |
+| `\` | Toggle sidebar visibility |
 | `1`/`2` | Jump to pane |
-| `w` | Toggle line wrapping |
+| `w` | Toggle line wrapping (any pane) |
 | `f` | Toggle flat/tree view |
 | `z`/`e` | Collapse/expand all (tree) |
 | `b` | Change base ref |
@@ -195,8 +197,9 @@ When the Monocle MCP channel is connected:
 | `x` | Toggle comment resolved (on a comment line) |
 | `d` | Delete comment (on a comment line) |
 | `r` | Toggle file reviewed |
-| `t` | Cycle diff style (unified/split/file) |
+| `t` | Cycle diff style (unified/split/file) (any pane) |
 | `T` | Cycle layout (auto/side-by-side/stacked) |
+| `R` | Force reload files |
 | `S` / `:submit` | Submit review |
 | `Ctrl+y` | Copy review to clipboard |
 | `P` / `:pause` | Pause Claude Code (wait for your review) |
@@ -290,7 +293,7 @@ Override any action key by mapping the action name to a new key string:
 }
 ```
 
-Available action names: `up`, `down`, `top`, `bottom`, `half_up`, `half_down`, `prev_file`, `next_file`, `select`, `focus_swap`, `scroll_down`, `scroll_up`, `scroll_left`, `scroll_right`, `scroll_home`, `wrap`, `toggle_diff`, `tree_mode`, `collapse_all`, `expand_all`, `comment`, `file_comment`, `visual`, `reviewed`, `submit`, `pause`, `dismiss_outdated`, `base_ref`, `cycle_layout`, `help`, `quit`, `command_mode`.
+Available action names: `up`, `down`, `top`, `bottom`, `half_up`, `half_down`, `prev_file`, `next_file`, `select`, `focus_swap`, `toggle_sidebar`, `scroll_down`, `scroll_up`, `scroll_left`, `scroll_right`, `scroll_home`, `wrap`, `toggle_diff`, `tree_mode`, `collapse_all`, `expand_all`, `prev_section`, `next_section`, `comment`, `file_comment`, `visual`, `reviewed`, `submit`, `pause`, `dismiss_outdated`, `base_ref`, `cycle_layout`, `refresh`, `help`, `quit`, `command_mode`.
 
 The help overlay (`?`) dynamically reflects your custom bindings. Modal keys (Enter, Esc, Tab in overlays) are not configurable.
 
