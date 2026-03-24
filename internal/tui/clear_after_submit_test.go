@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/anthropics/monocle/internal/core"
@@ -12,6 +13,7 @@ type stubEngine struct {
 	core.EngineAPI // embed to satisfy interface; panics on unimplemented methods
 	cfg            *types.Config
 	session        *types.ReviewSession
+	contentItems   []types.ContentItem
 	cleared        bool
 }
 
@@ -21,6 +23,15 @@ func (s *stubEngine) GetFeedbackStatus() string          { return "" }
 func (s *stubEngine) GetChangedFiles() []types.ChangedFile { return nil }
 func (s *stubEngine) MarkContentReviewed(id string) error   { return nil }
 func (s *stubEngine) UnmarkContentReviewed(id string) error { return nil }
+func (s *stubEngine) GetContentItems() []types.ContentItem { return s.contentItems }
+func (s *stubEngine) GetContentItem(id string) (*types.ContentItem, error) {
+	for i := range s.contentItems {
+		if s.contentItems[i].ID == id {
+			return &s.contentItems[i], nil
+		}
+	}
+	return nil, fmt.Errorf("not found")
+}
 func (s *stubEngine) ClearComments() error {
 	s.cleared = true
 	return nil

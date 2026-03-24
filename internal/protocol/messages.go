@@ -53,6 +53,7 @@ type SubmitContentMsg struct {
 	Title       string `json:"title"`
 	Content     string `json:"content"`
 	ContentType string `json:"content_type,omitempty"`
+	IsPlan      bool   `json:"is_plan,omitempty"`
 }
 
 // SubmitContentResponse acknowledges content submission.

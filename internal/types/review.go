@@ -77,6 +77,7 @@ type ContentItem struct {
 	Title       string
 	Content     string
 	ContentType string
+	IsPlan      bool
 	Reviewed    bool
 	Comments    []ReviewComment
 	CreatedAt   time.Time

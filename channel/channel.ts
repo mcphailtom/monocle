@@ -449,6 +449,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
           title: args.title,
           content: args.content,
           content_type: args.content_type || "",
+          is_plan: true,
         });
         return {
           content: [
@@ -474,6 +475,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
           title: args.title,
           content: args.content,
           content_type: args.content_type || "",
+          is_plan: true,
         });
 
         // Step 2: Block until reviewer submits feedback

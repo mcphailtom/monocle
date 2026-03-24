@@ -845,7 +845,7 @@ func (e *Engine) GetReviewStatusInfo() *ReviewStatusInfo {
 }
 
 // SubmitContentForReview adds or updates a content item (plan, doc) for review.
-func (e *Engine) SubmitContentForReview(id, title, content, contentType string) error {
+func (e *Engine) SubmitContentForReview(id, title, content, contentType string, isPlan bool) error {
 	e.mu.Lock()
 	if e.current == nil {
 		e.mu.Unlock()
@@ -859,6 +859,7 @@ func (e *Engine) SubmitContentForReview(id, title, content, contentType string) 
 		Title:       title,
 		Content:     content,
 		ContentType: contentType,
+		IsPlan:      isPlan,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -870,6 +871,7 @@ func (e *Engine) SubmitContentForReview(id, title, content, contentType string) 
 			session.ContentItems[i].Title = title
 			session.ContentItems[i].Content = content
 			session.ContentItems[i].ContentType = contentType
+			session.ContentItems[i].IsPlan = isPlan
 			session.ContentItems[i].UpdatedAt = now
 			item = session.ContentItems[i]
 			found = true
@@ -1086,7 +1088,7 @@ func (e *Engine) handleSubmitContent(msg *protocol.SubmitContentMsg) *protocol.S
 		id = uuid.New().String()
 	}
 
-	err := e.SubmitContentForReview(id, msg.Title, msg.Content, msg.ContentType)
+	err := e.SubmitContentForReview(id, msg.Title, msg.Content, msg.ContentType, msg.IsPlan)
 	if err != nil {
 		return &protocol.SubmitContentResponse{
 			Type:    protocol.TypeSubmitContentResponse,

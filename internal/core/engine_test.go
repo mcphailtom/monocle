@@ -83,7 +83,7 @@ func TestSubmitContentForReview(t *testing.T) {
 	}
 
 	// Submit content
-	err = e.SubmitContentForReview("plan", "Implementation Plan", "# Plan\n1. Step one", "markdown")
+	err = e.SubmitContentForReview("plan", "Implementation Plan", "# Plan\n1. Step one", "markdown", true)
 	if err != nil {
 		t.Fatalf("SubmitContentForReview: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestSubmitContentForReview(t *testing.T) {
 	}
 
 	// Update same content item
-	err = e.SubmitContentForReview("plan", "Updated Plan", "# Updated Plan\n1. New step", "markdown")
+	err = e.SubmitContentForReview("plan", "Updated Plan", "# Updated Plan\n1. New step", "markdown", true)
 	if err != nil {
 		t.Fatalf("update SubmitContentForReview: %v", err)
 	}

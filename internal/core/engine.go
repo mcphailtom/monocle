@@ -110,7 +110,7 @@ type EngineAPI interface {
 	PollFeedback() *FormattedReview
 	WaitForFeedback() *FormattedReview
 	GetReviewStatusInfo() *ReviewStatusInfo
-	SubmitContentForReview(id, title, content, contentType string) error
+	SubmitContentForReview(id, title, content, contentType string, isPlan bool) error
 	RequestPause()
 	CancelPause()
 

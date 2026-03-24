@@ -160,6 +160,10 @@ type appModel struct {
 	registerPrompt   registerPromptModel
 
 	clearAfterSubmitOverride string // session-only override: "", "always", or "never"
+
+	planReviewActive       bool // currently in plan review UI mode
+	planReviewSavedSidebar bool // sidebar visibility before entering
+	planReviewSavedWrap    bool // wrap state before entering
 }
 
 // NewApp creates the root appModel.
@@ -472,6 +476,28 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sidebar.rebuildTree()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
+		// Enter plan review mode if enabled and this is a plan
+		if !m.planReviewActive && msg.id != "" {
+			if cfg := m.engine.GetConfig(); cfg != nil && cfg.PlanReviewMode {
+				if item, err := m.engine.GetContentItem(msg.id); err == nil && item != nil && item.IsPlan {
+					m.planReviewSavedSidebar = m.sidebarHidden
+					m.planReviewSavedWrap = m.diffView.wrap
+					m.sidebarHidden = true
+					m.diffView.wrap = true
+					m.diffView.hOffset = 0
+					m.focus = focusMain
+					m.sidebar.focused = false
+					m.diffView.focused = true
+					m.planReviewActive = true
+					m.sidebar.selectContentByID(msg.id)
+					selectCmd := m.handleSidebarSelect(sidebarSelectMsg{isContent: true, contentID: msg.id})
+					resizeCmd := func() tea.Msg {
+						return tea.WindowSizeMsg{Width: m.width, Height: m.height}
+					}
+					return m, tea.Batch(selectCmd, resizeCmd)
+				}
+			}
+		}
 		// Refresh currently displayed content item if it matches
 		if m.diffView.contentMode && m.diffView.contentID == msg.id && msg.id != "" {
 			return m, m.handleSidebarSelect(sidebarSelectMsg{isContent: true, contentID: msg.id})
@@ -769,6 +795,30 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if session != nil {
 			m.statusBar.commentCount = len(session.Comments)
 		}
+
+		// Restore plan review mode state
+		var planReviewRestored bool
+		if m.planReviewActive {
+			m.sidebarHidden = m.planReviewSavedSidebar
+			m.diffView.wrap = m.planReviewSavedWrap
+			m.planReviewActive = false
+			planReviewRestored = true
+		}
+
+		// Helper: if plan review was restored, batch cmd with layout recalc
+		maybeResize := func(cmd tea.Cmd) tea.Cmd {
+			if !planReviewRestored {
+				return cmd
+			}
+			resize := func() tea.Msg {
+				return tea.WindowSizeMsg{Width: m.width, Height: m.height}
+			}
+			if cmd == nil {
+				return resize
+			}
+			return tea.Batch(cmd, resize)
+		}
+
 		// Only consider clearing if there are active comments
 		hasActive := false
 		if session != nil {
@@ -794,10 +844,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				engine := m.engine
 				currentPath := m.diffView.path
 				isContent := m.diffView.contentMode
-				return m, func() tea.Msg {
+				return m, maybeResize(func() tea.Msg {
 					_ = engine.ClearComments()
 					return commentsClearedMsg{reloadPath: currentPath, isContent: isContent, isAdditionalFile: m.diffView.additionalFilePath != ""}
-				}
+				})
 			case "never":
 				// Do nothing — keep comments
 			default: // "ask"
@@ -805,7 +855,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.overlay = overlayConfirm
 			}
 		}
-		return m, nil
+		return m, maybeResize(nil)
 
 	// Confirm overlay actions
 	case confirmActionMsg:

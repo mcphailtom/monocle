@@ -148,10 +148,10 @@ func (d *DB) MarkContentItemReviewed(sessionID, id string, reviewed bool) error 
 // UpsertContentItem inserts or updates a content item.
 func (d *DB) UpsertContentItem(sessionID string, item *types.ContentItem) error {
 	_, err := d.Exec(
-		`INSERT INTO content_items (id, session_id, title, content, content_type, reviewed, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(id) DO UPDATE SET title = excluded.title, content = excluded.content, content_type = excluded.content_type, updated_at = excluded.updated_at`,
-		item.ID, sessionID, item.Title, item.Content, item.ContentType, boolToInt(item.Reviewed), item.CreatedAt, item.UpdatedAt,
+		`INSERT INTO content_items (id, session_id, title, content, content_type, is_plan, reviewed, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(id) DO UPDATE SET title = excluded.title, content = excluded.content, content_type = excluded.content_type, is_plan = excluded.is_plan, updated_at = excluded.updated_at`,
+		item.ID, sessionID, item.Title, item.Content, item.ContentType, boolToInt(item.IsPlan), boolToInt(item.Reviewed), item.CreatedAt, item.UpdatedAt,
 	)
 	return err
 }
@@ -159,7 +159,7 @@ func (d *DB) UpsertContentItem(sessionID string, item *types.ContentItem) error 
 // GetContentItems returns all content items for a session.
 func (d *DB) GetContentItems(sessionID string) ([]types.ContentItem, error) {
 	rows, err := d.Query(
-		`SELECT id, title, content, content_type, reviewed, created_at, updated_at
+		`SELECT id, title, content, content_type, is_plan, reviewed, created_at, updated_at
 		 FROM content_items WHERE session_id = ? ORDER BY created_at`, sessionID,
 	)
 	if err != nil {
@@ -170,10 +170,11 @@ func (d *DB) GetContentItems(sessionID string) ([]types.ContentItem, error) {
 	var items []types.ContentItem
 	for rows.Next() {
 		var item types.ContentItem
-		var reviewed int
-		if err := rows.Scan(&item.ID, &item.Title, &item.Content, &item.ContentType, &reviewed, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		var isPlan, reviewed int
+		if err := rows.Scan(&item.ID, &item.Title, &item.Content, &item.ContentType, &isPlan, &reviewed, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
+		item.IsPlan = isPlan != 0
 		item.Reviewed = reviewed != 0
 		items = append(items, item)
 	}
@@ -183,14 +184,15 @@ func (d *DB) GetContentItems(sessionID string) ([]types.ContentItem, error) {
 // GetContentItem returns a single content item by ID.
 func (d *DB) GetContentItem(id string) (*types.ContentItem, error) {
 	item := &types.ContentItem{}
-	var reviewed int
+	var isPlan, reviewed int
 	err := d.QueryRow(
-		`SELECT id, title, content, content_type, reviewed, created_at, updated_at
+		`SELECT id, title, content, content_type, is_plan, reviewed, created_at, updated_at
 		 FROM content_items WHERE id = ?`, id,
-	).Scan(&item.ID, &item.Title, &item.Content, &item.ContentType, &reviewed, &item.CreatedAt, &item.UpdatedAt)
+	).Scan(&item.ID, &item.Title, &item.Content, &item.ContentType, &isPlan, &reviewed, &item.CreatedAt, &item.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	item.IsPlan = isPlan != 0
 	item.Reviewed = reviewed != 0
 	return item, nil
 }
