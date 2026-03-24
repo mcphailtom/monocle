@@ -1,5 +1,8 @@
 {
   "name": "monocle",
+  "owner": {
+    "name": "Joseph Schmitt"
+  },
   "description": "Monocle — terminal-based code review companion for Claude Code",
   "plugins": [
     {
