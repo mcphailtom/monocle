@@ -1084,6 +1084,14 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.diffView.ResetHScroll()
 		return m, nil
 
+	case Matches(key, km.ScrollFirstChar):
+		m.diffView.ScrollToFirstChar()
+		return m, nil
+
+	case Matches(key, km.ScrollEnd):
+		m.diffView.ScrollToEnd()
+		return m, nil
+
 	case Matches(key, km.Wrap):
 		m.diffView.ToggleWrap()
 		return m, nil

@@ -1185,9 +1185,63 @@ func (m *diffViewModel) ScrollLeft() {
 	}
 }
 
-// ResetHScroll resets the horizontal scroll offset to 0.
+// ResetHScroll resets the horizontal scroll offset to 0 (vim `0`).
 func (m *diffViewModel) ResetHScroll() {
 	m.hOffset = 0
+}
+
+// ScrollToFirstChar scrolls to the first non-whitespace column (vim `^`).
+// Finds the minimum leading whitespace across all visible content lines.
+func (m *diffViewModel) ScrollToFirstChar() {
+	if m.wrap || len(m.lines) == 0 {
+		return
+	}
+	minIndent := -1
+	for _, line := range m.lines {
+		if line.isHunk || line.isComment || line.content == "" {
+			continue
+		}
+		indent := 0
+		for _, r := range line.content {
+			if r == ' ' || r == '\t' {
+				if r == '\t' {
+					indent += m.tabSize
+				} else {
+					indent++
+				}
+			} else {
+				break
+			}
+		}
+		if minIndent < 0 || indent < minIndent {
+			minIndent = indent
+		}
+		if minIndent == 0 {
+			break
+		}
+	}
+	if minIndent > 0 {
+		m.hOffset = minIndent
+	} else {
+		m.hOffset = 0
+	}
+}
+
+// ScrollToEnd scrolls horizontally to the longest visible line.
+func (m *diffViewModel) ScrollToEnd() {
+	if m.wrap || len(m.lines) == 0 {
+		return
+	}
+	maxLen := 0
+	for _, line := range m.lines {
+		if n := len([]rune(line.content)); n > maxLen {
+			maxLen = n
+		}
+	}
+	cw := m.contentWidthFor(m.lines[0])
+	if maxLen > cw {
+		m.hOffset = maxLen - cw
+	}
 }
 
 // ToggleWrap toggles line wrapping and resets horizontal scroll when enabling.

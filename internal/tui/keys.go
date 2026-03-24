@@ -25,7 +25,9 @@ type KeyMap struct {
 	ScrollUp    []string
 	ScrollLeft  []string
 	ScrollRight []string
-	ScrollHome  []string
+	ScrollHome      []string
+	ScrollFirstChar []string
+	ScrollEnd       []string
 	Wrap        []string
 	ToggleDiff  []string
 
@@ -75,7 +77,9 @@ func DefaultKeyMap() KeyMap {
 		ScrollUp:    []string{"K"},
 		ScrollLeft:  []string{"H"},
 		ScrollRight: []string{"L"},
-		ScrollHome:  []string{"0"},
+		ScrollHome:      []string{"0"},
+		ScrollFirstChar: []string{"^"},
+		ScrollEnd:       []string{"$"},
 		Wrap:        []string{"w"},
 		ToggleDiff:  []string{"t"},
 
@@ -108,7 +112,7 @@ var actionNames = []string{
 	"up", "down", "top", "bottom", "half_up", "half_down",
 	"prev_file", "next_file", "select",
 	"focus_swap", "toggle_sidebar",
-	"scroll_down", "scroll_up", "scroll_left", "scroll_right", "scroll_home",
+	"scroll_down", "scroll_up", "scroll_left", "scroll_right", "scroll_home", "scroll_first_char", "scroll_end",
 	"wrap", "toggle_diff",
 	"tree_mode", "collapse_all", "expand_all", "prev_section", "next_section",
 	"comment", "file_comment", "visual", "reviewed",
@@ -153,6 +157,10 @@ func (km KeyMap) ApplyOverrides(overrides map[string]string) KeyMap {
 			km.ScrollRight = []string{key}
 		case "scroll_home":
 			km.ScrollHome = []string{key}
+		case "scroll_first_char":
+			km.ScrollFirstChar = []string{key}
+		case "scroll_end":
+			km.ScrollEnd = []string{key}
 		case "wrap":
 			km.Wrap = []string{key}
 		case "toggle_diff":

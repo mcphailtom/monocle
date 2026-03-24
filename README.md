@@ -181,6 +181,9 @@ When the Monocle MCP channel is connected:
 | `g`/`G` | Top/bottom |
 | `h`/`l` | Scroll diff left/right |
 | `H`/`L` | Scroll diff left/right (any pane) |
+| `0` | Scroll to column 0 (any pane) |
+| `^` | Scroll to first non-space (any pane) |
+| `$` | Scroll to line end (any pane) |
 | `[`/`]` | Previous/next file (any pane) |
 | `{`/`}` | Previous/next sidebar section (any pane) |
 | `Enter` | Focus diff pane / toggle dir |
@@ -293,7 +296,7 @@ Override any action key by mapping the action name to a new key string:
 }
 ```
 
-Available action names: `up`, `down`, `top`, `bottom`, `half_up`, `half_down`, `prev_file`, `next_file`, `select`, `focus_swap`, `toggle_sidebar`, `scroll_down`, `scroll_up`, `scroll_left`, `scroll_right`, `scroll_home`, `wrap`, `toggle_diff`, `tree_mode`, `collapse_all`, `expand_all`, `prev_section`, `next_section`, `comment`, `file_comment`, `visual`, `reviewed`, `submit`, `pause`, `dismiss_outdated`, `base_ref`, `cycle_layout`, `refresh`, `help`, `quit`, `command_mode`.
+Available action names: `up`, `down`, `top`, `bottom`, `half_up`, `half_down`, `prev_file`, `next_file`, `select`, `focus_swap`, `toggle_sidebar`, `scroll_down`, `scroll_up`, `scroll_left`, `scroll_right`, `scroll_home`, `scroll_first_char`, `scroll_end`, `wrap`, `toggle_diff`, `tree_mode`, `collapse_all`, `expand_all`, `prev_section`, `next_section`, `comment`, `file_comment`, `visual`, `reviewed`, `submit`, `pause`, `dismiss_outdated`, `base_ref`, `cycle_layout`, `refresh`, `help`, `quit`, `command_mode`.
 
 The help overlay (`?`) dynamically reflects your custom bindings. Modal keys (Enter, Esc, Tab in overlays) are not configurable.
 
