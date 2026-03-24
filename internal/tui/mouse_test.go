@@ -60,12 +60,12 @@ func TestComputePaneLayoutHorizontal(t *testing.T) {
 
 	layout := computePaneLayout(&app)
 
-	// Sidebar content starts at x=1 (border left), y=2 (title + border top)
+	// Sidebar content starts at x=1 (border left), y=3 (mouseOrigin + title + border top)
 	if layout.sidebar.x != 1 {
 		t.Errorf("sidebar.x = %d, want 1", layout.sidebar.x)
 	}
-	if layout.sidebar.y != 2 {
-		t.Errorf("sidebar.y = %d, want 2", layout.sidebar.y)
+	if layout.sidebar.y != 3 {
+		t.Errorf("sidebar.y = %d, want 3", layout.sidebar.y)
 	}
 	if layout.sidebar.w != app.sidebar.width {
 		t.Errorf("sidebar.w = %d, want %d", layout.sidebar.w, app.sidebar.width)
@@ -80,8 +80,8 @@ func TestComputePaneLayoutHorizontal(t *testing.T) {
 	if layout.diff.x != expectedDiffX {
 		t.Errorf("diff.x = %d, want %d", layout.diff.x, expectedDiffX)
 	}
-	if layout.diff.y != 2 {
-		t.Errorf("diff.y = %d, want 2", layout.diff.y)
+	if layout.diff.y != 3 {
+		t.Errorf("diff.y = %d, want 3", layout.diff.y)
 	}
 }
 
@@ -104,8 +104,8 @@ func TestComputePaneLayoutStacked(t *testing.T) {
 		t.Errorf("diff.x = %d, want 1", layout.diff.x)
 	}
 
-	// Diff starts after sidebar outer height
-	expectedDiffY := titleHeight + (app.sidebar.height + borderH) + 1
+	// Diff starts after sidebar outer height (mouseOriginY=1 + titleHeight + sidebarOuter + borderTop)
+	expectedDiffY := 1 + titleHeight + (app.sidebar.height + borderH) + 1
 	if layout.diff.y != expectedDiffY {
 		t.Errorf("diff.y = %d, want %d", layout.diff.y, expectedDiffY)
 	}
@@ -433,15 +433,16 @@ func TestComputePaneLayoutMatchesRenderedView(t *testing.T) {
 		t.Fatal("marker line not found in rendered view")
 	}
 
-	// Compare with computed layout
+	// Compare with computed layout.
+	// layout.diff.y includes mouseOriginY (1) to account for Bubble Tea v2's
+	// alt-screen rendering offset. The rendered string doesn't have this offset,
+	// so we expect layout.diff.y = markerRow + 1.
 	layout := computePaneLayout(&app)
-	t.Logf("layout.diff.y = %d, actual marker row = %d", layout.diff.y, markerRow)
-	t.Logf("layout.diff.x = %d, layout.diff.w = %d, layout.diff.h = %d", layout.diff.x, layout.diff.w, layout.diff.h)
-	t.Logf("layout.sidebar.y = %d, sidebar.height = %d", layout.sidebar.y, app.sidebar.height)
+	t.Logf("layout.diff.y = %d, string marker row = %d (expected layout.y = marker+1)", layout.diff.y, markerRow)
 
-	if layout.diff.y != markerRow {
-		t.Errorf("computePaneLayout diff.y = %d, but first diff content renders at row %d (off by %d)",
-			layout.diff.y, markerRow, markerRow-layout.diff.y)
+	if layout.diff.y != markerRow+1 {
+		t.Errorf("computePaneLayout diff.y = %d, but expected string row %d + mouseOriginY(1) = %d",
+			layout.diff.y, markerRow, markerRow+1)
 	}
 }
 
