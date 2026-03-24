@@ -119,7 +119,7 @@ func (sm *SessionManager) RefreshChangedFiles(session *types.ReviewSession) ([]t
 }
 
 // AdvanceRound increments the review round, advances BaseRef to current HEAD,
-// clears the file list, and marks existing comments as outdated.
+// clears the file list and content items, and marks existing comments as outdated.
 // This resets the diff baseline so the next round only shows new changes.
 func (sm *SessionManager) AdvanceRound(session *types.ReviewSession) error {
 	// Advance BaseRef to current HEAD
@@ -139,6 +139,11 @@ func (sm *SessionManager) AdvanceRound(session *types.ReviewSession) error {
 
 	if err := sm.db.DeleteChangedFiles(session.ID); err != nil {
 		return fmt.Errorf("clear changed files: %w", err)
+	}
+
+	session.ContentItems = nil
+	if err := sm.db.DeleteContentItems(session.ID); err != nil {
+		return fmt.Errorf("clear content items: %w", err)
 	}
 
 	if err := sm.db.MarkOutdated(session.ID); err != nil {

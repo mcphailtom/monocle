@@ -52,6 +52,12 @@ func (d *DB) DeleteChangedFiles(sessionID string) error {
 	return err
 }
 
+// DeleteContentItems removes all content item records for a session.
+func (d *DB) DeleteContentItems(sessionID string) error {
+	_, err := d.Exec(`DELETE FROM content_items WHERE session_id = ?`, sessionID)
+	return err
+}
+
 // ListSessions returns session summaries, optionally filtered by repo root.
 func (d *DB) ListSessions(repoRoot string, limit int) ([]types.SessionSummary, error) {
 	query := `SELECT s.id, s.agent, s.repo_root, s.review_round, s.created_at, s.updated_at,

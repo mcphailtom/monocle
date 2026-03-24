@@ -860,6 +860,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// After comments are cleared, refresh sidebar + diff
 	case commentsClearedMsg:
 		m.sidebar.files = m.engine.GetChangedFiles()
+		m.sidebar.contentItems = m.engine.GetContentItems()
 		m.sidebar.rebuildTree()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)

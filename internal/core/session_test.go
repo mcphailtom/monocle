@@ -187,6 +187,14 @@ func TestAdvanceRound(t *testing.T) {
 	session.ChangedFiles = []types.ChangedFile{*file}
 	session.FileStatuses = map[string]bool{"hello.go": true}
 
+	// Add a content item
+	contentItem := &types.ContentItem{
+		ID: "plan-1", Title: "Test Plan", Content: "# Plan\nDo the thing",
+		ContentType: "md", CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	sm.db.UpsertContentItem(session.ID, contentItem)
+	session.ContentItems = []types.ContentItem{*contentItem}
+
 	// Add a comment
 	now := time.Now()
 	comment := &types.ReviewComment{
@@ -224,6 +232,15 @@ func TestAdvanceRound(t *testing.T) {
 	dbFiles, _ := sm.db.GetChangedFiles(session.ID)
 	if len(dbFiles) != 0 {
 		t.Errorf("expected 0 changed files in DB after advance, got %d", len(dbFiles))
+	}
+
+	// Content items should be cleared in memory and DB
+	if session.ContentItems != nil {
+		t.Errorf("expected ContentItems to be nil")
+	}
+	dbItems, _ := sm.db.GetContentItems(session.ID)
+	if len(dbItems) != 0 {
+		t.Errorf("expected 0 content items in DB after advance, got %d", len(dbItems))
 	}
 }
 
