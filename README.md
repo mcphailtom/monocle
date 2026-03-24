@@ -150,6 +150,7 @@ When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-co
 - **Ref picker** — Change the base ref on the fly to compare against any branch or commit
 - **Comment resolution** — Mark individual comments as resolved (`x`); resolved comments are excluded from submitted reviews
 - **Submission history** — View past review submissions with `:history`
+- **Mouse support** — Click to focus panes, scroll with the wheel, click files to select, drag to make visual selections, and interact with modal controls
 - **Configurable keybindings** — Override any navigation or action key via config
 - **Feedback queue** — Submit reviews while the agent is working; delivered when Claude Code next checks
 - **Connection indicator** — See at a glance whether Claude Code is connected, with manual socket override for troubleshooting
@@ -256,6 +257,7 @@ Monocle loads settings from JSON config files:
   "context_lines": 3,
   "ignore_patterns": [],
   "keybindings": {},
+  "mouse": true,
   "clear_after_submit": "ask",
   "plan_review_mode": false,
   "review_format": {
@@ -275,6 +277,7 @@ Monocle loads settings from JSON config files:
 | `tab_size` | integer | `4` | Spaces per tab character |
 | `context_lines` | integer | `3` | Unchanged lines shown around diff hunks |
 | `ignore_patterns` | string array | `[]` | Glob patterns for files to exclude |
+| `mouse` | `true`, `false` | `true` | Enable mouse interactions (click, scroll, drag) |
 | `clear_after_submit` | `"ask"`, `"always"`, `"never"` | `"ask"` | Whether to clear comments after submitting a review |
 | `plan_review_mode` | `true`, `false` | `false` | Auto-hide sidebar and enable wrap when reviewing plans |
 | `keybindings` | object | `{}` | Custom key overrides (see below) |
