@@ -410,6 +410,15 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(msg.files) > 0 && !m.diffViewShowsValidFile() {
 			m.sidebar.selectPath(msg.files[0].Path)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.files[0].Path})
+		} else if len(msg.files) == 0 && !m.diffView.contentMode && m.diffView.path != "" {
+			m.diffView.path = ""
+			m.diffView.hunks = nil
+			m.diffView.lines = nil
+			m.diffView.comments = nil
+			m.diffView.cursor = 0
+			m.diffView.offset = 0
+			m.diffView.hOffset = 0
+			m.diffView.visualMode = false
 		}
 		return m, diffCmd
 
@@ -429,6 +438,15 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.sidebar.files) > 0 && !m.diffViewShowsValidFile() {
 			m.sidebar.selectPath(m.sidebar.files[0].Path)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: m.sidebar.files[0].Path})
+		} else if len(m.sidebar.files) == 0 && !m.diffView.contentMode && m.diffView.path != "" {
+			m.diffView.path = ""
+			m.diffView.hunks = nil
+			m.diffView.lines = nil
+			m.diffView.comments = nil
+			m.diffView.cursor = 0
+			m.diffView.offset = 0
+			m.diffView.hOffset = 0
+			m.diffView.visualMode = false
 		}
 		return m, nil
 
