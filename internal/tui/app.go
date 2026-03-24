@@ -390,8 +390,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
 		m.statusBar.fileCount = len(msg.files)
-		if msg.path != "" && msg.result != nil {
-			m.diffView, _ = m.diffView.Update(loadDiffMsg{
+		var diffCmd tea.Cmd
+		if msg.contentItem != nil && m.diffView.contentMode && m.diffView.contentID == msg.contentItem.ID {
+			m.diffView, diffCmd = m.diffView.Update(loadContentMsg{
+				id:          msg.contentItem.ID,
+				title:       msg.contentItem.Title,
+				content:     msg.contentItem.Content,
+				contentType: msg.contentItem.ContentType,
+				comments:    msg.contentComments,
+			})
+		} else if msg.path != "" && msg.result != nil {
+			m.diffView, diffCmd = m.diffView.Update(loadDiffMsg{
 				path:     msg.path,
 				result:   msg.result,
 				comments: msg.comments,
@@ -402,7 +411,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.sidebar.selectPath(msg.files[0].Path)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.files[0].Path})
 		}
-		return m, nil
+		return m, diffCmd
 
 	// Engine events
 	case fileChangedMsg:
@@ -445,6 +454,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sidebar.rebuildTree()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
+		// Refresh currently displayed content item if it matches
+		if m.diffView.contentMode && m.diffView.contentID == msg.id && msg.id != "" {
+			return m, m.handleSidebarSelect(sidebarSelectMsg{isContent: true, contentID: msg.id})
+		}
 		// Auto-select only if nothing else is available (no files, no current view)
 		if m.diffView.path == "" && len(m.sidebar.files) == 0 && msg.id != "" {
 			m.sidebar.selectContentByID(msg.id)
@@ -1621,6 +1634,7 @@ func (m appModel) refreshFiles() tea.Cmd {
 	engine := m.engine
 	currentPath := m.diffView.path
 	inContentMode := m.diffView.contentMode
+	contentID := m.diffView.contentID
 	inAdditionalFileMode := m.diffView.additionalFilePath != ""
 	return func() tea.Msg {
 		// Refresh the file list from git
@@ -1630,10 +1644,31 @@ func (m appModel) refreshFiles() tea.Cmd {
 		}
 		session := engine.GetSession()
 
-		// Don't reload diff when viewing a content item or additional file — they're not git files
+		// Refresh content item if one is currently displayed
+		if inContentMode && contentID != "" {
+			item, itemErr := engine.GetContentItem(contentID)
+			var contentComments []types.ReviewComment
+			if session != nil {
+				for _, c := range session.Comments {
+					if c.TargetRef == contentID && c.TargetType == types.TargetContent {
+						contentComments = append(contentComments, c)
+					}
+				}
+			}
+			if itemErr == nil && item != nil {
+				return refreshResultMsg{
+					files:       files,
+					contentItem: item,
+					contentComments: contentComments,
+				}
+			}
+			return refreshResultMsg{files: files}
+		}
+
+		// Don't reload diff when viewing an additional file — it's not a git file
 		var result *types.DiffResult
 		var comments []types.ReviewComment
-		if currentPath != "" && !inContentMode && !inAdditionalFileMode {
+		if currentPath != "" && !inAdditionalFileMode {
 			result, _ = engine.GetFileDiff(currentPath)
 			if session != nil {
 				for _, c := range session.Comments {
@@ -1654,10 +1689,12 @@ func (m appModel) refreshFiles() tea.Cmd {
 }
 
 type refreshResultMsg struct {
-	files    []types.ChangedFile
-	path     string
-	result   *types.DiffResult
-	comments []types.ReviewComment
+	files           []types.ChangedFile
+	path            string
+	result          *types.DiffResult
+	comments        []types.ReviewComment
+	contentItem     *types.ContentItem
+	contentComments []types.ReviewComment
 }
 
 // loadContentMsg carries content item data for rendering in the diff view.
