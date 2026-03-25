@@ -30,7 +30,7 @@ const (
 	layoutStacked
 )
 
-const layoutBreakpoint = 110
+const defaultMinDiffWidth = 80
 
 // overlayKind identifies which (if any) overlay is shown.
 type overlayKind int
@@ -173,6 +173,7 @@ type appModel struct {
 	focusModeSavedWrap    bool // wrap state before entering focus mode
 
 	mouseEnabled bool // whether mouse mode is active
+	minDiffWidth int  // minimum diff viewer content width in horizontal layout
 
 	showSessionPicker bool   // open session picker on startup
 	repoRoot          string // repo root for session listing
@@ -194,6 +195,7 @@ func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 	var layoutCfg string
 
 	mouseEnabled := true
+	minDiffW := defaultMinDiffWidth
 	if engine != nil {
 		if cfg := engine.GetConfig(); cfg != nil {
 			if cfg.Keybindings != nil {
@@ -220,6 +222,9 @@ func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 			if cfg.Mouse != nil && !*cfg.Mouse {
 				mouseEnabled = false
 			}
+			if cfg.MinDiffWidth > 0 {
+				minDiffW = cfg.MinDiffWidth
+			}
 		}
 	}
 
@@ -244,6 +249,7 @@ func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 		keys:          keys,
 		mcpRegisterFn:     o.MCPRegisterFn,
 		mouseEnabled:      mouseEnabled,
+		minDiffWidth:      minDiffW,
 		showSessionPicker: o.ShowSessionPicker,
 		repoRoot:          o.RepoRoot,
 		deferredSocket:    o.DeferredSocket,
@@ -356,7 +362,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "stacked":
 			m.layout = layoutStacked
 		default: // "auto" or ""
-			if m.width < layoutBreakpoint {
+			if m.width < m.minDiffWidth+30 {
 				m.layout = layoutStacked
 			} else {
 				m.layout = layoutHorizontal
@@ -389,10 +395,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.diffView.width = contentW
 			m.diffView.height = diffH
 		} else {
-			// Prioritize diff area: guarantee 80 chars for diff content,
+			// Prioritize diff area: guarantee minDiffWidth chars for diff content,
 			// then let sidebar grow up to 1/3 of width (clamped to [30, 50]).
-			const minDiffContent = 80
-			maxSidebarForDiff := m.width - minDiffContent - 2*borderW // room left after diff + both borders
+			maxSidebarForDiff := m.width - m.minDiffWidth - 2*borderW // room left after diff + both borders
 			sidebarContentW := m.width / 3
 			if sidebarContentW > maxSidebarForDiff {
 				sidebarContentW = maxSidebarForDiff

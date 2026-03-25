@@ -13,6 +13,7 @@ type Config struct {
 	ClearAfterSubmit  string             `json:"clear_after_submit"`
 	AutoFocusMode     bool               `json:"auto_focus_mode"`
 	Mouse             *bool              `json:"mouse"`
+	MinDiffWidth      int               `json:"min_diff_width"`
 }
 
 type ReviewFormatConfig struct {

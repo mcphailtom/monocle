@@ -126,6 +126,44 @@ func TestLayoutTransitionOnResize(t *testing.T) {
 	}
 }
 
+func TestLayoutModeBreakpointCustomMinDiffWidth(t *testing.T) {
+	tests := []struct {
+		name  string
+		width int
+		want  layoutMode
+	}{
+		{"wide terminal selects horizontal", 140, layoutHorizontal},
+		{"exactly at custom breakpoint selects horizontal", 130, layoutHorizontal},
+		{"below custom breakpoint selects stacked", 129, layoutStacked},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := NewApp(nil)
+			m.minDiffWidth = 100
+			updated, _ := m.Update(tea.WindowSizeMsg{Width: tt.width, Height: 40})
+			got := updated.(appModel).layout
+			if got != tt.want {
+				t.Errorf("minDiffWidth=100, width=%d: layout = %d, want %d", tt.width, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestWidthAllocationCustomMinDiffWidth(t *testing.T) {
+	m := NewApp(nil)
+	m.minDiffWidth = 60
+	// At width 100, breakpoint is 60+30=90, so horizontal layout
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 40})
+	app := updated.(appModel)
+
+	if app.layout != layoutHorizontal {
+		t.Fatalf("expected horizontal layout at width 100 with minDiffWidth=60")
+	}
+	if app.diffView.width < 60 {
+		t.Errorf("diffView.width = %d, want >= 60", app.diffView.width)
+	}
+}
+
 func TestLayoutConfigForceSideBySide(t *testing.T) {
 	m := NewApp(nil)
 	m.layoutConfig = "side-by-side"

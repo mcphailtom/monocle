@@ -43,6 +43,7 @@ func DefaultConfig() *types.Config {
 			IncludeSummary:  true,
 		},
 		ClearAfterSubmit: "ask",
+		MinDiffWidth:     80,
 	}
 }
 

@@ -264,6 +264,7 @@ Monocle loads settings from JSON config files:
   "ignore_patterns": [],
   "keybindings": {},
   "mouse": true,
+  "min_diff_width": 80,
   "clear_after_submit": "ask",
   "auto_focus_mode": false,
   "review_format": {
@@ -283,6 +284,7 @@ Monocle loads settings from JSON config files:
 | `tab_size` | integer | `4` | Spaces per tab character |
 | `context_lines` | integer | `3` | Unchanged lines shown around diff hunks |
 | `ignore_patterns` | string array | `[]` | Glob patterns for files to exclude |
+| `min_diff_width` | integer | `80` | Minimum character width for the diff viewer in side-by-side layout |
 | `mouse` | `true`, `false` | `true` | Enable mouse interactions (click, scroll, drag) |
 | `clear_after_submit` | `"ask"`, `"always"`, `"never"` | `"ask"` | Whether to clear comments after submitting a review |
 | `auto_focus_mode` | `true`, `false` | `false` | Auto-enter focus mode (hide sidebar, enable wrap) when reviewing plans |
