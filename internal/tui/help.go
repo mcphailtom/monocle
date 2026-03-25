@@ -110,6 +110,7 @@ func (m helpModel) View() string {
 		}},
 		{"Review", []struct{ key, desc string }{
 			{Label(km.Comment), "Add comment at cursor"},
+			{Label(km.Suggest), "Suggest edit at cursor"},
 			{Label(km.FileComment), "Add file comment"},
 			{Label(km.Visual), "Visual select mode"},
 			{"x", "Toggle comment resolved"},

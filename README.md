@@ -141,6 +141,7 @@ When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-co
 - **Pause flow** — Ask Claude Code to stop and wait while you review, then release it when ready
 - **Live diff viewer** — Unified and split (side-by-side) views with syntax highlighting and intra-line diffs
 - **Structured comments** — Tag feedback as issues, suggestions, notes, or praise with line-level or file-level precision
+- **Suggested edits** — Press `s` to propose exact code changes with GitHub-style `suggestion` blocks
 - **Visual selection** — Select line ranges for comments with vim-style visual mode
 - **Plan review + focus mode** — Claude Code can submit plans for your review before writing code, with markdown rendering and distraction-free focus mode
 - **Plan mode gating** — `submit_plan_and_wait` blocks the agent until you approve the plan before implementation begins
@@ -180,6 +181,7 @@ When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-co
 | `z`/`e` | Collapse/expand all (tree) |
 | `b` | Change base ref |
 | `c` | Add comment at cursor (edit if on a comment) |
+| `s` | Suggest edit at cursor (pre-fills suggestion block) |
 | `C` | Add file-level comment |
 | `v` | Visual select (multi-line comments) |
 | `x` | Toggle comment resolved (on a comment line) |
@@ -286,7 +288,7 @@ Override any action key by mapping the action name to a new key string:
 }
 ```
 
-Available action names: `up`, `down`, `top`, `bottom`, `half_up`, `half_down`, `prev_file`, `next_file`, `select`, `focus_swap`, `toggle_sidebar`, `scroll_down`, `scroll_up`, `scroll_left`, `scroll_right`, `scroll_home`, `scroll_first_char`, `scroll_end`, `wrap`, `toggle_diff`, `tree_mode`, `collapse_all`, `expand_all`, `prev_section`, `next_section`, `comment`, `file_comment`, `visual`, `reviewed`, `submit`, `pause`, `dismiss_outdated`, `base_ref`, `cycle_layout`, `refresh`, `help`, `quit`, `command_mode`.
+Available action names: `up`, `down`, `top`, `bottom`, `half_up`, `half_down`, `prev_file`, `next_file`, `select`, `focus_swap`, `toggle_sidebar`, `scroll_down`, `scroll_up`, `scroll_left`, `scroll_right`, `scroll_home`, `scroll_first_char`, `scroll_end`, `wrap`, `toggle_diff`, `tree_mode`, `collapse_all`, `expand_all`, `prev_section`, `next_section`, `comment`, `file_comment`, `suggest`, `visual`, `reviewed`, `submit`, `pause`, `dismiss_outdated`, `base_ref`, `cycle_layout`, `refresh`, `help`, `quit`, `command_mode`.
 
 The help overlay (`?`) dynamically reflects your custom bindings. Modal keys (Enter, Esc, Tab in overlays) are not configurable.
 

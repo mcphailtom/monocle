@@ -299,6 +299,39 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 					return m, openCommentCmd(targetRef, line, line, targetType)
 				}
 			}
+		case Matches(key, m.keys.Suggest):
+			// Suggest edit — requires a line target (no file-level suggestions)
+			if m.contentMode {
+				if m.visualMode {
+					start, end := m.visualRange()
+					idxStart, idxEnd := m.orderedVisualIndices()
+					code := m.selectedContent(idxStart, idxEnd)
+					return m, openSuggestCmd(m.contentID, start, end, types.TargetContent, code)
+				}
+				line := m.currentDiffLine()
+				if line > 0 {
+					code := m.selectedContent(m.cursor, m.cursor)
+					return m, openSuggestCmd(m.contentID, line, line, types.TargetContent, code)
+				}
+			} else {
+				targetType := types.TargetFile
+				targetRef := m.path
+				if m.additionalFilePath != "" {
+					targetType = types.TargetAdditionalFile
+					targetRef = m.additionalFilePath
+				}
+				if m.visualMode {
+					start, end := m.visualRange()
+					idxStart, idxEnd := m.orderedVisualIndices()
+					code := m.selectedContent(idxStart, idxEnd)
+					return m, openSuggestCmd(targetRef, start, end, targetType, code)
+				}
+				line := m.currentDiffLine()
+				if line > 0 {
+					code := m.selectedContent(m.cursor, m.cursor)
+					return m, openSuggestCmd(targetRef, line, line, targetType, code)
+				}
+			}
 		case Matches(key, m.keys.FileComment):
 			// File-level comment
 			if m.contentMode {
@@ -1740,10 +1773,12 @@ func (m *diffViewModel) handleMouseRelease() {
 }
 
 type openCommentMsg struct {
-	path       string
-	lineStart  int
-	lineEnd    int
-	targetType types.TargetType
+	path        string
+	lineStart   int
+	lineEnd     int
+	targetType  types.TargetType
+	prefillBody string           // pre-filled body text (for suggestions)
+	prefillType types.CommentType // pre-set comment type (zero value = default)
 }
 
 func openCommentCmd(path string, start, end int, targetType types.TargetType) tea.Cmd {
@@ -1756,6 +1791,55 @@ func openFileCommentCmd(path string, targetType types.TargetType) tea.Cmd {
 	return func() tea.Msg {
 		return openCommentMsg{path: path, lineStart: 0, lineEnd: 0, targetType: targetType}
 	}
+}
+
+func openSuggestCmd(path string, start, end int, targetType types.TargetType, codeContent string) tea.Cmd {
+	body := "```suggestion\n" + codeContent + "\n```"
+	return func() tea.Msg {
+		return openCommentMsg{
+			path:        path,
+			lineStart:   start,
+			lineEnd:     end,
+			targetType:  targetType,
+			prefillBody: body,
+			prefillType: types.CommentSuggestion,
+		}
+	}
+}
+
+// selectedContent returns the raw text content of the new-file lines
+// in the range [idxStart, idxEnd] (indices into m.lines).
+// Skips hunk headers, comment lines, and removed lines.
+func (m diffViewModel) selectedContent(idxStart, idxEnd int) string {
+	if idxStart > idxEnd {
+		idxStart, idxEnd = idxEnd, idxStart
+	}
+	var lines []string
+	for i := idxStart; i <= idxEnd && i < len(m.lines); i++ {
+		line := m.lines[i]
+		if line.isHunk || line.isComment {
+			continue
+		}
+		if line.kind == types.DiffLineRemoved {
+			continue
+		}
+		content := line.content
+		if line.isSplit {
+			content = line.rightContent
+		}
+		lines = append(lines, content)
+	}
+	return strings.Join(lines, "\n")
+}
+
+// orderedVisualIndices returns visual selection indices in order (low, high).
+func (m diffViewModel) orderedVisualIndices() (int, int) {
+	start := m.visualStart
+	end := m.cursor
+	if start > end {
+		start, end = end, start
+	}
+	return start, end
 }
 
 // insertInlineComments inserts comment lines after the diff line they target.
@@ -1806,6 +1890,10 @@ func (m *diffViewModel) insertInlineComments(hunk types.DiffHunk) {
 
 func formatInlineComment(c *types.ReviewComment) string {
 	typeLabel := strings.ToUpper(string(c.Type))
+	hasSuggestionBlock := strings.Contains(c.Body, "```suggestion")
+	if hasSuggestionBlock {
+		typeLabel = "✏ " + typeLabel
+	}
 	prefix := "│"
 	if c.Resolved {
 		prefix = "│ ✓"
@@ -1814,7 +1902,9 @@ func formatInlineComment(c *types.ReviewComment) string {
 		prefix = "│ ⚠"
 	}
 	body := c.Body
-	if len(body) > 60 {
+	if hasSuggestionBlock {
+		body = "(suggested edit)"
+	} else if len(body) > 60 {
 		body = body[:57] + "..."
 	}
 	return fmt.Sprintf("  ┌─── %s %s", typeLabel, strings.Repeat("─", 20)) + "\n" +

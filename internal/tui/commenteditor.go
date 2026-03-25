@@ -118,6 +118,8 @@ func (m commentEditorModel) View() string {
 	title := "New Comment"
 	if m.editingID != "" {
 		title = "Edit Comment"
+	} else if m.commentType == types.CommentSuggestion && strings.Contains(m.body, "```suggestion") {
+		title = "New Suggestion"
 	}
 	b.WriteString(lipgloss.NewStyle().Bold(true).Render(title))
 	b.WriteString("\n\n")
@@ -218,6 +220,17 @@ func (m *commentEditorModel) handleClick(contentX, contentY int) bool {
 		x += labelW + 1 // +1 for " " separator
 	}
 	return false
+}
+
+func (m *commentEditorModel) openSuggest(path string, lineStart, lineEnd int, targetType types.TargetType, body string, commentType types.CommentType) {
+	m.active = true
+	m.path = path
+	m.lineStart = lineStart
+	m.lineEnd = lineEnd
+	m.targetType = targetType
+	m.commentType = commentType
+	m.body = body
+	m.editingID = ""
 }
 
 func (m *commentEditorModel) openEdit(comment *types.ReviewComment) {

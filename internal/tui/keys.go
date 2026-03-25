@@ -41,6 +41,7 @@ type KeyMap struct {
 	// Review actions
 	Comment     []string
 	FileComment []string
+	Suggest     []string
 	Visual      []string
 	Reviewed    []string
 	Submit      []string
@@ -92,6 +93,7 @@ func DefaultKeyMap() KeyMap {
 
 		Comment:         []string{"c"},
 		FileComment:     []string{"C"},
+		Suggest:         []string{"s"},
 		Visual:          []string{"v"},
 		Reviewed:        []string{"r"},
 		Submit:          []string{"S"},
@@ -117,7 +119,7 @@ var actionNames = []string{
 	"scroll_down", "scroll_up", "scroll_left", "scroll_right", "scroll_home", "scroll_first_char", "scroll_end",
 	"wrap", "toggle_diff",
 	"tree_mode", "collapse_all", "expand_all", "prev_section", "next_section",
-	"comment", "file_comment", "visual", "reviewed",
+	"comment", "file_comment", "suggest", "visual", "reviewed",
 	"submit", "pause", "dismiss_outdated", "toggle_focus_mode",
 	"base_ref", "cycle_layout", "refresh", "help", "quit", "command_mode",
 }
@@ -181,6 +183,8 @@ func (km KeyMap) ApplyOverrides(overrides map[string]string) KeyMap {
 			km.Comment = []string{key}
 		case "file_comment":
 			km.FileComment = []string{key}
+		case "suggest":
+			km.Suggest = []string{key}
 		case "visual":
 			km.Visual = []string{key}
 		case "reviewed":
