@@ -9,7 +9,7 @@ import (
 // renderSplash renders the monocle logo and getting-started hints centered in the given dimensions.
 func renderSplash(width, height int) string {
 	var lines []string
-	if width >= 48 && height >= 16 {
+	if width >= 80 && height >= 20 {
 		lines = splashFull()
 	} else {
 		lines = splashSmall()
@@ -33,7 +33,11 @@ func splashFull() []string {
 		logo.Render("o_(◉) monocle"),
 		dim.Render("code review companion for Claude Code"),
 		"",
-		dim.Render("Launch Claude Code in this repo with:"),
+		dim.Render("Install the plugin in Claude Code:"),
+		dim.Render("  " + cmd.Render("/plugin marketplace add josephschmitt/monocle")),
+		dim.Render("  " + cmd.Render("/plugin install monocle@monocle")),
+		"",
+		dim.Render("Then launch Claude Code with:"),
 		dim.Render("  " + cmd.Render("claude --dangerously-load-development-channels plugin:monocle@monocle")),
 		"",
 		dim.Render("Diffs appear here as Claude Code works."),

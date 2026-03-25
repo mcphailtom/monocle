@@ -8,9 +8,15 @@ import (
 )
 
 func TestRenderSplashFullTier(t *testing.T) {
-	result := renderSplash(60, 20)
+	result := renderSplash(90, 24)
 	if !strings.Contains(result, "◉") {
 		t.Error("full splash should contain ◉ character")
+	}
+	if !strings.Contains(result, "plugin marketplace add") {
+		t.Error("full splash should contain marketplace install instruction")
+	}
+	if !strings.Contains(result, "/plugin install monocle@monocle") {
+		t.Error("full splash should contain plugin install instruction")
 	}
 	if !strings.Contains(result, "plugin:monocle@monocle") {
 		t.Error("full splash should contain plugin launch instruction")
@@ -31,22 +37,22 @@ func TestRenderSplashSmallTier(t *testing.T) {
 }
 
 func TestRenderSplashTierSelection(t *testing.T) {
-	// Full tier requires width >= 48 and height >= 16
-	full := renderSplash(48, 16)
+	// Full tier requires width >= 80 and height >= 20
+	full := renderSplash(80, 20)
 	if !strings.Contains(full, "to submit your review") {
-		t.Error("48x16 should use full tier")
+		t.Error("80x20 should use full tier")
 	}
 
 	// Below width threshold
-	small := renderSplash(47, 16)
+	small := renderSplash(79, 20)
 	if strings.Contains(small, "to submit your review") {
-		t.Error("47x16 should use small tier")
+		t.Error("79x20 should use small tier")
 	}
 
 	// Below height threshold
-	smallH := renderSplash(48, 15)
+	smallH := renderSplash(80, 19)
 	if strings.Contains(smallH, "to submit your review") {
-		t.Error("48x15 should use small tier")
+		t.Error("80x19 should use small tier")
 	}
 }
 
