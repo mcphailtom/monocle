@@ -91,19 +91,25 @@ func (m commentEditorModel) Update(msg tea.Msg) (commentEditorModel, tea.Cmd) {
 			}
 		case "backspace":
 			m.deleteBeforeCursor()
-		case "delete":
+		case "delete", "ctrl+d":
 			m.deleteAtCursor()
-		case "left":
+		case "ctrl+k":
+			m.killToLineEnd()
+		case "ctrl+u":
+			m.killToLineStart()
+		case "ctrl+w":
+			m.deleteWordBeforeCursor()
+		case "left", "ctrl+b":
 			if m.cursor > 0 {
 				m.cursor--
 			}
-		case "right":
+		case "right", "ctrl+f":
 			if m.cursor < len([]rune(m.body)) {
 				m.cursor++
 			}
-		case "up":
+		case "up", "ctrl+p":
 			m.moveCursorVertical(-1)
-		case "down":
+		case "down", "ctrl+n":
 			m.moveCursorVertical(1)
 		case "home", "ctrl+a":
 			m.moveCursorToLineStart()
@@ -153,6 +159,58 @@ func (m *commentEditorModel) deleteAtCursor() {
 	m.body = string(append(runes[:m.cursor], runes[m.cursor+1:]...))
 }
 
+// killToLineEnd deletes from cursor to the end of the current line (Ctrl+K).
+func (m *commentEditorModel) killToLineEnd() {
+	runes := []rune(m.body)
+	if m.cursor >= len(runes) {
+		return
+	}
+	// Find next newline or end of body
+	end := m.cursor
+	for end < len(runes) && runes[end] != '\n' {
+		end++
+	}
+	// If cursor is already at a newline, delete just the newline
+	if end == m.cursor && end < len(runes) {
+		end++
+	}
+	m.body = string(runes[:m.cursor]) + string(runes[end:])
+}
+
+// killToLineStart deletes from start of current line to cursor (Ctrl+U).
+func (m *commentEditorModel) killToLineStart() {
+	if m.cursor == 0 {
+		return
+	}
+	runes := []rune(m.body)
+	// Find start of current line
+	start := m.cursor
+	for start > 0 && runes[start-1] != '\n' {
+		start--
+	}
+	m.body = string(runes[:start]) + string(runes[m.cursor:])
+	m.cursor = start
+}
+
+// deleteWordBeforeCursor deletes the word before the cursor (Ctrl+W).
+func (m *commentEditorModel) deleteWordBeforeCursor() {
+	if m.cursor == 0 {
+		return
+	}
+	runes := []rune(m.body)
+	end := m.cursor
+	// Skip trailing whitespace
+	for end > 0 && (runes[end-1] == ' ' || runes[end-1] == '\t') {
+		end--
+	}
+	// Delete back to start of word
+	for end > 0 && runes[end-1] != ' ' && runes[end-1] != '\t' && runes[end-1] != '\n' {
+		end--
+	}
+	m.body = string(runes[:end]) + string(runes[m.cursor:])
+	m.cursor = end
+}
+
 // moveCursorVertical moves the cursor up (dir=-1) or down (dir=1) by one line.
 func (m *commentEditorModel) moveCursorVertical(dir int) {
 	runes := []rune(m.body)
@@ -194,16 +252,32 @@ func (m *commentEditorModel) moveCursorVertical(dir int) {
 	m.cursor = newPos
 }
 
-// moveCursorToLineStart moves the cursor to the start of the current line.
+// moveCursorToLineStart moves the cursor to the first non-whitespace character
+// of the current line. If already there (or before it), jumps to column 0.
 func (m *commentEditorModel) moveCursorToLineStart() {
 	runes := []rune(m.body)
+
+	// Find the start of the current line (column 0)
+	lineStart := 0
 	for i := m.cursor - 1; i >= 0; i-- {
 		if runes[i] == '\n' {
-			m.cursor = i + 1
-			return
+			lineStart = i + 1
+			break
 		}
 	}
-	m.cursor = 0
+
+	// Find first non-whitespace character on this line
+	firstNonWS := lineStart
+	for firstNonWS < len(runes) && runes[firstNonWS] != '\n' && (runes[firstNonWS] == ' ' || runes[firstNonWS] == '\t') {
+		firstNonWS++
+	}
+
+	// Toggle between first non-whitespace and column 0
+	if m.cursor == firstNonWS || (m.cursor != lineStart && m.cursor < firstNonWS) {
+		m.cursor = lineStart
+	} else {
+		m.cursor = firstNonWS
+	}
 }
 
 // moveCursorToLineEnd moves the cursor to the end of the current line.

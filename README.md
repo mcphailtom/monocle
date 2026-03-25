@@ -200,6 +200,25 @@ When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-co
 | `I` | Connection info (socket path, subscriber count) |
 | `?` | Show all keybindings |
 
+### Comment editor
+
+The comment editor supports standard emacs-style shortcuts:
+
+| Key | Action |
+|-----|--------|
+| `←`/`→` or `Ctrl+B`/`Ctrl+F` | Move cursor left/right |
+| `↑`/`↓` or `Ctrl+P`/`Ctrl+N` | Move cursor up/down (multiline) |
+| `Home`/`Ctrl+A` | First non-whitespace, then start of line |
+| `End`/`Ctrl+E` | End of line |
+| `Ctrl+D` or `Delete` | Delete character at cursor |
+| `Ctrl+K` | Kill to end of line |
+| `Ctrl+U` | Kill to start of line |
+| `Ctrl+W` | Delete word before cursor |
+| `Shift+Enter` or `Alt+Enter` | Insert newline |
+| `Tab` | Cycle comment type |
+| `Enter` | Save comment |
+| `Esc` | Cancel |
+
 ## CLI
 
 ```
