@@ -91,7 +91,7 @@ func DefaultKeyMap() KeyMap {
 		ExpandAll:      []string{"e"},
 		PrevSection:    []string{"{"},
 		NextSection:    []string{"}"},
-		FilterReviewed: []string{"X"},
+		FilterReviewed: []string{"/"},
 
 		Comment:         []string{"c"},
 		FileComment:     []string{"C"},

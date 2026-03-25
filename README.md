@@ -155,6 +155,7 @@ When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-co
 - **Configurable keybindings** — Override any navigation or action key via config
 - **Feedback queue** — Submit reviews while the agent is working; delivered when Claude Code next checks
 - **Connection indicator** — See at a glance whether Claude Code is connected, with manual socket override for troubleshooting
+- **Review tracking** — Mark files as reviewed with `r` (auto-advances to next), filter sidebar to show only unreviewed or reviewed files with `/`, and all reviewed states reset on submit
 - **Session persistence** — Reviews survive restarts via SQLite
 
 ## Keybindings
@@ -186,7 +187,8 @@ When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-co
 | `v` | Visual select (multi-line comments) |
 | `x` | Toggle comment resolved (on a comment line) |
 | `d` | Delete comment (on a comment line) |
-| `r` | Toggle file reviewed |
+| `r` | Toggle file reviewed (auto-advances to next unreviewed) |
+| `/` | Cycle sidebar filter (all → unreviewed → reviewed) |
 | `t` | Cycle diff style (unified/split/file) (any pane) |
 | `T` | Cycle layout (auto/side-by-side/stacked) |
 | `R` | Force reload files |
