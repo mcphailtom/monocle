@@ -19,6 +19,7 @@ type commentEditorModel struct {
 	targetType  types.TargetType
 	commentType types.CommentType
 	body        string
+	cursor      int // cursor position in runes
 	width       int
 	height      int
 	theme       Theme
@@ -75,7 +76,7 @@ func (m commentEditorModel) Update(msg tea.Msg) (commentEditorModel, tea.Cmd) {
 			m.active = false
 			return m, func() tea.Msg { return saveMsg }
 		case "shift+enter", "alt+enter":
-			m.body += "\n"
+			m.insertAtCursor("\n")
 		case "tab":
 			// Cycle comment type
 			switch m.commentType {
@@ -89,20 +90,132 @@ func (m commentEditorModel) Update(msg tea.Msg) (commentEditorModel, tea.Cmd) {
 				m.commentType = types.CommentIssue
 			}
 		case "backspace":
-			if len(m.body) > 0 {
-				m.body = m.body[:len(m.body)-1]
+			m.deleteBeforeCursor()
+		case "delete":
+			m.deleteAtCursor()
+		case "left":
+			if m.cursor > 0 {
+				m.cursor--
 			}
+		case "right":
+			if m.cursor < len([]rune(m.body)) {
+				m.cursor++
+			}
+		case "up":
+			m.moveCursorVertical(-1)
+		case "down":
+			m.moveCursorVertical(1)
+		case "home", "ctrl+a":
+			m.moveCursorToLineStart()
+		case "end", "ctrl+e":
+			m.moveCursorToLineEnd()
 		case "space":
-			m.body += " "
+			m.insertAtCursor(" ")
 		default:
 			// Only add printable characters
 			key := msg.String()
 			if len(key) == 1 {
-				m.body += key
+				m.insertAtCursor(key)
 			}
 		}
 	}
 	return m, nil
+}
+
+// insertAtCursor inserts text at the cursor position and advances the cursor.
+func (m *commentEditorModel) insertAtCursor(s string) {
+	runes := []rune(m.body)
+	inserted := []rune(s)
+	result := make([]rune, 0, len(runes)+len(inserted))
+	result = append(result, runes[:m.cursor]...)
+	result = append(result, inserted...)
+	result = append(result, runes[m.cursor:]...)
+	m.body = string(result)
+	m.cursor += len(inserted)
+}
+
+// deleteBeforeCursor deletes one rune before the cursor (backspace).
+func (m *commentEditorModel) deleteBeforeCursor() {
+	if m.cursor == 0 {
+		return
+	}
+	runes := []rune(m.body)
+	m.body = string(append(runes[:m.cursor-1], runes[m.cursor:]...))
+	m.cursor--
+}
+
+// deleteAtCursor deletes one rune at the cursor position (forward delete).
+func (m *commentEditorModel) deleteAtCursor() {
+	runes := []rune(m.body)
+	if m.cursor >= len(runes) {
+		return
+	}
+	m.body = string(append(runes[:m.cursor], runes[m.cursor+1:]...))
+}
+
+// moveCursorVertical moves the cursor up (dir=-1) or down (dir=1) by one line.
+func (m *commentEditorModel) moveCursorVertical(dir int) {
+	runes := []rune(m.body)
+	lines := strings.Split(string(runes), "\n")
+
+	// Find current line and column from cursor position
+	currentLine := 0
+	currentCol := 0
+	pos := 0
+	for _, r := range runes {
+		if pos == m.cursor {
+			break
+		}
+		if r == '\n' {
+			currentLine++
+			currentCol = 0
+		} else {
+			currentCol++
+		}
+		pos++
+	}
+
+	targetLine := currentLine + dir
+	if targetLine < 0 || targetLine >= len(lines) {
+		return
+	}
+
+	// Calculate new cursor position
+	newPos := 0
+	for i := 0; i < targetLine; i++ {
+		newPos += len([]rune(lines[i])) + 1 // +1 for newline
+	}
+	targetCol := currentCol
+	lineLen := len([]rune(lines[targetLine]))
+	if targetCol > lineLen {
+		targetCol = lineLen
+	}
+	newPos += targetCol
+	m.cursor = newPos
+}
+
+// moveCursorToLineStart moves the cursor to the start of the current line.
+func (m *commentEditorModel) moveCursorToLineStart() {
+	runes := []rune(m.body)
+	for i := m.cursor - 1; i >= 0; i-- {
+		if runes[i] == '\n' {
+			m.cursor = i + 1
+			return
+		}
+	}
+	m.cursor = 0
+}
+
+// moveCursorToLineEnd moves the cursor to the end of the current line.
+func (m *commentEditorModel) moveCursorToLineEnd() {
+	runes := []rune(m.body)
+	for i := m.cursor; i < len(runes); i++ {
+		if runes[i] == '\n' {
+			m.cursor = i
+			return
+		}
+	}
+	m.cursor = len(runes)
 }
 
 func (m commentEditorModel) View() string {
@@ -169,13 +282,31 @@ func (m commentEditorModel) View() string {
 	b.WriteString(lipgloss.NewStyle().Faint(true).Render("(Tab)"))
 	b.WriteString("\n\n")
 
-	// Text area
-	bodyDisplay := m.body + "█"
+	// Text area — render cursor as reverse-video block over the character at cursor position
+	runes := []rune(m.body)
+	pos := m.cursor
+	if pos > len(runes) {
+		pos = len(runes)
+	}
+	cursorStyle := lipgloss.NewStyle().Reverse(true)
+	var bodyDisplay string
+	if pos < len(runes) {
+		ch := runes[pos]
+		if ch == '\n' {
+			// Show inverted space before the newline
+			bodyDisplay = string(runes[:pos]) + cursorStyle.Render(" ") + string(runes[pos:])
+		} else {
+			bodyDisplay = string(runes[:pos]) + cursorStyle.Render(string(ch)) + string(runes[pos+1:])
+		}
+	} else {
+		// Cursor past end — show inverted space
+		bodyDisplay = string(runes) + cursorStyle.Render(" ")
+	}
 	b.WriteString(bodyDisplay)
 	b.WriteString("\n\n")
 
 	// Hints
-	b.WriteString(lipgloss.NewStyle().Faint(true).Render("Enter: save  Shift+Enter: newline  Esc: cancel  Tab: cycle type"))
+	b.WriteString(lipgloss.NewStyle().Faint(true).Render("Enter: save  Shift+Enter: newline  Esc: cancel  Tab: cycle type  Arrows: navigate"))
 
 	return m.theme.ModalBorder.Width(modalWidth).Render(b.String())
 }
@@ -188,6 +319,7 @@ func (m *commentEditorModel) open(path string, lineStart, lineEnd int, targetTyp
 	m.targetType = targetType
 	m.commentType = types.CommentIssue
 	m.body = ""
+	m.cursor = 0
 	m.editingID = ""
 }
 
@@ -230,6 +362,12 @@ func (m *commentEditorModel) openSuggest(path string, lineStart, lineEnd int, ta
 	m.targetType = targetType
 	m.commentType = commentType
 	m.body = body
+	// Position cursor at end of code content, before the closing fence
+	runes := []rune(body)
+	m.cursor = len(runes) - 4 // skip "\n```"
+	if m.cursor < 0 {
+		m.cursor = len(runes)
+	}
 	m.editingID = ""
 }
 
@@ -241,5 +379,6 @@ func (m *commentEditorModel) openEdit(comment *types.ReviewComment) {
 	m.targetType = comment.TargetType
 	m.commentType = comment.Type
 	m.body = comment.Body
+	m.cursor = len([]rune(comment.Body))
 	m.editingID = comment.ID
 }
