@@ -881,10 +881,7 @@ func (m diffViewModel) renderContentLine(line diffViewLine, _, contentWidth int,
 	if m.hOffset > 0 {
 		content, _ = applyHOffset(content, m.hOffset)
 	}
-	contentRunes := []rune(content)
-	if len(contentRunes) > contentWidth {
-		content = string(contentRunes[:contentWidth])
-	}
+	content = ansi.Truncate(content, contentWidth, "")
 
 	if (selected || inVisual) && m.focused {
 		padded := gutter + padToWidth(content, contentWidth)
@@ -959,10 +956,7 @@ func (m diffViewModel) renderDiffLine(line diffViewLine, _, contentWidth int, se
 	if m.hOffset > 0 {
 		content, _ = applyHOffset(content, m.hOffset)
 	}
-	contentRunes := []rune(content)
-	if len(contentRunes) > contentWidth {
-		content = string(contentRunes[:contentWidth])
-	}
+	content = ansi.Truncate(content, contentWidth, "")
 
 	// Selected: reverse the full plain line
 	if (selected || inVisual) && m.focused {
@@ -1044,10 +1038,9 @@ func (m diffViewModel) renderSplitLine(line diffViewLine, selected, inVisual boo
 		if m.hOffset > 0 {
 			leftRawContent, _ = applyHOffset(leftRawContent, m.hOffset)
 		}
-		leftRunes := []rune(leftRawContent)
-		if len(leftRunes) > contentW {
+		if ansi.StringWidth(leftRawContent) > contentW {
 			leftTruncatedAt = contentW
-			leftRawContent = string(leftRunes[:contentW])
+			leftRawContent = ansi.Truncate(leftRawContent, contentW, "")
 		}
 	}
 
@@ -1067,10 +1060,9 @@ func (m diffViewModel) renderSplitLine(line diffViewLine, selected, inVisual boo
 		if m.hOffset > 0 {
 			rightRawContent, _ = applyHOffset(rightRawContent, m.hOffset)
 		}
-		rightRunes := []rune(rightRawContent)
-		if len(rightRunes) > contentW {
+		if ansi.StringWidth(rightRawContent) > contentW {
 			rightTruncatedAt = contentW
-			rightRawContent = string(rightRunes[:contentW])
+			rightRawContent = ansi.Truncate(rightRawContent, contentW, "")
 		}
 	}
 
@@ -1362,17 +1354,16 @@ func (m diffViewModel) screenLinesFor(idx int) int {
 	return len(wrapContent(line.content, cw))
 }
 
-// applyHOffset slices content at the horizontal offset (rune-aware).
+// applyHOffset slices content at the horizontal offset (visual-width-aware).
 // Returns the sliced content and whether there is hidden content to the left.
 func applyHOffset(content string, hOffset int) (string, bool) {
 	if hOffset <= 0 {
 		return content, false
 	}
-	runes := []rune(content)
-	if hOffset >= len(runes) {
+	if ansi.StringWidth(content) <= hOffset {
 		return "", true
 	}
-	return string(runes[hOffset:]), true
+	return ansi.TruncateLeft(content, hOffset, ""), true
 }
 
 // shiftChangeRanges adjusts byte-offset change ranges by a rune offset.
