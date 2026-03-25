@@ -670,6 +670,34 @@ func (e *Engine) ResetAllReviewed() error {
 	return nil
 }
 
+func (e *Engine) MarkAllReviewed() error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if e.current == nil {
+		return fmt.Errorf("no active session")
+	}
+
+	if err := e.database.MarkAllReviewed(e.current.ID); err != nil {
+		return fmt.Errorf("mark all reviewed: %w", err)
+	}
+
+	for i := range e.current.ChangedFiles {
+		e.current.ChangedFiles[i].Reviewed = true
+	}
+	for i := range e.current.AdditionalFiles {
+		e.current.AdditionalFiles[i].Reviewed = true
+	}
+	for i := range e.current.ContentItems {
+		e.current.ContentItems[i].Reviewed = true
+	}
+	for k := range e.current.FileStatuses {
+		e.current.FileStatuses[k] = true
+	}
+
+	return nil
+}
+
 // -- Submission --
 
 func (e *Engine) GetReviewSummary() (*types.ReviewSummary, error) {

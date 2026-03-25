@@ -197,6 +197,8 @@ When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-co
 | `P` / `:pause` | Pause Claude Code (wait for your review) |
 | `D` / `:dismiss-outdated` | Dismiss outdated comments |
 | `F` | Toggle focus mode (hide sidebar, enable wrap) |
+| `:mark-all-reviewed` | Mark all files as reviewed |
+| `:mark-all-unreviewed` | Mark all files as unreviewed |
 | `:discard` | Discard all pending comments |
 | `:history` | View past review submissions |
 | `I` | Connection info (socket path, subscriber count) |

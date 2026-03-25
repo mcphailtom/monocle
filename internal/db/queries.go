@@ -366,6 +366,20 @@ func (d *DB) DeleteAdditionalFiles(sessionID string) error {
 	return err
 }
 
+// MarkAllReviewed sets the reviewed flag on all files, content items, and additional files for a session.
+func (d *DB) MarkAllReviewed(sessionID string) error {
+	for _, query := range []string{
+		`UPDATE changed_files SET reviewed = 1 WHERE session_id = ?`,
+		`UPDATE content_items SET reviewed = 1 WHERE session_id = ?`,
+		`UPDATE additional_files SET reviewed = 1 WHERE session_id = ?`,
+	} {
+		if _, err := d.Exec(query, sessionID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ResetAllReviewed resets the reviewed flag on all files, content items, and additional files for a session.
 func (d *DB) ResetAllReviewed(sessionID string) error {
 	for _, query := range []string{

@@ -98,6 +98,7 @@ type EngineAPI interface {
 	MarkContentReviewed(id string) error
 	UnmarkContentReviewed(id string) error
 	ResetAllReviewed() error
+	MarkAllReviewed() error
 
 	// Submission
 	GetReviewSummary() (*types.ReviewSummary, error)

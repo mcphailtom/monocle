@@ -122,6 +122,8 @@ func (m helpModel) View() string {
 			{Label(km.Pause) + " / :pause", "Toggle pause (ask Claude Code to wait)"},
 			{Label(km.DismissOutdated) + " / :dismiss-outdated", "Dismiss outdated comments"},
 			{Label(km.ToggleFocusMode), "Toggle focus mode"},
+			{":mark-all-reviewed", "Mark all files as reviewed"},
+			{":mark-all-unreviewed", "Mark all files as unreviewed"},
 			{":discard", "Discard all pending comments"},
 			{":history", "View submission history"},
 		}},

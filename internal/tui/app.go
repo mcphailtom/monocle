@@ -1579,6 +1579,18 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 			}
 			return openHistoryMsg{submissions: subs}
 		}
+
+	case "mark-all-reviewed":
+		return func() tea.Msg {
+			_ = engine.MarkAllReviewed()
+			return fileChangedMsg{}
+		}
+
+	case "mark-all-unreviewed":
+		return func() tea.Msg {
+			_ = engine.ResetAllReviewed()
+			return fileChangedMsg{}
+		}
 	}
 
 	// Handle :ref commands
