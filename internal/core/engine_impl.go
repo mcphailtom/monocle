@@ -1146,6 +1146,7 @@ func (e *Engine) handlePollFeedback(msg *protocol.PollFeedbackMsg) *protocol.Pol
 			HasFeedback:  true,
 			Feedback:     review.Formatted,
 			CommentCount: review.CommentCount,
+			Action:       review.Action,
 		}
 	}
 
@@ -1176,6 +1177,7 @@ func (e *Engine) handlePollFeedback(msg *protocol.PollFeedbackMsg) *protocol.Pol
 		HasFeedback:  true,
 		Feedback:     review.Formatted,
 		CommentCount: review.CommentCount,
+		Action:       review.Action,
 	}
 }
 

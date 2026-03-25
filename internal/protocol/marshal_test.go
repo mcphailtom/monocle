@@ -62,7 +62,7 @@ func TestEncodeDecodeEventNotification(t *testing.T) {
 		Type:  TypeEventNotification,
 		Event: "feedback_submitted",
 		Payload: map[string]any{
-			"message": "## Code Review — Changes Requested",
+			"message": "## Review — Changes Requested",
 			"status":  "request_changes",
 		},
 	}
@@ -84,7 +84,7 @@ func TestEncodeDecodeEventNotification(t *testing.T) {
 	if notif.Event != "feedback_submitted" {
 		t.Errorf("event = %q, want %q", notif.Event, "feedback_submitted")
 	}
-	if notif.Payload["message"] != "## Code Review — Changes Requested" {
+	if notif.Payload["message"] != "## Review — Changes Requested" {
 		t.Errorf("payload.message = %q", notif.Payload["message"])
 	}
 }

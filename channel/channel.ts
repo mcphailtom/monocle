@@ -549,7 +549,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
           };
         }
         return {
-          content: [{ type: "text" as const, text: "Reviewer approved with no comments." }],
+          content: [{ type: "text" as const, text: "Review approved." }],
         };
       } catch {
         return {

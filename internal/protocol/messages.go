@@ -44,6 +44,7 @@ type PollFeedbackResponse struct {
 	HasFeedback  bool   `json:"has_feedback"`
 	Feedback     string `json:"feedback,omitempty"`
 	CommentCount int    `json:"comment_count,omitempty"`
+	Action       string `json:"action,omitempty"` // "approve" | "request_changes"
 }
 
 // SubmitContentMsg sends reviewable content (plans, docs) from the agent.

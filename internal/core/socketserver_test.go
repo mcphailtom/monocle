@@ -141,7 +141,7 @@ func TestSocketServer_Subscription(t *testing.T) {
 	// Emit an event from the engine
 	engine.emit(EventFeedbackSubmitted, EventPayload{
 		Kind:    EventFeedbackSubmitted,
-		Message: "## Code Review — Changes Requested",
+		Message: "## Review — Changes Requested",
 		Status:  "request_changes",
 	})
 
@@ -162,7 +162,7 @@ func TestSocketServer_Subscription(t *testing.T) {
 	if notif.Event != string(EventFeedbackSubmitted) {
 		t.Errorf("event = %q, want %q", notif.Event, EventFeedbackSubmitted)
 	}
-	if notif.Payload["message"] != "## Code Review — Changes Requested" {
+	if notif.Payload["message"] != "## Review — Changes Requested" {
 		t.Errorf("payload.message = %q", notif.Payload["message"])
 	}
 }
