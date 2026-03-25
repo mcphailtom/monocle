@@ -17,6 +17,7 @@ const (
 	FileModified FileChangeStatus = "modified"
 	FileDeleted  FileChangeStatus = "deleted"
 	FileRenamed  FileChangeStatus = "renamed"
+	FileNone     FileChangeStatus = "none" // no git status (directory mode)
 )
 
 type CommentType string

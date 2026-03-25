@@ -140,6 +140,8 @@ func computeOverlayDimensions(m *appModel) (int, int) {
 		content = m.connectionInfo.View()
 	case overlayHistory:
 		content = m.history.View()
+	case overlayInfo:
+		content = m.infoBanner.View()
 	default:
 		return 0, 0
 	}
@@ -283,6 +285,9 @@ func (m appModel) handleOverlayClick(x, y int) (tea.Model, tea.Cmd) {
 			m.overlay = overlayNone
 		case overlayHistory:
 			m.history.active = false
+			m.overlay = overlayNone
+		case overlayInfo:
+			m.infoBanner.active = false
 			m.overlay = overlayNone
 		}
 		return m, nil

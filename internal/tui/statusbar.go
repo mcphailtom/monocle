@@ -72,7 +72,7 @@ func (m statusBarModel) View() string {
 	// Info sections
 	parts := []string{status, connIndicator}
 
-	if m.baseRef != "" {
+	if m.baseRef != "" && m.baseRef != "WORKING" {
 		ref := m.baseRef
 		if len(ref) > 8 {
 			ref = ref[:8]

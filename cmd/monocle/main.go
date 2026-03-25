@@ -205,15 +205,21 @@ func runTUI(socketOverride string, additionalPaths []string, continueSession boo
 		return fmt.Errorf("get cwd: %w", err)
 	}
 	repoRoot = adapters.FindRepoRoot(repoRoot)
+	nonGitMode := !adapters.IsGitRepo(repoRoot)
 
 	// Create engine
-	engine, err := core.NewEngine(cfg, database, repoRoot)
+	engine, err := core.NewEngine(cfg, database, repoRoot, nonGitMode)
 	if err != nil {
 		return fmt.Errorf("create engine: %w", err)
 	}
 
 	// Resolve session: continue, resume, or new
-	if err := resolveSession(engine, repoRoot, continueSession, resumePicker, sessionID); err != nil {
+	if nonGitMode {
+		// In non-git mode, always start a fresh session
+		if err := startNewSession(engine, repoRoot); err != nil {
+			return err
+		}
+	} else if err := resolveSession(engine, repoRoot, continueSession, resumePicker, sessionID); err != nil {
 		return err
 	}
 
@@ -237,6 +243,7 @@ func runTUI(socketOverride string, additionalPaths []string, continueSession boo
 
 	// Check if MCP channel needs registration
 	var appOpts tui.AppOptions
+	appOpts.NonGitMode = nonGitMode
 	adapter := &adapters.ClaudeAdapter{}
 	if adapter.Detect() && adapter.NeedsRegister() {
 		appOpts.MCPRegisterFn = func(global bool) error {

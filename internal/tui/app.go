@@ -46,6 +46,7 @@ const (
 	overlayConnectionInfo
 	overlayHistory
 	overlaySessionPicker
+	overlayInfo
 )
 
 // Engine event messages bridged from core.EngineAPI callbacks.
@@ -115,6 +116,8 @@ type openConfirmMsg struct {
 
 type mcpRegisterPromptMsg struct{}
 
+type openInfoBannerMsg struct{}
+
 type mcpRegisterResultMsg struct {
 	err error
 }
@@ -133,6 +136,7 @@ type AppOptions struct {
 	ShowSessionPicker bool   // if true, show session picker modal on startup
 	RepoRoot         string  // repo root path, used by session picker to list sessions
 	DeferredSocket   string  // socket path to start after session is established (empty = already started)
+	NonGitMode       bool   // if true, directory mode (no git, show file contents instead of diffs)
 }
 
 // appModel is the root model that composes all sub-models.
@@ -181,6 +185,9 @@ type appModel struct {
 	showSessionPicker bool   // open session picker on startup
 	repoRoot          string // repo root for session listing
 	deferredSocket    string // socket to start after session pick
+
+	nonGitMode bool             // directory mode (no git)
+	infoBanner infoBannerModel  // info modal for non-git startup
 }
 
 // NewApp creates the root appModel.
@@ -231,6 +238,10 @@ func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 		}
 	}
 
+	if o.NonGitMode {
+		dv.style = diffStyleFile
+	}
+
 	return appModel{
 		engine:        engine,
 		sidebar:       sidebar,
@@ -245,6 +256,7 @@ func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 		history:        newHistoryModel(theme),
 		sessionPicker:  newSessionPickerModel(theme),
 		registerPrompt: newRegisterPromptModel(theme),
+		infoBanner:     newInfoBannerModel(theme),
 		focus:         focusSidebar,
 		overlay:       overlayNone,
 		layoutConfig:  layoutCfg,
@@ -256,6 +268,7 @@ func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 		showSessionPicker: o.ShowSessionPicker,
 		repoRoot:          o.RepoRoot,
 		deferredSocket:    o.DeferredSocket,
+		nonGitMode:        o.NonGitMode,
 	}
 }
 
@@ -291,6 +304,11 @@ func (m appModel) Init() tea.Cmd {
 	if m.mcpRegisterFn != nil {
 		cmds = append(cmds, func() tea.Msg {
 			return mcpRegisterPromptMsg{}
+		})
+	}
+	if m.nonGitMode {
+		cmds = append(cmds, func() tea.Msg {
+			return openInfoBannerMsg{}
 		})
 	}
 	return tea.Batch(cmds...)
@@ -439,6 +457,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.connectionInfo.height = m.height
 		m.sessionPicker.width = m.width
 		m.sessionPicker.height = m.height
+		m.infoBanner.width = m.width
+		m.infoBanner.height = m.height
 		return m, nil
 
 	case initialLoadMsg:
@@ -1042,6 +1062,21 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.overlay = overlayRegisterPrompt
 		return m, nil
 
+	case openInfoBannerMsg:
+		m.infoBanner.open(
+			"Directory Mode",
+			"This directory is not a Git repository.\nMonocle will display file contents instead of diffs.",
+		)
+		m.overlay = overlayInfo
+		return m, nil
+
+	case closeInfoBannerMsg:
+		m.overlay = overlayNone
+		if msg.quit {
+			return m, tea.Quit
+		}
+		return m, nil
+
 	case registerMCPMsg:
 		m.overlay = overlayNone
 		registerFn := m.mcpRegisterFn
@@ -1196,6 +1231,11 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.overlay == overlaySessionPicker {
 		var cmd tea.Cmd
 		m.sessionPicker, cmd = m.sessionPicker.Update(msg)
+		return m, cmd
+	}
+	if m.overlay == overlayInfo {
+		var cmd tea.Cmd
+		m.infoBanner, cmd = m.infoBanner.Update(msg)
 		return m, cmd
 	}
 
@@ -1353,6 +1393,9 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.refreshFiles()
 
 	case Matches(key, km.BaseRef):
+		if m.nonGitMode {
+			return m, nil // no git refs in directory mode
+		}
 		engine := m.engine
 		return m, func() tea.Msg {
 			entries, err := engine.RecentCommits(20)
@@ -1400,6 +1443,9 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case Matches(key, km.ToggleDiff):
+		if m.nonGitMode {
+			return m, nil // always file view in directory mode
+		}
 		cmd := m.diffView.CycleDiffStyle()
 		return m, cmd
 
@@ -2135,6 +2181,11 @@ func (m appModel) View() tea.View {
 		}
 	} else if m.overlay == overlaySessionPicker {
 		overlayContent := m.sessionPicker.View()
+		if overlayContent != "" {
+			full = overlayOn(full, overlayContent, m.width, m.height)
+		}
+	} else if m.overlay == overlayInfo {
+		overlayContent := m.infoBanner.View()
 		if overlayContent != "" {
 			full = overlayOn(full, overlayContent, m.width, m.height)
 		}

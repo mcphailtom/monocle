@@ -38,8 +38,15 @@ type Engine struct {
 }
 
 // NewEngine constructs an Engine with all subsystems wired together.
-func NewEngine(cfg *types.Config, database *db.DB, repoRoot string) (*Engine, error) {
-	git := NewGitClient(repoRoot)
+// When nonGitMode is true, a DirClient is used instead of GitClient,
+// allowing Monocle to browse non-git directories.
+func NewEngine(cfg *types.Config, database *db.DB, repoRoot string, nonGitMode bool) (*Engine, error) {
+	var git GitAPI
+	if nonGitMode {
+		git = NewDirClient(repoRoot, cfg.IgnorePatterns)
+	} else {
+		git = NewGitClient(repoRoot)
+	}
 	server := NewSocketServer()
 	feedback := NewFeedbackQueue()
 
@@ -50,7 +57,7 @@ func NewEngine(cfg *types.Config, database *db.DB, repoRoot string) (*Engine, er
 		server:         server,
 		feedback:       feedback,
 		sessions:       NewSessionManager(database, git),
-		autoAdvanceRef: true,
+		autoAdvanceRef: !nonGitMode,
 		subscribers:    make(map[EventKind]map[int]EventCallback),
 	}
 

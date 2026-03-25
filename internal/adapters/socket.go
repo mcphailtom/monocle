@@ -30,6 +30,13 @@ func FindRepoRoot(startDir string) string {
 	}
 }
 
+// IsGitRepo returns true if dir is inside a Git repository.
+func IsGitRepo(dir string) bool {
+	root := FindRepoRoot(dir)
+	_, err := os.Stat(filepath.Join(root, ".git"))
+	return err == nil
+}
+
 // DefaultSocketPath computes a deterministic socket path from a directory.
 // Returns /tmp/monocle-<sha256_first12>.sock (30 chars, well within the
 // ~104-byte macOS socket path limit).

@@ -189,6 +189,18 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 
 	case loadFileContentMsg:
 		if msg.err != nil {
+			m.style = diffStyleFile
+			m.path = msg.path
+			m.hunks = nil
+			m.comments = nil
+			m.lines = []diffViewLine{{
+				kind:       types.DiffLineContext,
+				content:    msg.err.Error(),
+				newLineNum: 0,
+			}}
+			m.cursor = 0
+			m.offset = 0
+			m.hOffset = 0
 			return m, nil
 		}
 		m.style = diffStyleFile

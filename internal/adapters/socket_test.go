@@ -57,6 +57,33 @@ func TestFindRepoRoot_GitFile(t *testing.T) {
 	}
 }
 
+func TestIsGitRepo_True(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
+
+	if !IsGitRepo(dir) {
+		t.Fatal("IsGitRepo() = false, want true")
+	}
+}
+
+func TestIsGitRepo_False(t *testing.T) {
+	dir := t.TempDir()
+
+	if IsGitRepo(dir) {
+		t.Fatal("IsGitRepo() = true, want false")
+	}
+}
+
+func TestIsGitRepo_GitFile(t *testing.T) {
+	// Worktrees use a .git file instead of a directory
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, ".git"), []byte("gitdir: /somewhere"), 0644)
+
+	if !IsGitRepo(dir) {
+		t.Fatal("IsGitRepo() = false, want true (git file)")
+	}
+}
+
 func TestDefaultSocketPath_Deterministic(t *testing.T) {
 	p1 := DefaultSocketPath("/some/repo")
 	p2 := DefaultSocketPath("/some/repo")

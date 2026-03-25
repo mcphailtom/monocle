@@ -300,6 +300,9 @@ func (m sidebarModel) renderFileItem(f types.ChangedFile, selected bool) string 
 	case types.FileRenamed:
 		statusChar = "R"
 		statusColor = "#a371f7"
+	case types.FileNone:
+		statusChar = " "
+		statusColor = "7"
 	default:
 		statusChar = "?"
 		statusColor = "7"
@@ -417,6 +420,9 @@ func (m sidebarModel) renderTreeFileItem(item visibleItem, selected bool) string
 	case types.FileRenamed:
 		statusChar = "R"
 		statusColor = "#a371f7"
+	case types.FileNone:
+		statusChar = " "
+		statusColor = "7"
 	default:
 		statusChar = "?"
 		statusColor = "7"
