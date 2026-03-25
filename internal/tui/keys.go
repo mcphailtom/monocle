@@ -32,11 +32,12 @@ type KeyMap struct {
 	ToggleDiff  []string
 
 	// Sidebar
-	TreeMode    []string
-	CollapseAll []string
-	ExpandAll   []string
-	PrevSection []string
-	NextSection []string
+	TreeMode       []string
+	CollapseAll    []string
+	ExpandAll      []string
+	PrevSection    []string
+	NextSection    []string
+	FilterReviewed []string
 
 	// Review actions
 	Comment     []string
@@ -85,11 +86,12 @@ func DefaultKeyMap() KeyMap {
 		Wrap:        []string{"w"},
 		ToggleDiff:  []string{"t"},
 
-		TreeMode:    []string{"f"},
-		CollapseAll: []string{"z"},
-		ExpandAll:   []string{"e"},
-		PrevSection: []string{"{"},
-		NextSection: []string{"}"},
+		TreeMode:       []string{"f"},
+		CollapseAll:    []string{"z"},
+		ExpandAll:      []string{"e"},
+		PrevSection:    []string{"{"},
+		NextSection:    []string{"}"},
+		FilterReviewed: []string{"X"},
 
 		Comment:         []string{"c"},
 		FileComment:     []string{"C"},
@@ -118,7 +120,7 @@ var actionNames = []string{
 	"focus_swap", "toggle_sidebar",
 	"scroll_down", "scroll_up", "scroll_left", "scroll_right", "scroll_home", "scroll_first_char", "scroll_end",
 	"wrap", "toggle_diff",
-	"tree_mode", "collapse_all", "expand_all", "prev_section", "next_section",
+	"tree_mode", "collapse_all", "expand_all", "prev_section", "next_section", "filter_reviewed",
 	"comment", "file_comment", "suggest", "visual", "reviewed",
 	"submit", "pause", "dismiss_outdated", "toggle_focus_mode",
 	"base_ref", "cycle_layout", "refresh", "help", "quit", "command_mode",
@@ -179,6 +181,8 @@ func (km KeyMap) ApplyOverrides(overrides map[string]string) KeyMap {
 			km.PrevSection = []string{key}
 		case "next_section":
 			km.NextSection = []string{key}
+		case "filter_reviewed":
+			km.FilterReviewed = []string{key}
 		case "comment":
 			km.Comment = []string{key}
 		case "file_comment":

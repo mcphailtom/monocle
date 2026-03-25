@@ -107,6 +107,7 @@ func (m helpModel) View() string {
 			{Label(km.BaseRef), "Change base ref"},
 			{Label(km.TreeMode), "Toggle flat/tree view"},
 			{Label(km.CollapseAll) + "/" + Label(km.ExpandAll), "Collapse/expand all (tree)"},
+			{Label(km.FilterReviewed), "Hide/show reviewed files"},
 		}},
 		{"Review", []struct{ key, desc string }{
 			{Label(km.Comment), "Add comment at cursor"},

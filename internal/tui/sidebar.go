@@ -27,6 +27,9 @@ type sidebarModel struct {
 	treeRoots    []*fileTreeNode
 	collapsed    map[string]bool
 	visibleItems []visibleItem
+
+	// Filter state
+	hideReviewed bool
 }
 
 func newSidebarModel(keys *KeyMap) sidebarModel {
@@ -195,7 +198,11 @@ func (m sidebarModel) View() string {
 			if m.treeMode {
 				modeIndicator = " "
 			}
-			header := fmt.Sprintf(" Files%s  %d / %d", modeIndicator, reviewedCount, fileCount)
+			filterIndicator := ""
+			if m.hideReviewed {
+				filterIndicator = " (unreviewed only)"
+			}
+			header := fmt.Sprintf(" Files%s%s  %d / %d", modeIndicator, filterIndicator, reviewedCount, fileCount)
 			b.WriteString(sectionStyle.Render(header))
 			b.WriteString("\n")
 			linesUsed++
@@ -220,7 +227,11 @@ func (m sidebarModel) View() string {
 					reviewedCount++
 				}
 			}
-			header := fmt.Sprintf(" Additional Files  %d / %d", reviewedCount, additionalCt)
+			filterIndicator := ""
+			if m.hideReviewed {
+				filterIndicator = " (unreviewed only)"
+			}
+			header := fmt.Sprintf(" Additional Files%s  %d / %d", filterIndicator, reviewedCount, additionalCt)
 			b.WriteString(sectionStyle.Render(header))
 			b.WriteString("\n")
 			linesUsed++
@@ -268,7 +279,11 @@ func (m sidebarModel) View() string {
 		if m.treeMode {
 			modeIndicator = " "
 		}
-		headerStr := fmt.Sprintf(" Files%s  %d / %d", modeIndicator, reviewedCount, fileCount)
+		filterIndicator := ""
+		if m.hideReviewed {
+			filterIndicator = " (unreviewed only)"
+		}
+		headerStr := fmt.Sprintf(" Files%s%s  %d / %d", modeIndicator, filterIndicator, reviewedCount, fileCount)
 		header.WriteString(sectionStyle.Render(headerStr))
 		header.WriteString("\n")
 		header.WriteString(b.String())
@@ -678,6 +693,63 @@ func (m *sidebarModel) navigateFile(dir int) tea.Cmd {
 	return m.selectCurrent()
 }
 
+// nextUnreviewed moves the cursor to the next unreviewed item after the current
+// cursor position (wrapping is not performed). Skips directory nodes in tree
+// mode. Returns a selectCurrent() command if found, or nil if there are no
+// unreviewed items ahead.
+func (m *sidebarModel) nextUnreviewed() tea.Cmd {
+	total := m.totalItems()
+	if total == 0 {
+		return nil
+	}
+	contentCount := len(m.contentItems)
+	fileCt := m.fileItemCount()
+
+	for next := m.cursor + 1; next < total; next++ {
+		// Content items
+		if next < contentCount {
+			if !m.contentItems[next].Reviewed {
+				m.cursor = next
+				m.ensureVisible()
+				return m.selectCurrent()
+			}
+			continue
+		}
+		// File items
+		fileIdx := next - contentCount
+		if fileIdx < fileCt {
+			if m.treeMode {
+				item := m.visibleItems[fileIdx]
+				if item.isDir {
+					continue
+				}
+				if !item.node.File.Reviewed {
+					m.cursor = next
+					m.ensureVisible()
+					return m.selectCurrent()
+				}
+			} else {
+				if !m.files[fileIdx].Reviewed {
+					m.cursor = next
+					m.ensureVisible()
+					return m.selectCurrent()
+				}
+			}
+			continue
+		}
+		// Additional files
+		additionalIdx := next - contentCount - fileCt
+		if additionalIdx >= 0 && additionalIdx < len(m.additionalFiles) {
+			if !m.additionalFiles[additionalIdx].Reviewed {
+				m.cursor = next
+				m.ensureVisible()
+				return m.selectCurrent()
+			}
+		}
+	}
+	return nil
+}
+
 // sectionStarts returns the starting cursor indices of non-empty sections.
 func (m sidebarModel) sectionStarts() []int {
 	var starts []int
@@ -916,6 +988,37 @@ func (m *sidebarModel) clampOffset() {
 	if m.offset < 0 {
 		m.offset = 0
 	}
+}
+
+// applyReviewedFilter builds new slices excluding reviewed items when
+// hideReviewed is enabled. Call after setting files/contentItems/additionalFiles.
+func (m *sidebarModel) applyReviewedFilter() {
+	if !m.hideReviewed {
+		return
+	}
+	var files []types.ChangedFile
+	for _, f := range m.files {
+		if !f.Reviewed {
+			files = append(files, f)
+		}
+	}
+	m.files = files
+
+	var items []types.ContentItem
+	for _, item := range m.contentItems {
+		if !item.Reviewed {
+			items = append(items, item)
+		}
+	}
+	m.contentItems = items
+
+	var additional []types.AdditionalFile
+	for _, af := range m.additionalFiles {
+		if !af.Reviewed {
+			additional = append(additional, af)
+		}
+	}
+	m.additionalFiles = additional
 }
 
 func truncatePath(path string, maxLen int) string {

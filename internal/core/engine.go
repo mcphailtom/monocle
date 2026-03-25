@@ -97,6 +97,7 @@ type EngineAPI interface {
 	UnmarkReviewed(path string) error
 	MarkContentReviewed(id string) error
 	UnmarkContentReviewed(id string) error
+	ResetAllReviewed() error
 
 	// Submission
 	GetReviewSummary() (*types.ReviewSummary, error)

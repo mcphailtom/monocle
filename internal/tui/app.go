@@ -51,7 +51,8 @@ const (
 // Engine event messages bridged from core.EngineAPI callbacks.
 
 type fileChangedMsg struct {
-	path string
+	path    string
+	advance bool // auto-advance to next unreviewed item
 }
 
 type agentStatusMsg struct {
@@ -67,7 +68,8 @@ type contentItemMsg struct {
 }
 
 type additionalFileAddedMsg struct {
-	path string
+	path    string
+	advance bool // auto-advance to next unreviewed item
 }
 
 type connectionChangedMsg struct {
@@ -79,7 +81,8 @@ type pauseChangedMsg struct {
 }
 
 type contentReviewedMsg struct {
-	id string
+	id      string
+	advance bool // auto-advance to next unreviewed item
 }
 
 type editCommentMsg struct {
@@ -442,6 +445,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sidebar.files = msg.files
 		m.sidebar.contentItems = msg.items
 		m.sidebar.additionalFiles = msg.additionalFiles
+		m.sidebar.applyReviewedFilter()
 		m.sidebar.rebuildTree()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
@@ -474,6 +478,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case refreshResultMsg:
 		m.sidebar.files = msg.files
+		m.sidebar.applyReviewedFilter()
 		m.sidebar.rebuildTree()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
@@ -513,6 +518,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Engine events
 	case fileChangedMsg:
 		m.sidebar.files = m.engine.GetChangedFiles()
+		m.sidebar.applyReviewedFilter()
 		m.sidebar.rebuildTree()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
@@ -521,6 +527,13 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if session != nil {
 			m.statusBar.baseRef = session.BaseRef
 			m.statusBar.commentCount = len(session.Comments)
+		}
+		// Auto-advance to next unreviewed item after marking reviewed
+		if msg.advance {
+			if cmd := m.sidebar.nextUnreviewed(); cmd != nil {
+				return m, cmd
+			}
+			return m, nil
 		}
 		// Auto-select first file if the current view is empty or stale
 		if len(m.sidebar.files) > 0 && !m.diffViewShowsValidFile() {
@@ -540,7 +553,14 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case contentReviewedMsg:
 		m.sidebar.contentItems = m.engine.GetContentItems()
+		m.sidebar.applyReviewedFilter()
 		m.sidebar.clampOffset()
+		// Auto-advance to next unreviewed item after marking reviewed
+		if msg.advance {
+			if cmd := m.sidebar.nextUnreviewed(); cmd != nil {
+				return m, cmd
+			}
+		}
 		return m, nil
 
 	case agentStatusMsg:
@@ -557,6 +577,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case contentItemMsg:
 		m.sidebar.contentItems = m.engine.GetContentItems()
+		m.sidebar.applyReviewedFilter()
 		m.sidebar.rebuildTree()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
@@ -595,8 +616,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case additionalFileAddedMsg:
 		m.sidebar.additionalFiles = m.engine.GetAdditionalFiles()
+		m.sidebar.applyReviewedFilter()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
+		// Auto-advance to next unreviewed item after marking reviewed
+		if msg.advance {
+			if cmd := m.sidebar.nextUnreviewed(); cmd != nil {
+				return m, cmd
+			}
+			return m, nil
+		}
 		// Auto-select only if nothing else is showing
 		if m.diffView.path == "" && len(m.sidebar.files) == 0 && len(m.sidebar.contentItems) == 0 && msg.path != "" {
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.path, isAdditionalFile: true})
@@ -926,6 +955,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Agent was connected — round was advanced, refresh sidebar
 		m.sidebar.files = m.engine.GetChangedFiles()
 		m.sidebar.contentItems = nil
+		m.sidebar.additionalFiles = m.engine.GetAdditionalFiles()
+		m.sidebar.applyReviewedFilter()
 
 		// Restore focus mode state
 		var focusModeRestored bool
@@ -1060,6 +1091,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case commentsClearedMsg:
 		m.sidebar.files = m.engine.GetChangedFiles()
 		m.sidebar.contentItems = m.engine.GetContentItems()
+		m.sidebar.applyReviewedFilter()
 		m.sidebar.rebuildTree()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
@@ -1258,6 +1290,18 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case Matches(key, km.Reviewed):
 		return m, m.handleMarkReviewed()
+
+	case Matches(key, km.FilterReviewed):
+		m.sidebar.hideReviewed = !m.sidebar.hideReviewed
+		m.sidebar.files = m.engine.GetChangedFiles()
+		m.sidebar.contentItems = m.engine.GetContentItems()
+		m.sidebar.additionalFiles = m.engine.GetAdditionalFiles()
+		m.sidebar.applyReviewedFilter()
+		m.sidebar.rebuildTree()
+		m.sidebar.clampOffset()
+		recalcStackedLayout(&m)
+		m.statusBar.fileCount = len(m.sidebar.files)
+		return m, nil
 
 	case Matches(key, km.Submit):
 		return m, m.executeCommand("submit")
@@ -1799,7 +1843,7 @@ func (m appModel) handleMarkReviewed() tea.Cmd {
 			} else {
 				_ = engine.MarkContentReviewed(id)
 			}
-			return contentReviewedMsg{id: id}
+			return contentReviewedMsg{id: id, advance: !reviewed}
 		}
 	}
 
@@ -1845,6 +1889,7 @@ func (m appModel) handleMarkReviewed() tea.Cmd {
 	default:
 		return nil
 	}
+	willAdvance := !reviewed
 	return func() tea.Msg {
 		if reviewed {
 			_ = m.engine.UnmarkReviewed(filePath)
@@ -1852,9 +1897,9 @@ func (m appModel) handleMarkReviewed() tea.Cmd {
 			_ = m.engine.MarkReviewed(filePath)
 		}
 		if isAdditional {
-			return additionalFileAddedMsg{path: filePath}
+			return additionalFileAddedMsg{path: filePath, advance: willAdvance}
 		}
-		return fileChangedMsg{path: filePath}
+		return fileChangedMsg{path: filePath, advance: willAdvance}
 	}
 }
 

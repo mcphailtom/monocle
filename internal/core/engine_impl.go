@@ -642,6 +642,34 @@ func (e *Engine) UnmarkContentReviewed(id string) error {
 	return nil
 }
 
+func (e *Engine) ResetAllReviewed() error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if e.current == nil {
+		return fmt.Errorf("no active session")
+	}
+
+	if err := e.database.ResetAllReviewed(e.current.ID); err != nil {
+		return fmt.Errorf("reset all reviewed: %w", err)
+	}
+
+	for i := range e.current.ChangedFiles {
+		e.current.ChangedFiles[i].Reviewed = false
+	}
+	for i := range e.current.AdditionalFiles {
+		e.current.AdditionalFiles[i].Reviewed = false
+	}
+	for i := range e.current.ContentItems {
+		e.current.ContentItems[i].Reviewed = false
+	}
+	for k := range e.current.FileStatuses {
+		e.current.FileStatuses[k] = false
+	}
+
+	return nil
+}
+
 // -- Submission --
 
 func (e *Engine) GetReviewSummary() (*types.ReviewSummary, error) {
@@ -710,6 +738,9 @@ func (e *Engine) Submit(action types.SubmitAction, body string) (*SubmitResult, 
 		SubmittedAt:     time.Now(),
 	}
 	_ = e.database.CreateSubmission(session.ID, sub)
+
+	// Reset all reviewed states after submitting
+	_ = e.ResetAllReviewed()
 
 	e.emit(EventFeedbackStatusChanged, EventPayload{
 		Kind:   EventFeedbackStatusChanged,
