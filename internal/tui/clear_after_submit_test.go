@@ -17,13 +17,15 @@ type stubEngine struct {
 	cleared        bool
 }
 
-func (s *stubEngine) GetConfig() *types.Config          { return s.cfg }
-func (s *stubEngine) GetSession() *types.ReviewSession   { return s.session }
-func (s *stubEngine) GetFeedbackStatus() string          { return "" }
-func (s *stubEngine) GetChangedFiles() []types.ChangedFile { return nil }
-func (s *stubEngine) MarkContentReviewed(id string) error   { return nil }
-func (s *stubEngine) UnmarkContentReviewed(id string) error { return nil }
-func (s *stubEngine) GetContentItems() []types.ContentItem { return s.contentItems }
+func (s *stubEngine) GetConfig() *types.Config              { return s.cfg }
+func (s *stubEngine) GetSession() *types.ReviewSession       { return s.session }
+func (s *stubEngine) GetFeedbackStatus() string              { return "" }
+func (s *stubEngine) GetAgentStatus() types.AgentStatus      { return types.AgentStatusIdle }
+func (s *stubEngine) GetChangedFiles() []types.ChangedFile   { return nil }
+func (s *stubEngine) GetAdditionalFiles() []types.AdditionalFile { return nil }
+func (s *stubEngine) MarkContentReviewed(id string) error    { return nil }
+func (s *stubEngine) UnmarkContentReviewed(id string) error  { return nil }
+func (s *stubEngine) GetContentItems() []types.ContentItem   { return s.contentItems }
 func (s *stubEngine) GetContentItem(id string) (*types.ContentItem, error) {
 	for i := range s.contentItems {
 		if s.contentItems[i].ID == id {
@@ -56,7 +58,7 @@ func TestSubmitSuccess_ConfigAsk_ShowsModal(t *testing.T) {
 	m.width = 80
 	m.height = 40
 
-	result, _ := m.Update(submitSuccessMsg{})
+	result, _ := m.Update(submitSuccessMsg{agentConnected: true})
 	app := result.(appModel)
 
 	if app.overlay != overlayConfirm {
@@ -74,7 +76,7 @@ func TestSubmitSuccess_ConfigAlways_AutoClears(t *testing.T) {
 	}
 	m := NewApp(engine)
 
-	result, cmd := m.Update(submitSuccessMsg{})
+	result, cmd := m.Update(submitSuccessMsg{agentConnected: true})
 	app := result.(appModel)
 
 	if app.overlay == overlayConfirm {
@@ -101,7 +103,7 @@ func TestSubmitSuccess_ConfigNever_SkipsModal(t *testing.T) {
 	}
 	m := NewApp(engine)
 
-	result, cmd := m.Update(submitSuccessMsg{})
+	result, cmd := m.Update(submitSuccessMsg{agentConnected: true})
 	app := result.(appModel)
 
 	if app.overlay == overlayConfirm {
@@ -128,7 +130,7 @@ func TestSubmitSuccess_NoActiveComments_SkipsModal(t *testing.T) {
 	}
 	m := NewApp(engine)
 
-	result, _ := m.Update(submitSuccessMsg{})
+	result, _ := m.Update(submitSuccessMsg{agentConnected: true})
 	app := result.(appModel)
 
 	if app.overlay == overlayConfirm {
@@ -144,7 +146,7 @@ func TestSubmitSuccess_SessionOverrideAlways(t *testing.T) {
 	m := NewApp(engine)
 	m.clearAfterSubmitOverride = "always"
 
-	result, cmd := m.Update(submitSuccessMsg{})
+	result, cmd := m.Update(submitSuccessMsg{agentConnected: true})
 	app := result.(appModel)
 
 	if app.overlay == overlayConfirm {
@@ -167,7 +169,7 @@ func TestSubmitSuccess_SessionOverrideNever(t *testing.T) {
 	m := NewApp(engine)
 	m.clearAfterSubmitOverride = "never"
 
-	result, cmd := m.Update(submitSuccessMsg{})
+	result, cmd := m.Update(submitSuccessMsg{agentConnected: true})
 	app := result.(appModel)
 
 	if app.overlay == overlayConfirm {

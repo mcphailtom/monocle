@@ -153,7 +153,7 @@ func (s *SocketServer) handleSubscription(conn net.Conn, scanner *bufio.Scanner,
 	for _, eventName := range sub.Events {
 		kind := EventKind(eventName)
 		unsub := s.engine.On(kind, func(payload EventPayload) {
-			_ = writeMsg(&protocol.EventNotification{
+			if err := writeMsg(&protocol.EventNotification{
 				Type:  protocol.TypeEventNotification,
 				Event: string(payload.Kind),
 				Payload: map[string]any{
@@ -162,7 +162,11 @@ func (s *SocketServer) handleSubscription(conn net.Conn, scanner *bufio.Scanner,
 					"path":    payload.Path,
 					"item_id": payload.ItemID,
 				},
-			})
+			}); err != nil {
+				// Write failed — connection is dead. Close it to trigger
+				// defer cleanup which decrements subscriberCount.
+				conn.Close()
+			}
 		})
 		unsubs = append(unsubs, unsub)
 	}

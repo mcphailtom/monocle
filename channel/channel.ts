@@ -241,6 +241,7 @@ const mcp = new Server(
       "When you receive a pause_requested event, your reviewer wants you to stop and wait. Use the get_feedback tool with wait=true to block until they submit their review.",
       "",
       "You can submit plans or architecture decisions for your reviewer to see using the submit_plan tool.",
+      "When submitting plans, use the plan filename as the id parameter so updates replace the previous version.",
       "You can check the current review status at any time using the review_status tool.",
       "",
       "IMPORTANT — Plan mode workflow:",
@@ -268,7 +269,7 @@ const engine = new EngineConnection(socketPath, (event, payload) => {
             meta: { event: "feedback_submitted" },
           },
         })
-        .catch(() => {});
+        .catch((err: unknown) => { console.error("Failed to deliver feedback_submitted notification:", err); });
       break;
     case "pause_changed":
       if (payload.status === "pause_requested") {
@@ -282,7 +283,7 @@ const engine = new EngineConnection(socketPath, (event, payload) => {
               meta: { event: "pause_requested" },
             },
           })
-          .catch(() => {});
+          .catch((err: unknown) => { console.error("Failed to deliver pause_requested notification:", err); });
       }
       break;
     case "content_item_added":
@@ -568,9 +569,8 @@ async function main() {
   }
 
   if (!connected) {
-    console.error(
-      "Warning: Could not connect to monocle engine. Will retry in background.",
-    );
+    console.error("Monocle is not running. Channel exiting.");
+    process.exit(1);
   }
 
   // Connect to Claude Code via stdio

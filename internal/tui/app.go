@@ -90,7 +90,9 @@ type deleteCommentMsg struct {
 	commentID string
 }
 
-type submitSuccessMsg struct{}
+type submitSuccessMsg struct {
+	agentConnected bool // whether an agent was connected to receive the review
+}
 
 type commentsClearedMsg struct {
 	reloadPath       string
@@ -849,7 +851,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		copyToClip := msg.copyToClipboard
 		engine := m.engine
 		return m, func() tea.Msg {
-			if err := engine.Submit(action, body); err != nil {
+			result, err := engine.Submit(action, body)
+			if err != nil {
 				return agentStatusMsg{status: "submit_error"}
 			}
 			if copyToClip {
@@ -857,7 +860,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					clipboard.Copy(text)
 				}
 			}
-			return submitSuccessMsg{}
+			return submitSuccessMsg{agentConnected: result.AgentConnected}
 		}
 
 	case yankReviewMsg:
@@ -891,10 +894,29 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Post-submit: offer to clear comments
 	case submitSuccessMsg:
 		m.statusBar.feedbackStatus = m.engine.GetFeedbackStatus()
+		m.statusBar.agentStatus = m.engine.GetAgentStatus()
 		session := m.engine.GetSession()
 		if session != nil {
 			m.statusBar.commentCount = len(session.Comments)
+			m.statusBar.fileCount = len(session.ChangedFiles)
+			m.statusBar.baseRef = session.BaseRef
 		}
+
+		// If no agent was connected, warn the user and preserve comments for retry
+		if !msg.agentConnected {
+			m.statusBar.feedbackStatus = "saved (no agent)"
+			// Restore focus mode state even when disconnected
+			if m.focusModeActive {
+				m.sidebarHidden = m.focusModeSavedSidebar
+				m.diffView.wrap = m.focusModeSavedWrap
+				m.focusModeActive = false
+			}
+			return m, nil
+		}
+
+		// Agent was connected — round was advanced, refresh sidebar
+		m.sidebar.files = m.engine.GetChangedFiles()
+		m.sidebar.contentItems = nil
 
 		// Restore focus mode state
 		var focusModeRestored bool
@@ -1449,10 +1471,11 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 			if summary != nil && (summary.IssueCt+summary.SuggestionCt > 0) {
 				action = types.ActionRequestChanges
 			}
-			if err := engine.Submit(action, ""); err != nil {
+			result, err := engine.Submit(action, "")
+			if err != nil {
 				return agentStatusMsg{status: "submit_error"}
 			}
-			return submitSuccessMsg{}
+			return submitSuccessMsg{agentConnected: result.AgentConnected}
 		}
 
 	case "discard":

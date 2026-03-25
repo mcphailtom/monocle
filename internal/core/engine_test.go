@@ -660,7 +660,7 @@ func TestSubmit(t *testing.T) {
 	})
 
 	// Submit the review
-	if err := e.Submit(types.ActionRequestChanges, "Please fix the issues"); err != nil {
+	if _, err := e.Submit(types.ActionRequestChanges, "Please fix the issues"); err != nil {
 		t.Fatalf("Submit: %v", err)
 	}
 

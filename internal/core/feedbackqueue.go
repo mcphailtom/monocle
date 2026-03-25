@@ -119,6 +119,14 @@ func (fq *FeedbackQueue) GetStatus() string {
 	return fq.status
 }
 
+// ClearStatus resets the feedback status to "none".
+// Used after advancing the review round so the status bar doesn't show stale state.
+func (fq *FeedbackQueue) ClearStatus() {
+	fq.mu.Lock()
+	defer fq.mu.Unlock()
+	fq.status = "none"
+}
+
 // HasPending returns true if there is a queued review waiting for delivery.
 func (fq *FeedbackQueue) HasPending() bool {
 	fq.mu.Lock()

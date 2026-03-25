@@ -686,13 +686,13 @@ func (e *Engine) GetReviewSummary() (*types.ReviewSummary, error) {
 	return summary, nil
 }
 
-func (e *Engine) Submit(action types.SubmitAction, body string) error {
+func (e *Engine) Submit(action types.SubmitAction, body string) (*SubmitResult, error) {
 	e.mu.RLock()
 	session := e.current
 	e.mu.RUnlock()
 
 	if session == nil {
-		return fmt.Errorf("no active session")
+		return nil, fmt.Errorf("no active session")
 	}
 
 	formatted := e.formatter.Format(session, session.Comments, action, body)
@@ -722,7 +722,33 @@ func (e *Engine) Submit(action types.SubmitAction, body string) error {
 		Status:  formatted.Action,
 	})
 
-	return nil
+	// Check if an agent is connected to receive the review
+	agentConnected := e.server != nil && e.server.SubscriberCount() > 0
+
+	if agentConnected {
+		// Agent connected: advance round for a clean slate
+		e.mu.Lock()
+		_ = e.sessions.AdvanceRound(session)
+		session.AgentStatus = types.AgentStatusIdle
+		_ = e.database.UpdateSession(session)
+		e.mu.Unlock()
+
+		e.feedback.ClearStatus()
+
+		e.emit(EventAgentStatusChanged, EventPayload{
+			Kind:   EventAgentStatusChanged,
+			Status: string(types.AgentStatusIdle),
+		})
+		e.emit(EventFeedbackStatusChanged, EventPayload{
+			Kind:   EventFeedbackStatusChanged,
+			Status: "none",
+		})
+		e.emit(EventFileChanged, EventPayload{
+			Kind: EventFileChanged,
+		})
+	}
+
+	return &SubmitResult{AgentConnected: agentConnected}, nil
 }
 
 func (e *Engine) FormatReview(action types.SubmitAction, body string) (string, error) {
@@ -1031,15 +1057,15 @@ func (e *Engine) handleGetReviewStatus(_ *protocol.GetReviewStatusMsg) *protocol
 }
 
 // handlePollFeedback returns pending feedback, optionally blocking until available.
+// Round advancement now happens in Submit(), not here.
 func (e *Engine) handlePollFeedback(msg *protocol.PollFeedbackMsg) *protocol.PollFeedbackResponse {
 	if msg.Wait {
 		review := e.WaitForFeedback()
 
-		// After feedback is delivered, advance the review round
+		// Update agent status to working now that feedback has been picked up
 		e.mu.Lock()
 		if e.current != nil {
 			e.current.AgentStatus = types.AgentStatusWorking
-			_ = e.sessions.AdvanceRound(e.current)
 			_ = e.database.UpdateSession(e.current)
 		}
 		e.mu.Unlock()
@@ -1047,9 +1073,6 @@ func (e *Engine) handlePollFeedback(msg *protocol.PollFeedbackMsg) *protocol.Pol
 		e.emit(EventAgentStatusChanged, EventPayload{
 			Kind:   EventAgentStatusChanged,
 			Status: string(types.AgentStatusWorking),
-		})
-		e.emit(EventFileChanged, EventPayload{
-			Kind: EventFileChanged,
 		})
 
 		return &protocol.PollFeedbackResponse{
@@ -1069,15 +1092,17 @@ func (e *Engine) handlePollFeedback(msg *protocol.PollFeedbackMsg) *protocol.Pol
 		}
 	}
 
-	// After feedback is delivered, advance the review round
+	// Update agent status to working now that feedback has been picked up
 	e.mu.Lock()
 	if e.current != nil {
-		_ = e.sessions.AdvanceRound(e.current)
+		e.current.AgentStatus = types.AgentStatusWorking
+		_ = e.database.UpdateSession(e.current)
 	}
 	e.mu.Unlock()
 
-	e.emit(EventFileChanged, EventPayload{
-		Kind: EventFileChanged,
+	e.emit(EventAgentStatusChanged, EventPayload{
+		Kind:   EventAgentStatusChanged,
+		Status: string(types.AgentStatusWorking),
 	})
 
 	return &protocol.PollFeedbackResponse{

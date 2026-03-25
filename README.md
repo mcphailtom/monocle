@@ -133,7 +133,7 @@ Monocle isn't limited to reviewing file changes. Claude Code can submit **plans,
 
 This means you can review the agent's *thinking* before it writes code — not just the output. Ask Claude Code to submit its plan first, review it, leave feedback, and only then let it start implementing.
 
-When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-code/plan-mode), Monocle provides the `submit_plan_and_wait` tool which submits the plan to your TUI **and blocks** until you respond with feedback. If you approve, the agent starts implementing. If you request changes, the agent updates the plan and submits again. See [Plan mode setup](#plan-mode-setup) for configuration details.
+When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-code/plan-mode), Monocle provides the `submit_plan_and_wait` tool which submits the plan to your TUI **and blocks** until you respond with feedback. If you approve, the agent starts implementing. If you request changes, the agent updates the plan and submits again.
 
 ## Features
 
@@ -155,22 +155,6 @@ When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-co
 - **Feedback queue** — Submit reviews while the agent is working; delivered when Claude Code next checks
 - **Connection indicator** — See at a glance whether Claude Code is connected, with manual socket override for troubleshooting
 - **Session persistence** — Reviews survive restarts via SQLite
-
-## Plan mode setup
-
-The channel's built-in instructions tell Claude Code about `submit_plan_and_wait`, but for reliable plan mode behavior you should also add instructions to your project's `CLAUDE.md`. Add the following to your project's `CLAUDE.md` (create one at the root of your repo if you don't have one):
-
-````markdown
-## Monocle Integration
-
-When the Monocle MCP channel is connected:
-- Use the `submit_plan` MCP tool to send plans or content for the reviewer to see
-- Use the plan filename as the `id` parameter so updates replace the previous version
-
-**Plan mode (important):** When in plan mode, use `submit_plan_and_wait` instead of `submit_plan`. This tool submits the plan AND blocks until the reviewer responds with feedback. If the reviewer approves, proceed to call ExitPlanMode. If they request changes, update the plan and call `submit_plan_and_wait` again. Only call ExitPlanMode after the reviewer has approved.
-````
-
-> **Why CLAUDE.md?** Claude Code reads your project's `CLAUDE.md` at the start of every conversation. While the MCP channel provides its own instructions, having the plan mode workflow in `CLAUDE.md` ensures the agent follows it consistently — especially at the critical moment of deciding whether to exit plan mode or submit for review first.
 
 ## Keybindings
 

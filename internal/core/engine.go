@@ -4,6 +4,13 @@ import (
 	"github.com/anthropics/monocle/internal/types"
 )
 
+// SubmitResult contains information about the outcome of a review submission.
+type SubmitResult struct {
+	// AgentConnected indicates whether an agent was connected at submit time.
+	// When false, the review was saved but may not have been delivered.
+	AgentConnected bool
+}
+
 // EventKind represents the type of engine event.
 type EventKind string
 
@@ -93,7 +100,7 @@ type EngineAPI interface {
 
 	// Submission
 	GetReviewSummary() (*types.ReviewSummary, error)
-	Submit(action types.SubmitAction, body string) error
+	Submit(action types.SubmitAction, body string) (*SubmitResult, error)
 	FormatReview(action types.SubmitAction, body string) (string, error)
 	GetSubmissions() ([]types.ReviewSubmission, error)
 
