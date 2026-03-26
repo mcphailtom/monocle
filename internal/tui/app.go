@@ -173,8 +173,6 @@ type appModel struct {
 	mcpRegisterFn    func(global bool) error
 	registerPrompt   registerPromptModel
 
-	clearAfterSubmitOverride string // session-only override: "", "always", or "never"
-
 	focusModeActive       bool // currently in focus mode
 	focusModeSavedSidebar bool // sidebar visibility before entering focus mode
 	focusModeSavedWrap    bool // wrap state before entering focus mode
@@ -972,84 +970,49 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Agent was connected — round was advanced, refresh sidebar
-		m.sidebar.files = m.engine.GetChangedFiles()
+		// Agent was connected — round was advanced.
+		// Only clear content items and comments. Don't touch sidebar files
+		// or call applyReviewedFilter — the periodic refresh handles that.
 		m.sidebar.contentItems = nil
-		m.sidebar.additionalFiles = m.engine.GetAdditionalFiles()
-		m.sidebar.applyReviewedFilter()
+		m.sidebar.rebuildTree()
+		m.sidebar.clampOffset()
+
+		// Clear stale content view after round advance
+		if m.diffView.contentMode {
+			m.diffView.contentMode = false
+			m.diffView.contentID = ""
+			m.diffView.path = ""
+			m.diffView.hunks = nil
+			m.diffView.lines = nil
+			m.diffView.comments = nil
+		}
+
+		// Clear comments — they're now frozen in the submission record
+		if session != nil && len(session.Comments) > 0 {
+			_ = m.engine.ClearComments()
+			m.statusBar.commentCount = 0
+		}
 
 		// Restore focus mode state
-		var focusModeRestored bool
 		if m.focusModeActive {
 			m.sidebarHidden = m.focusModeSavedSidebar
 			m.diffView.wrap = m.focusModeSavedWrap
 			m.focusModeActive = false
-			focusModeRestored = true
-		}
-
-		// Helper: if focus mode was restored, batch cmd with layout recalc
-		maybeResize := func(cmd tea.Cmd) tea.Cmd {
-			if !focusModeRestored {
-				return cmd
-			}
-			resize := func() tea.Msg {
+			return m, func() tea.Msg {
 				return tea.WindowSizeMsg{Width: m.width, Height: m.height}
 			}
-			if cmd == nil {
-				return resize
-			}
-			return tea.Batch(cmd, resize)
 		}
 
-		// Only consider clearing if there are active comments
-		hasActive := false
-		if session != nil {
-			for _, c := range session.Comments {
-				if !c.Outdated {
-					hasActive = true
-					break
-				}
-			}
-		}
-		if hasActive {
-			// Determine effective clear behavior: session override > config > default
-			clearBehavior := m.clearAfterSubmitOverride
-			if clearBehavior == "" {
-				if cfg := m.engine.GetConfig(); cfg != nil && cfg.ClearAfterSubmit != "" {
-					clearBehavior = cfg.ClearAfterSubmit
-				} else {
-					clearBehavior = "ask"
-				}
-			}
-			switch clearBehavior {
-			case "always":
-				engine := m.engine
-				currentPath := m.diffView.path
-				isContent := m.diffView.contentMode
-				return m, maybeResize(func() tea.Msg {
-					_ = engine.ClearComments()
-					return commentsClearedMsg{reloadPath: currentPath, isContent: isContent, isAdditionalFile: m.diffView.additionalFilePath != ""}
-				})
-			case "never":
-				// Do nothing — keep comments
-			default: // "ask"
-				m.confirm.openWithDontAsk("Review Submitted", "Clear all comments from this review?", confirmClearAfterSubmit)
-				m.overlay = overlayConfirm
-			}
-		}
-		return m, maybeResize(nil)
+		return m, nil
 
 	// Confirm overlay actions
 	case confirmActionMsg:
 		m.overlay = overlayNone
-		if msg.dontAsk && msg.action == confirmClearAfterSubmit {
-			m.clearAfterSubmitOverride = "always"
-		}
 		engine := m.engine
 		currentPath := m.diffView.path
 		isContent := m.diffView.contentMode
 		switch msg.action {
-		case confirmClearAfterSubmit, confirmDiscard:
+		case confirmDiscard:
 			return m, func() tea.Msg {
 				_ = engine.ClearComments()
 				return commentsClearedMsg{reloadPath: currentPath, isContent: isContent, isAdditionalFile: m.diffView.additionalFilePath != ""}
@@ -1106,9 +1069,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case cancelConfirmMsg:
 		m.overlay = overlayNone
-		if msg.dontAsk {
-			m.clearAfterSubmitOverride = "never"
-		}
 		return m, nil
 
 	case openHistoryMsg:
@@ -1122,7 +1082,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 		return m, nil
 
-	// After comments are cleared, refresh sidebar + diff
+	// After comments are cleared (e.g. :discard), refresh sidebar + diff
 	case commentsClearedMsg:
 		m.sidebar.files = m.engine.GetChangedFiles()
 		m.sidebar.contentItems = m.engine.GetContentItems()
@@ -1345,9 +1305,6 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case Matches(key, km.Submit):
 		return m, m.executeCommand("submit")
-
-	case Matches(key, km.DismissOutdated):
-		return m, m.executeCommand("dismiss-outdated")
 
 	case Matches(key, km.Pause):
 		return m, m.executeCommand("pause")
@@ -1580,16 +1537,7 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 	case "discard":
 		return func() tea.Msg {
 			session := engine.GetSession()
-			hasActive := false
-			if session != nil {
-				for _, c := range session.Comments {
-					if !c.Outdated {
-						hasActive = true
-						break
-					}
-				}
-			}
-			if !hasActive {
+			if session == nil || len(session.Comments) == 0 {
 				return nil
 			}
 			return openConfirmMsg{
@@ -1597,12 +1545,6 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 				message: "Discard all pending comments? This cannot be undone.",
 				action:  confirmDiscard,
 			}
-		}
-
-	case "dismiss-outdated":
-		return func() tea.Msg {
-			_ = engine.DismissOutdated()
-			return fileChangedMsg{}
 		}
 
 	case "pause":
@@ -1716,7 +1658,12 @@ func (m appModel) diffViewShowsValidFile() bool {
 		return false
 	}
 	if m.diffView.contentMode {
-		return true // content items are always valid
+		for _, ci := range m.sidebar.contentItems {
+			if ci.ID == m.diffView.contentID {
+				return true
+			}
+		}
+		return false
 	}
 	if m.diffView.additionalFilePath != "" {
 		for _, af := range m.sidebar.additionalFiles {

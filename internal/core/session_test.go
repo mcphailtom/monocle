@@ -174,7 +174,7 @@ func TestRefreshChangedFiles(t *testing.T) {
 }
 
 func TestAdvanceRound(t *testing.T) {
-	sm, stub := newTestSessionManager(t)
+	sm, _ := newTestSessionManager(t)
 
 	session, err := sm.CreateSession(SessionOptions{BaseRef: "old-base-ref"})
 	if err != nil {
@@ -212,26 +212,19 @@ func TestAdvanceRound(t *testing.T) {
 	if session.ReviewRound != 2 {
 		t.Errorf("expected ReviewRound 2, got %d", session.ReviewRound)
 	}
-	if session.BaseRef != stub.currentRef {
-		t.Errorf("expected BaseRef updated to %q, got %q", stub.currentRef, session.BaseRef)
+	// BaseRef should NOT change (files are untouched)
+	if session.BaseRef != "old-base-ref" {
+		t.Errorf("expected BaseRef unchanged at %q, got %q", "old-base-ref", session.BaseRef)
 	}
-	if session.ChangedFiles != nil {
-		t.Errorf("expected ChangedFiles to be nil")
-	}
-	if len(session.FileStatuses) != 0 {
-		t.Errorf("expected FileStatuses to be empty")
+	// Changed files should remain
+	if session.ChangedFiles == nil {
+		t.Errorf("expected ChangedFiles to still be present")
 	}
 
-	// Comments in DB should be marked as outdated
+	// Comments in DB should be untouched (cleared separately by engine)
 	comments, _ := sm.db.GetComments(session.ID)
-	if len(comments) != 1 || !comments[0].Outdated {
-		t.Error("expected comment to be marked as outdated")
-	}
-
-	// Changed files should be deleted from DB
-	dbFiles, _ := sm.db.GetChangedFiles(session.ID)
-	if len(dbFiles) != 0 {
-		t.Errorf("expected 0 changed files in DB after advance, got %d", len(dbFiles))
+	if len(comments) != 1 {
+		t.Errorf("expected comment to still exist, got %d", len(comments))
 	}
 
 	// Content items should be cleared in memory and DB

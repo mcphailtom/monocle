@@ -197,7 +197,6 @@ When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-co
 | `S` / `:submit` | Submit review |
 | `Ctrl+y` | Copy review to clipboard |
 | `P` / `:pause` | Pause Claude Code (wait for your review) |
-| `D` / `:dismiss-outdated` | Dismiss outdated comments |
 | `F` | Toggle focus mode (hide sidebar, enable wrap) |
 | `:mark-all-reviewed` | Mark all files as reviewed |
 | `:mark-all-unreviewed` | Mark all files as unreviewed |
@@ -271,7 +270,6 @@ Monocle loads settings from JSON config files:
   "keybindings": {},
   "mouse": true,
   "min_diff_width": 80,
-  "clear_after_submit": "ask",
   "auto_focus_mode": false,
   "review_format": {
     "include_snippets": true,
@@ -292,7 +290,6 @@ Monocle loads settings from JSON config files:
 | `ignore_patterns` | string array | `[]` | Glob patterns for files to exclude |
 | `min_diff_width` | integer | `80` | Minimum character width for the diff viewer in side-by-side layout |
 | `mouse` | `true`, `false` | `true` | Enable mouse interactions (click, scroll, drag) |
-| `clear_after_submit` | `"ask"`, `"always"`, `"never"` | `"ask"` | Whether to clear comments after submitting a review |
 | `auto_focus_mode` | `true`, `false` | `false` | Auto-enter focus mode (hide sidebar, enable wrap) when reviewing plans |
 | `keybindings` | object | `{}` | Custom key overrides (see below) |
 | `review_format.include_snippets` | `true`, `false` | `true` | Include code snippets in formatted reviews |
