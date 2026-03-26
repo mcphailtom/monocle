@@ -1,10 +1,3 @@
----
-name: monocle-review-plan-wait
-description: Send a plan to Monocle for review and wait for feedback. Use when the user wants to submit a plan and block until the reviewer responds — ideal for plan mode.
-argument-hint: [plan-file-path]
-allowed-tools: [Read, Glob, mcp__plugin_monocle_monocle__submit_plan_and_wait]
----
-
 # Send Plan to Monocle and Wait for Review
 
 Submit a plan file to Monocle and block until the reviewer responds with feedback. Use this in plan mode or whenever you need reviewer approval before proceeding.

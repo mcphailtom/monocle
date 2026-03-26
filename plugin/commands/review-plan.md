@@ -1,13 +1,6 @@
----
-name: monocle-review-plan
-description: Send a plan to Monocle for review (fire-and-forget). Use when the user wants to share a plan with their reviewer without blocking.
-argument-hint: [plan-file-path]
-allowed-tools: [Read, Glob, mcp__plugin_monocle_monocle__submit_plan]
----
-
 # Send Plan to Monocle
 
-Submit a plan file to Monocle so the reviewer can see it. This does NOT wait for feedback — use `/monocle-review-plan-wait` if you need to block until the reviewer responds.
+Submit a plan file to Monocle so the reviewer can see it. This does NOT wait for feedback — use `/review-plan-wait` if you need to block until the reviewer responds.
 
 ## Instructions
 
