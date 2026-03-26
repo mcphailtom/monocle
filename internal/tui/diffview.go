@@ -1901,8 +1901,6 @@ func formatInlineComment(c *types.ReviewComment) string {
 	if c.Resolved {
 		prefix = "│ ✓"
 		typeLabel = "✓ " + typeLabel
-	} else if c.Outdated {
-		prefix = "│ ⚠"
 	}
 	body := c.Body
 	if hasSuggestionBlock {

@@ -203,7 +203,7 @@ func (d *DB) CreateComment(sessionID string, c *types.ReviewComment) error {
 		`INSERT INTO comments (id, session_id, target_type, target_ref, line_start, line_end, type, body, code_snippet, resolved, outdated, review_round, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		c.ID, sessionID, string(c.TargetType), c.TargetRef, c.LineStart, c.LineEnd,
-		string(c.Type), c.Body, c.CodeSnippet, boolToInt(c.Resolved), boolToInt(c.Outdated),
+		string(c.Type), c.Body, c.CodeSnippet, boolToInt(c.Resolved), 0,
 		c.ReviewRound, c.CreatedAt, c.UpdatedAt,
 	)
 	return err
@@ -247,7 +247,6 @@ func (d *DB) GetComments(sessionID string) ([]types.ReviewComment, error) {
 		c.TargetType = types.TargetType(targetType)
 		c.Type = types.CommentType(commentType)
 		c.Resolved = resolved != 0
-		c.Outdated = outdated != 0
 		comments = append(comments, c)
 	}
 	return comments, rows.Err()
@@ -262,24 +261,9 @@ func (d *DB) ResolveComment(id string, resolved bool) error {
 	return err
 }
 
-// MarkOutdated marks all non-outdated comments in the session as outdated.
-func (d *DB) MarkOutdated(sessionID string) error {
-	_, err := d.Exec(
-		`UPDATE comments SET outdated = 1, updated_at = ? WHERE session_id = ? AND outdated = 0`,
-		time.Now(), sessionID,
-	)
-	return err
-}
-
-// DismissOutdated deletes all outdated comments in the session.
-func (d *DB) DismissOutdated(sessionID string) error {
-	_, err := d.Exec(`DELETE FROM comments WHERE session_id = ? AND outdated = 1`, sessionID)
-	return err
-}
-
-// ClearActiveComments deletes all non-outdated comments in the session.
-func (d *DB) ClearActiveComments(sessionID string) error {
-	_, err := d.Exec(`DELETE FROM comments WHERE session_id = ? AND outdated = 0`, sessionID)
+// ClearComments deletes all comments in the session.
+func (d *DB) ClearComments(sessionID string) error {
+	_, err := d.Exec(`DELETE FROM comments WHERE session_id = ?`, sessionID)
 	return err
 }
 

@@ -30,8 +30,8 @@ func TestGetReviewStatusInfo_Pending(t *testing.T) {
 	}
 	e.current = &types.ReviewSession{
 		Comments: []types.ReviewComment{
-			{ID: "c1", Outdated: false},
-			{ID: "c2", Outdated: false},
+			{ID: "c1"},
+			{ID: "c2"},
 		},
 	}
 
@@ -325,93 +325,6 @@ func TestDeleteComment(t *testing.T) {
 	}
 }
 
-func TestDismissOutdated(t *testing.T) {
-	database, err := db.Open(":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer database.Close()
-
-	e := &Engine{
-		feedback:    NewFeedbackQueue(),
-		database:    database,
-		subscribers: make(map[EventKind]map[int]EventCallback),
-	}
-	e.current = &types.ReviewSession{
-		ID:           "sess-1",
-		FileStatuses: make(map[string]bool),
-	}
-	if err := database.CreateSession(e.current); err != nil {
-		t.Fatalf("create session: %v", err)
-	}
-
-	// Add two comments
-	target := CommentTarget{
-		TargetType: types.TargetFile,
-		TargetRef:  "main.go",
-		LineStart:  1,
-		LineEnd:    1,
-	}
-	_, err = e.AddComment(target, types.CommentIssue, "Comment 1")
-	if err != nil {
-		t.Fatalf("AddComment c1: %v", err)
-	}
-	_, err = e.AddComment(target, types.CommentNote, "Comment 2")
-	if err != nil {
-		t.Fatalf("AddComment c2: %v", err)
-	}
-
-	// Mark all as outdated in DB, then reload into e.current
-	if err := database.MarkOutdated("sess-1"); err != nil {
-		t.Fatalf("MarkOutdated: %v", err)
-	}
-
-	// Reload comments from DB into memory to get the outdated flag
-	dbComments, err := database.GetComments("sess-1")
-	if err != nil {
-		t.Fatalf("GetComments: %v", err)
-	}
-	e.current.Comments = dbComments
-
-	// Verify both are outdated
-	for _, c := range e.current.Comments {
-		if !c.Outdated {
-			t.Fatalf("expected comment %s to be outdated", c.ID)
-		}
-	}
-
-	// Now add a fresh (non-outdated) comment
-	c3, err := e.AddComment(target, types.CommentPraise, "Comment 3 - fresh")
-	if err != nil {
-		t.Fatalf("AddComment c3: %v", err)
-	}
-
-	// Dismiss outdated
-	if err := e.DismissOutdated(); err != nil {
-		t.Fatalf("DismissOutdated: %v", err)
-	}
-
-	// Verify in-memory: only c3 remains
-	if len(e.current.Comments) != 1 {
-		t.Fatalf("expected 1 comment in memory after dismiss, got %d", len(e.current.Comments))
-	}
-	if e.current.Comments[0].ID != c3.ID {
-		t.Errorf("expected remaining comment to be c3 (%s), got %s", c3.ID, e.current.Comments[0].ID)
-	}
-
-	// Verify in DB: only c3 remains
-	dbComments, err = database.GetComments("sess-1")
-	if err != nil {
-		t.Fatalf("GetComments after dismiss: %v", err)
-	}
-	if len(dbComments) != 1 {
-		t.Fatalf("expected 1 comment in DB after dismiss, got %d", len(dbComments))
-	}
-	if dbComments[0].ID != c3.ID {
-		t.Errorf("expected DB comment to be c3, got %s", dbComments[0].ID)
-	}
-}
-
 func TestClearComments(t *testing.T) {
 	database, err := db.Open(":memory:")
 	if err != nil {
@@ -432,66 +345,37 @@ func TestClearComments(t *testing.T) {
 		t.Fatalf("create session: %v", err)
 	}
 
-	// Add two comments (both will initially be non-outdated)
 	target := CommentTarget{
 		TargetType: types.TargetFile,
 		TargetRef:  "main.go",
 		LineStart:  1,
 		LineEnd:    1,
 	}
-	_, err = e.AddComment(target, types.CommentIssue, "Active comment")
+	_, err = e.AddComment(target, types.CommentIssue, "Comment 1")
 	if err != nil {
-		t.Fatalf("AddComment active: %v", err)
+		t.Fatalf("AddComment: %v", err)
 	}
-	_, err = e.AddComment(target, types.CommentNote, "Will be outdated")
+	_, err = e.AddComment(target, types.CommentNote, "Comment 2")
 	if err != nil {
-		t.Fatalf("AddComment outdated: %v", err)
+		t.Fatalf("AddComment: %v", err)
 	}
 
-	// Mark all as outdated in DB
-	if err := database.MarkOutdated("sess-1"); err != nil {
-		t.Fatalf("MarkOutdated: %v", err)
-	}
-	// Reload from DB to get correct outdated flags
-	dbComments, err := database.GetComments("sess-1")
-	if err != nil {
-		t.Fatalf("GetComments: %v", err)
-	}
-	e.current.Comments = dbComments
-
-	// Now add a fresh active comment (after marking outdated, so it stays active)
-	_, err = e.AddComment(target, types.CommentSuggestion, "Fresh active comment")
-	if err != nil {
-		t.Fatalf("AddComment fresh: %v", err)
-	}
-
-	// Clear active (non-outdated) comments
 	if err := e.ClearComments(); err != nil {
 		t.Fatalf("ClearComments: %v", err)
 	}
 
-	// Verify in-memory: only outdated comments remain
-	if len(e.current.Comments) != 2 {
-		t.Fatalf("expected 2 outdated comments in memory, got %d", len(e.current.Comments))
-	}
-	for _, c := range e.current.Comments {
-		if !c.Outdated {
-			t.Errorf("expected remaining comment %s to be outdated", c.ID)
-		}
+	// Verify in-memory: no comments remain
+	if len(e.current.Comments) != 0 {
+		t.Fatalf("expected 0 comments in memory, got %d", len(e.current.Comments))
 	}
 
-	// Verify in DB: only outdated comments remain
-	dbComments, err = database.GetComments("sess-1")
+	// Verify in DB: no comments remain
+	dbComments, err := database.GetComments("sess-1")
 	if err != nil {
 		t.Fatalf("GetComments after clear: %v", err)
 	}
-	if len(dbComments) != 2 {
-		t.Fatalf("expected 2 comments in DB after clear, got %d", len(dbComments))
-	}
-	for _, c := range dbComments {
-		if !c.Outdated {
-			t.Errorf("expected DB comment %s to be outdated", c.ID)
-		}
+	if len(dbComments) != 0 {
+		t.Fatalf("expected 0 comments in DB, got %d", len(dbComments))
 	}
 }
 
@@ -573,7 +457,6 @@ func TestGetReviewSummary(t *testing.T) {
 			{ID: "c2", TargetType: types.TargetFile, TargetRef: "main.go", Type: types.CommentSuggestion, Body: "Consider this"},
 			{ID: "c3", TargetType: types.TargetFile, TargetRef: "util.go", Type: types.CommentNote, Body: "FYI"},
 			{ID: "c4", TargetType: types.TargetContent, TargetRef: "plan-1", Type: types.CommentPraise, Body: "Nice plan"},
-			{ID: "c5", TargetType: types.TargetFile, TargetRef: "main.go", Type: types.CommentIssue, Body: "Outdated issue", Outdated: true},
 		},
 	}
 
@@ -582,7 +465,7 @@ func TestGetReviewSummary(t *testing.T) {
 		t.Fatalf("GetReviewSummary: %v", err)
 	}
 
-	// Verify counts (outdated comments are excluded from counts)
+	// Verify counts
 	if summary.IssueCt != 1 {
 		t.Errorf("expected 1 issue, got %d", summary.IssueCt)
 	}
@@ -596,7 +479,7 @@ func TestGetReviewSummary(t *testing.T) {
 		t.Errorf("expected 1 praise, got %d", summary.PraiseCt)
 	}
 
-	// Verify file groupings (outdated excluded)
+	// Verify file groupings
 	mainComments := summary.FileComments["main.go"]
 	if len(mainComments) != 2 {
 		t.Errorf("expected 2 comments on main.go, got %d", len(mainComments))

@@ -494,29 +494,6 @@ func (e *Engine) ResolveComment(commentID string) error {
 	return nil
 }
 
-func (e *Engine) DismissOutdated() error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	if e.current == nil {
-		return fmt.Errorf("no active session")
-	}
-
-	if err := e.database.DismissOutdated(e.current.ID); err != nil {
-		return fmt.Errorf("dismiss outdated: %w", err)
-	}
-
-	active := e.current.Comments[:0]
-	for _, c := range e.current.Comments {
-		if !c.Outdated {
-			active = append(active, c)
-		}
-	}
-	e.current.Comments = active
-
-	return nil
-}
-
 func (e *Engine) ClearComments() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -525,18 +502,11 @@ func (e *Engine) ClearComments() error {
 		return fmt.Errorf("no active session")
 	}
 
-	if err := e.database.ClearActiveComments(e.current.ID); err != nil {
+	if err := e.database.ClearComments(e.current.ID); err != nil {
 		return fmt.Errorf("clear comments: %w", err)
 	}
 
-	// Keep only outdated comments in memory
-	outdated := e.current.Comments[:0]
-	for _, c := range e.current.Comments {
-		if c.Outdated {
-			outdated = append(outdated, c)
-		}
-	}
-	e.current.Comments = outdated
+	e.current.Comments = nil
 
 	return nil
 }
@@ -723,9 +693,6 @@ func (e *Engine) GetReviewSummary() (*types.ReviewSummary, error) {
 	}
 
 	for _, c := range e.current.Comments {
-		if c.Outdated {
-			continue
-		}
 		switch c.TargetType {
 		case types.TargetFile:
 			summary.FileComments[c.TargetRef] = append(summary.FileComments[c.TargetRef], c)
@@ -922,11 +889,7 @@ func (e *Engine) GetReviewStatusInfo() *ReviewStatusInfo {
 		e.mu.RLock()
 		commentCount := 0
 		if e.current != nil {
-			for _, c := range e.current.Comments {
-				if !c.Outdated {
-					commentCount++
-				}
-			}
+			commentCount = len(e.current.Comments)
 		}
 		e.mu.RUnlock()
 

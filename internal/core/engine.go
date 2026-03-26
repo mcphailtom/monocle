@@ -89,7 +89,6 @@ type EngineAPI interface {
 	EditComment(commentID string, body string) (*types.ReviewComment, error)
 	DeleteComment(commentID string) error
 	ResolveComment(commentID string) error
-	DismissOutdated() error
 	ClearComments() error
 
 	// Review status

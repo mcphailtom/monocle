@@ -112,35 +112,6 @@ func TestFormatMixedTypes(t *testing.T) {
 	}
 }
 
-func TestFormatOutdatedSkipped(t *testing.T) {
-	f := NewReviewFormatter(nil, defaultFormatCfg())
-	comments := []types.ReviewComment{
-		{
-			ID:         "c1",
-			TargetType: types.TargetFile,
-			TargetRef:  "main.go",
-			Type:       types.CommentIssue,
-			Body:       "Old bug",
-			Outdated:   true,
-		},
-		{
-			ID:         "c2",
-			TargetType: types.TargetFile,
-			TargetRef:  "main.go",
-			Type:       types.CommentNote,
-			Body:       "Current note",
-		},
-	}
-
-	result := f.Format(&types.ReviewSession{}, comments, types.ActionApprove, "")
-
-	if strings.Contains(result.Formatted, "Old bug") {
-		t.Error("outdated comment should be skipped")
-	}
-	if !strings.Contains(result.Formatted, "Current note") {
-		t.Error("current comment should be included")
-	}
-}
 
 func TestFormatContentItemWithProvider(t *testing.T) {
 	f := NewReviewFormatter(nil, defaultFormatCfg())

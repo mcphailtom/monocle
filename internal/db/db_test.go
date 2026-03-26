@@ -130,20 +130,12 @@ func TestComments(t *testing.T) {
 		t.Errorf("expected updated body, got %q", comments[0].Body)
 	}
 
-	if err := d.MarkOutdated("sess-1"); err != nil {
-		t.Fatalf("mark outdated: %v", err)
-	}
-	comments, _ = d.GetComments("sess-1")
-	if !comments[0].Outdated {
-		t.Error("expected outdated")
-	}
-
-	if err := d.DismissOutdated("sess-1"); err != nil {
-		t.Fatalf("dismiss: %v", err)
+	if err := d.ClearComments("sess-1"); err != nil {
+		t.Fatalf("clear comments: %v", err)
 	}
 	comments, _ = d.GetComments("sess-1")
 	if len(comments) != 0 {
-		t.Errorf("expected 0 comments after dismiss, got %d", len(comments))
+		t.Errorf("expected 0 comments after clear, got %d", len(comments))
 	}
 }
 
@@ -215,69 +207,27 @@ func TestDeleteComment(t *testing.T) {
 	}
 }
 
-func TestClearActiveComments(t *testing.T) {
+func TestClearComments(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
 	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
 
-	// Subtest: all active comments are cleared
-	t.Run("all_active", func(t *testing.T) {
-		c1 := &types.ReviewComment{ID: "cmt-a1", TargetType: types.TargetFile, TargetRef: "a.go", Type: types.CommentIssue, Body: "first", ReviewRound: 1, CreatedAt: now, UpdatedAt: now}
-		c2 := &types.ReviewComment{ID: "cmt-a2", TargetType: types.TargetFile, TargetRef: "b.go", Type: types.CommentIssue, Body: "second", ReviewRound: 1, CreatedAt: now, UpdatedAt: now}
-		d.CreateComment("sess-1", c1)
-		d.CreateComment("sess-1", c2)
+	c1 := &types.ReviewComment{ID: "cmt-a1", TargetType: types.TargetFile, TargetRef: "a.go", Type: types.CommentIssue, Body: "first", ReviewRound: 1, CreatedAt: now, UpdatedAt: now}
+	c2 := &types.ReviewComment{ID: "cmt-a2", TargetType: types.TargetFile, TargetRef: "b.go", Type: types.CommentIssue, Body: "second", ReviewRound: 1, CreatedAt: now, UpdatedAt: now}
+	d.CreateComment("sess-1", c1)
+	d.CreateComment("sess-1", c2)
 
-		if err := d.ClearActiveComments("sess-1"); err != nil {
-			t.Fatalf("clear active: %v", err)
-		}
+	if err := d.ClearComments("sess-1"); err != nil {
+		t.Fatalf("clear comments: %v", err)
+	}
 
-		comments, err := d.GetComments("sess-1")
-		if err != nil {
-			t.Fatalf("get comments: %v", err)
-		}
-		if len(comments) != 0 {
-			t.Errorf("expected 0 comments after clearing all active, got %d", len(comments))
-		}
-	})
-
-	// Subtest: only active comments are cleared, outdated ones remain
-	t.Run("mixed_active_and_outdated", func(t *testing.T) {
-		c1 := &types.ReviewComment{ID: "cmt-b1", TargetType: types.TargetFile, TargetRef: "a.go", Type: types.CommentIssue, Body: "outdated-1", ReviewRound: 1, CreatedAt: now, UpdatedAt: now}
-		c2 := &types.ReviewComment{ID: "cmt-b2", TargetType: types.TargetFile, TargetRef: "b.go", Type: types.CommentIssue, Body: "outdated-2", ReviewRound: 1, CreatedAt: now, UpdatedAt: now}
-		c3 := &types.ReviewComment{ID: "cmt-b3", TargetType: types.TargetFile, TargetRef: "c.go", Type: types.CommentIssue, Body: "active", ReviewRound: 1, CreatedAt: now, UpdatedAt: now}
-		d.CreateComment("sess-1", c1)
-		d.CreateComment("sess-1", c2)
-		d.CreateComment("sess-1", c3)
-
-		// Mark all current comments as outdated (c1, c2, c3 become outdated)
-		if err := d.MarkOutdated("sess-1"); err != nil {
-			t.Fatalf("mark outdated: %v", err)
-		}
-
-		// Now only c1 and c2 should be the ones we originally wanted outdated,
-		// but MarkOutdated marks all non-outdated. So all 3 are outdated now.
-		// Create a fresh active comment after marking.
-		c4 := &types.ReviewComment{ID: "cmt-b4", TargetType: types.TargetFile, TargetRef: "d.go", Type: types.CommentIssue, Body: "new-active", ReviewRound: 2, CreatedAt: now, UpdatedAt: now}
-		d.CreateComment("sess-1", c4)
-
-		// Now we have 3 outdated (c1, c2, c3) and 1 active (c4)
-		if err := d.ClearActiveComments("sess-1"); err != nil {
-			t.Fatalf("clear active: %v", err)
-		}
-
-		comments, err := d.GetComments("sess-1")
-		if err != nil {
-			t.Fatalf("get comments: %v", err)
-		}
-		if len(comments) != 3 {
-			t.Errorf("expected 3 outdated comments to remain, got %d", len(comments))
-		}
-		for _, c := range comments {
-			if !c.Outdated {
-				t.Errorf("expected all remaining comments to be outdated, but %q is not", c.ID)
-			}
-		}
-	})
+	comments, err := d.GetComments("sess-1")
+	if err != nil {
+		t.Fatalf("get comments: %v", err)
+	}
+	if len(comments) != 0 {
+		t.Errorf("expected 0 comments after clear, got %d", len(comments))
+	}
 }
 
 func TestDeleteChangedFiles(t *testing.T) {

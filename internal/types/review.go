@@ -95,7 +95,6 @@ type ReviewComment struct {
 	Body        string
 	CodeSnippet string
 	Resolved    bool
-	Outdated    bool
 	ReviewRound int
 	CreatedAt   time.Time
 	UpdatedAt   time.Time

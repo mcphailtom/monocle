@@ -120,7 +120,6 @@ func (m helpModel) View() string {
 			{Label(km.Submit) + " / :submit", "Submit review"},
 			{"Ctrl+y", "Copy review to clipboard"},
 			{Label(km.Pause) + " / :pause", "Toggle pause (ask Claude Code to wait)"},
-			{Label(km.DismissOutdated) + " / :dismiss-outdated", "Dismiss outdated comments"},
 			{Label(km.ToggleFocusMode), "Toggle focus mode"},
 			{":mark-all-reviewed", "Mark all files as reviewed"},
 			{":mark-all-unreviewed", "Mark all files as unreviewed"},
