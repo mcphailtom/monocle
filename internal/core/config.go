@@ -42,8 +42,7 @@ func DefaultConfig() *types.Config {
 			MaxSnippetLines: 10,
 			IncludeSummary:  true,
 		},
-		ClearAfterSubmit: "ask",
-		MinDiffWidth:     80,
+		MinDiffWidth: 80,
 	}
 }
 

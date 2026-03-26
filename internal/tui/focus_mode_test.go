@@ -68,7 +68,7 @@ func TestAutoFocusMode_DoesNotEnterOnNonPlanContentItem(t *testing.T) {
 
 func TestAutoFocusMode_ExitsOnSubmit(t *testing.T) {
 	engine := &stubEngine{
-		cfg: &types.Config{AutoFocusMode: true, ClearAfterSubmit: "never"},
+		cfg: &types.Config{AutoFocusMode: true},
 		contentItems: []types.ContentItem{
 			{ID: "plan-1", Title: "Plan", IsPlan: true},
 		},
@@ -155,7 +155,7 @@ func TestAutoFocusMode_Disabled_NoEffect(t *testing.T) {
 
 func TestAutoFocusMode_RestoresCustomState(t *testing.T) {
 	engine := &stubEngine{
-		cfg: &types.Config{AutoFocusMode: true, Wrap: true, ClearAfterSubmit: "never"},
+		cfg: &types.Config{AutoFocusMode: true, Wrap: true},
 		contentItems: []types.ContentItem{
 			{ID: "plan-1", Title: "Plan", IsPlan: true},
 		},

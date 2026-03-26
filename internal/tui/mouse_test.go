@@ -519,30 +519,12 @@ func TestReviewSummaryClickActionLabel(t *testing.T) {
 	}
 }
 
-func TestConfirmClickCheckbox(t *testing.T) {
+func TestConfirmClickAlwaysReturnsFalse(t *testing.T) {
 	m := &confirmModel{
-		active:      true,
-		showDontAsk: true,
-		dontAsk:     false,
+		active: true,
 	}
 
-	// Click on checkbox position
-	if !m.handleClick(1, 4) {
-		t.Error("click on checkbox should return true")
-	}
-	if !m.dontAsk {
-		t.Error("dontAsk should be toggled to true")
-	}
-
-	// Click again to toggle off
-	m.handleClick(1, 4)
-	if m.dontAsk {
-		t.Error("dontAsk should be toggled back to false")
-	}
-
-	// Without showDontAsk, clicks should be ignored
-	m.showDontAsk = false
 	if m.handleClick(1, 4) {
-		t.Error("click should be ignored when showDontAsk is false")
+		t.Error("handleClick should always return false")
 	}
 }

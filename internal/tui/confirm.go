@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"fmt"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -11,20 +10,17 @@ import (
 type confirmAction int
 
 const (
-	confirmClearAfterSubmit confirmAction = iota
-	confirmDiscard
+	confirmDiscard confirmAction = iota
 )
 
 type confirmModel struct {
-	active      bool
-	title       string
-	message     string
-	action      confirmAction
-	showDontAsk bool
-	dontAsk     bool
-	width       int
-	height      int
-	theme       Theme
+	active  bool
+	title   string
+	message string
+	action  confirmAction
+	width   int
+	height  int
+	theme   Theme
 }
 
 func newConfirmModel(theme Theme) confirmModel {
@@ -32,26 +28,16 @@ func newConfirmModel(theme Theme) confirmModel {
 }
 
 type confirmActionMsg struct {
-	action  confirmAction
-	dontAsk bool
+	action confirmAction
 }
 
-type cancelConfirmMsg struct {
-	dontAsk bool
-}
+type cancelConfirmMsg struct{}
 
 func (m *confirmModel) open(title, message string, action confirmAction) {
 	m.active = true
 	m.title = title
 	m.message = message
 	m.action = action
-	m.showDontAsk = false
-	m.dontAsk = false
-}
-
-func (m *confirmModel) openWithDontAsk(title, message string, action confirmAction) {
-	m.open(title, message, action)
-	m.showDontAsk = true
 }
 
 func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
@@ -65,16 +51,10 @@ func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
 		case "enter", "y":
 			m.active = false
 			action := m.action
-			dontAsk := m.dontAsk
-			return m, func() tea.Msg { return confirmActionMsg{action: action, dontAsk: dontAsk} }
+			return m, func() tea.Msg { return confirmActionMsg{action: action} }
 		case "esc", "n":
 			m.active = false
-			dontAsk := m.dontAsk
-			return m, func() tea.Msg { return cancelConfirmMsg{dontAsk: dontAsk} }
-		case "shift+tab":
-			if m.showDontAsk {
-				m.dontAsk = !m.dontAsk
-			}
+			return m, func() tea.Msg { return cancelConfirmMsg{} }
 		}
 	}
 	return m, nil
@@ -82,19 +62,7 @@ func (m confirmModel) Update(msg tea.Msg) (confirmModel, tea.Cmd) {
 
 // handleClick processes a mouse click at content-relative coordinates.
 // Returns true if the click was on an interactive element.
-func (m *confirmModel) handleClick(contentX, contentY int) bool {
-	if !m.showDontAsk {
-		return false
-	}
-	// Line 0: title
-	// Line 1: blank
-	// Line 2: message
-	// Line 3: blank
-	// Line 4: checkbox
-	if contentY == 4 && contentX >= 0 && contentX <= 2 {
-		m.dontAsk = !m.dontAsk
-		return true
-	}
+func (m *confirmModel) handleClick(_, _ int) bool {
 	return false
 }
 
@@ -112,18 +80,7 @@ func (m confirmModel) View() string {
 	b.WriteString(m.message)
 	b.WriteString("\n\n")
 
-	if m.showDontAsk {
-		check := " "
-		if m.dontAsk {
-			check = "x"
-		}
-		b.WriteString(fmt.Sprintf("[%s] Don't ask again this session\n\n", check))
-	}
-
 	hints := "Y/Enter: confirm  N/Esc: cancel"
-	if m.showDontAsk {
-		hints += "  Shift+Tab: don't ask again"
-	}
 	b.WriteString(lipgloss.NewStyle().Faint(true).Render(hints))
 
 	return m.theme.ModalBorder.Width(modalWidth).Render(b.String())

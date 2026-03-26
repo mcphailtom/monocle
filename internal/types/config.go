@@ -10,7 +10,6 @@ type Config struct {
 	TabSize        int               `json:"tab_size"`
 	ContextLines   int               `json:"context_lines"`
 	ReviewFormat      ReviewFormatConfig `json:"review_format"`
-	ClearAfterSubmit  string             `json:"clear_after_submit"`
 	AutoFocusMode     bool               `json:"auto_focus_mode"`
 	Mouse             *bool              `json:"mouse"`
 	MinDiffWidth      int               `json:"min_diff_width"`

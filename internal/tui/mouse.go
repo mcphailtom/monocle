@@ -278,8 +278,7 @@ func (m appModel) handleOverlayClick(x, y int) (tea.Model, tea.Cmd) {
 		case overlayConfirm:
 			m.confirm.active = false
 			m.overlay = overlayNone
-			dontAsk := m.confirm.dontAsk
-			return m, func() tea.Msg { return cancelConfirmMsg{dontAsk: dontAsk} }
+			return m, func() tea.Msg { return cancelConfirmMsg{} }
 		case overlayRefPicker:
 			m.refPicker.active = false
 			m.overlay = overlayNone
