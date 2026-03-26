@@ -35,10 +35,7 @@ type Theme struct {
 	CommentPraise  lipgloss.Style
 
 	// Status
-	StatusBar      lipgloss.Style
-	StatusIdle     lipgloss.Style
-	StatusWorking  lipgloss.Style
-	StatusStopped  lipgloss.Style
+	StatusBar lipgloss.Style
 
 	// Modal
 	ModalOverlay   lipgloss.Style
@@ -75,10 +72,7 @@ func DefaultTheme() Theme {
 		CommentNote:    lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true),
 		CommentPraise:  lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true),
 
-		StatusBar:      lipgloss.NewStyle().Background(lipgloss.Color("0")).Foreground(lipgloss.Color("7")),
-		StatusIdle:     lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
-		StatusWorking:  lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
-		StatusStopped:  lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
+		StatusBar: lipgloss.NewStyle().Background(lipgloss.Color("0")).Foreground(lipgloss.Color("7")),
 
 		ModalOverlay:   lipgloss.NewStyle().Background(lipgloss.Color("0")),
 		ModalBorder:    lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("4")).Padding(1, 2),

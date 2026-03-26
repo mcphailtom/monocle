@@ -2,14 +2,6 @@ package types
 
 import "time"
 
-type AgentStatus string
-
-const (
-	AgentStatusIdle    AgentStatus = "idle"
-	AgentStatusWorking AgentStatus = "working"
-	AgentStatusPaused  AgentStatus = "paused"
-)
-
 type FileChangeStatus string
 
 const (
@@ -47,7 +39,6 @@ const (
 type ReviewSession struct {
 	ID              string
 	Agent           string
-	AgentStatus     AgentStatus
 	RepoRoot        string
 	BaseRef         string
 	ChangedFiles    []ChangedFile

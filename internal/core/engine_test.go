@@ -130,7 +130,6 @@ func TestRequestPauseAndCancel(t *testing.T) {
 	}
 	e.current = &types.ReviewSession{
 		ID:           "sess-1",
-		AgentStatus:  types.AgentStatusWorking,
 		FileStatuses: make(map[string]bool),
 	}
 
@@ -140,18 +139,12 @@ func TestRequestPauseAndCancel(t *testing.T) {
 	if !e.feedback.IsPauseRequested() {
 		t.Error("expected pause requested")
 	}
-	if e.current.AgentStatus != types.AgentStatusPaused {
-		t.Errorf("expected Paused status, got %q", e.current.AgentStatus)
-	}
 
 	// Cancel pause
 	e.CancelPause()
 
 	if e.feedback.IsPauseRequested() {
 		t.Error("expected pause cancelled")
-	}
-	if e.current.AgentStatus != types.AgentStatusWorking {
-		t.Errorf("expected Working status, got %q", e.current.AgentStatus)
 	}
 }
 
@@ -588,7 +581,7 @@ func TestSetBaseRef(t *testing.T) {
 
 	now := time.Now()
 	session := &types.ReviewSession{
-		ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle,
+		ID: "sess-1", Agent: "claude",
 		RepoRoot: "/tmp/repo", BaseRef: "old-base", ReviewRound: 1,
 		FileStatuses: make(map[string]bool), CreatedAt: now, UpdatedAt: now,
 	}
@@ -652,7 +645,6 @@ func TestResolveComment(t *testing.T) {
 	session := &types.ReviewSession{
 		ID:           "sess-1",
 		Agent:        "claude",
-		AgentStatus:  types.AgentStatusIdle,
 		RepoRoot:     "/tmp",
 		BaseRef:      "abc",
 		ReviewRound:  1,

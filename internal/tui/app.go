@@ -56,9 +56,7 @@ type fileChangedMsg struct {
 	advance bool // auto-advance to next unreviewed item
 }
 
-type agentStatusMsg struct {
-	status string
-}
+type submitErrorMsg struct{}
 
 type feedbackStatusMsg struct {
 	status string
@@ -474,7 +472,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusBar.agentName = session.Agent
 		}
 		m.statusBar.fileCount = len(msg.files)
-		m.statusBar.agentStatus = m.engine.GetAgentStatus()
+		m.statusBar.socketStarted = m.engine.GetSocketPath() != ""
+		m.statusBar.subscriberCount = m.engine.GetSubscriberCount()
 		m.statusBar.feedbackStatus = m.engine.GetFeedbackStatus()
 		// Auto-select the first file, or first content item if no files
 		if len(msg.files) > 0 {
@@ -581,12 +580,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case agentStatusMsg:
-		m.statusBar.agentStatus = m.engine.GetAgentStatus()
-		return m, nil
-
 	case connectionChangedMsg:
-		m.statusBar.connected = msg.count > 0
+		m.statusBar.subscriberCount = msg.count
+		m.statusBar.socketStarted = m.engine.GetSocketPath() != ""
 		return m, nil
 
 	case feedbackStatusMsg:
@@ -651,7 +647,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case pauseChangedMsg:
-		m.statusBar.agentStatus = m.engine.GetAgentStatus()
 		return m, nil
 
 	case baseRefChangedMsg:
@@ -895,7 +890,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Review summary overlay open
 	case openReviewMsg:
-		m.reviewSummary.open(msg.summary, msg.agentStopped)
+		m.reviewSummary.open(msg.summary, msg.agentConnected)
 		m.overlay = overlayReview
 		return m, nil
 
@@ -909,7 +904,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, func() tea.Msg {
 			result, err := engine.Submit(action, body)
 			if err != nil {
-				return agentStatusMsg{status: "submit_error"}
+				return submitErrorMsg{}
 			}
 			if copyToClip {
 				if text, err := engine.FormatReview(action, body); err == nil {
@@ -950,7 +945,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Post-submit: offer to clear comments
 	case submitSuccessMsg:
 		m.statusBar.feedbackStatus = m.engine.GetFeedbackStatus()
-		m.statusBar.agentStatus = m.engine.GetAgentStatus()
 		session := m.engine.GetSession()
 		if session != nil {
 			m.statusBar.commentCount = len(session.Comments)
@@ -1494,8 +1488,8 @@ func (m appModel) handleCommandModeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd)
 
 // openReviewMsg carries the data needed to open the review summary overlay.
 type openReviewMsg struct {
-	summary      *types.ReviewSummary
-	agentStopped bool
+	summary        *types.ReviewSummary
+	agentConnected bool
 }
 
 // executeCommand runs a named command entered in command mode.
@@ -1514,9 +1508,8 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 					ContentComments: map[string][]types.ReviewComment{},
 				}
 			}
-			session := engine.GetSession()
-			agentStopped := session != nil && session.AgentStatus == types.AgentStatusPaused
-			return openReviewMsg{summary: summary, agentStopped: agentStopped}
+			agentConnected := engine.GetSubscriberCount() > 0
+			return openReviewMsg{summary: summary, agentConnected: agentConnected}
 		}
 
 	case "submit!":
@@ -1529,7 +1522,7 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 			}
 			result, err := engine.Submit(action, "")
 			if err != nil {
-				return agentStatusMsg{status: "submit_error"}
+				return submitErrorMsg{}
 			}
 			return submitSuccessMsg{agentConnected: result.AgentConnected}
 		}
@@ -2218,9 +2211,6 @@ func calcModalWidth(screenWidth, maxWidth int) int {
 func BridgeEngineEvents(engine core.EngineAPI, p *tea.Program) {
 	engine.On(core.EventFileChanged, func(e core.EventPayload) {
 		p.Send(fileChangedMsg{path: e.Path})
-	})
-	engine.On(core.EventAgentStatusChanged, func(e core.EventPayload) {
-		p.Send(agentStatusMsg{status: e.Status})
 	})
 	engine.On(core.EventFeedbackStatusChanged, func(e core.EventPayload) {
 		p.Send(feedbackStatusMsg{status: e.Status})

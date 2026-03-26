@@ -24,7 +24,6 @@ func TestSessionCRUD(t *testing.T) {
 	s := &types.ReviewSession{
 		ID:          "sess-1",
 		Agent:       "claude",
-		AgentStatus: types.AgentStatusIdle,
 		RepoRoot:    "/tmp/repo",
 		BaseRef:     "abc123",
 		ReviewRound: 1,
@@ -40,18 +39,18 @@ func TestSessionCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if got.Agent != "claude" || got.AgentStatus != types.AgentStatusIdle {
-		t.Errorf("got agent=%q status=%q", got.Agent, got.AgentStatus)
+	if got.Agent != "claude" {
+		t.Errorf("got agent=%q", got.Agent)
 	}
 
-	s.AgentStatus = types.AgentStatusWorking
+	s.BaseRef = "def456"
 	if err := d.UpdateSession(s); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 
 	got, _ = d.GetSession("sess-1")
-	if got.AgentStatus != types.AgentStatusWorking {
-		t.Errorf("expected working, got %q", got.AgentStatus)
+	if got.BaseRef != "def456" {
+		t.Errorf("expected updated base_ref, got %q", got.BaseRef)
 	}
 
 	summaries, err := d.ListSessions("", 0)
@@ -66,7 +65,7 @@ func TestSessionCRUD(t *testing.T) {
 func TestChangedFiles(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
-	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
 
 	f := &types.ChangedFile{Path: "main.go", Status: types.FileModified}
 	if err := d.UpsertChangedFile("sess-1", f); err != nil {
@@ -94,7 +93,7 @@ func TestChangedFiles(t *testing.T) {
 func TestComments(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
-	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
 
 	c := &types.ReviewComment{
 		ID:          "cmt-1",
@@ -142,7 +141,7 @@ func TestComments(t *testing.T) {
 func TestContentItems(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
-	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
 
 	item := &types.ContentItem{
 		ID:          "item-1",
@@ -176,7 +175,7 @@ func TestContentItems(t *testing.T) {
 func TestDeleteComment(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
-	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
 
 	c := &types.ReviewComment{
 		ID:          "cmt-1",
@@ -210,7 +209,7 @@ func TestDeleteComment(t *testing.T) {
 func TestClearComments(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
-	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
 
 	c1 := &types.ReviewComment{ID: "cmt-a1", TargetType: types.TargetFile, TargetRef: "a.go", Type: types.CommentIssue, Body: "first", ReviewRound: 1, CreatedAt: now, UpdatedAt: now}
 	c2 := &types.ReviewComment{ID: "cmt-a2", TargetType: types.TargetFile, TargetRef: "b.go", Type: types.CommentIssue, Body: "second", ReviewRound: 1, CreatedAt: now, UpdatedAt: now}
@@ -233,7 +232,7 @@ func TestClearComments(t *testing.T) {
 func TestDeleteChangedFiles(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
-	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
 
 	f1 := &types.ChangedFile{Path: "main.go", Status: types.FileModified}
 	f2 := &types.ChangedFile{Path: "util.go", Status: types.FileAdded}
@@ -256,7 +255,7 @@ func TestDeleteChangedFiles(t *testing.T) {
 func TestCreateAndGetSubmissions(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
-	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
 
 	sub := &types.ReviewSubmission{
 		ID:              "sub-1",
@@ -299,7 +298,7 @@ func TestCreateAndGetSubmissions(t *testing.T) {
 func TestAdditionalFiles(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
-	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
 
 	af := &types.AdditionalFile{Path: "/tmp/extra.go", Name: "extra.go"}
 	if err := d.UpsertAdditionalFile("sess-1", af); err != nil {
@@ -355,8 +354,8 @@ func TestAdditionalFiles(t *testing.T) {
 func TestListSessions_WithFilter(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
-	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp/repo-a", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
-	d.CreateSession(&types.ReviewSession{ID: "sess-2", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp/repo-b", BaseRef: "def", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp/repo-a", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-2", Agent: "claude", RepoRoot: "/tmp/repo-b", BaseRef: "def", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
 
 	summaries, err := d.ListSessions("/tmp/repo-a", 0)
 	if err != nil {
@@ -376,9 +375,9 @@ func TestListSessions_WithFilter(t *testing.T) {
 func TestListSessions_WithLimit(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
-	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
-	d.CreateSession(&types.ReviewSession{ID: "sess-2", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "def", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
-	d.CreateSession(&types.ReviewSession{ID: "sess-3", Agent: "claude", AgentStatus: types.AgentStatusIdle, RepoRoot: "/tmp", BaseRef: "ghi", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-2", Agent: "claude", RepoRoot: "/tmp", BaseRef: "def", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-3", Agent: "claude", RepoRoot: "/tmp", BaseRef: "ghi", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
 
 	summaries, err := d.ListSessions("", 2)
 	if err != nil {

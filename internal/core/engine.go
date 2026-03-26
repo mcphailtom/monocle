@@ -16,7 +16,6 @@ type EventKind string
 
 const (
 	EventFileChanged           EventKind = "file_changed"
-	EventAgentStatusChanged    EventKind = "agent_status_changed"
 	EventFeedbackStatusChanged EventKind = "feedback_status_changed"
 	EventContentItemAdded      EventKind = "content_item_added"
 	EventPauseChanged          EventKind = "pause_changed"
@@ -122,8 +121,7 @@ type EngineAPI interface {
 	RequestPause()
 	CancelPause()
 
-	// Agent status
-	GetAgentStatus() types.AgentStatus
+	// Feedback status
 	GetFeedbackStatus() string
 
 	// Connection status

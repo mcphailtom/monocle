@@ -35,7 +35,6 @@ func (sm *SessionManager) CreateSession(opts SessionOptions) (*types.ReviewSessi
 	session := &types.ReviewSession{
 		ID:             uuid.New().String(),
 		Agent:          opts.Agent,
-		AgentStatus:    types.AgentStatusIdle,
 		RepoRoot:       opts.RepoRoot,
 		BaseRef:        baseRef,
 		IgnorePatterns: opts.IgnorePatterns,

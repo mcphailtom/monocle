@@ -762,16 +762,10 @@ func (e *Engine) Submit(action types.SubmitAction, body string) (*SubmitResult, 
 		// Agent connected: advance round for a clean slate
 		e.mu.Lock()
 		_ = e.sessions.AdvanceRound(session)
-		session.AgentStatus = types.AgentStatusIdle
-		_ = e.database.UpdateSession(session)
 		e.mu.Unlock()
 
 		e.feedback.ClearStatus()
 
-		e.emit(EventAgentStatusChanged, EventPayload{
-			Kind:   EventAgentStatusChanged,
-			Status: string(types.AgentStatusIdle),
-		})
 		e.emit(EventFeedbackStatusChanged, EventPayload{
 			Kind:   EventFeedbackStatusChanged,
 			Status: "none",
@@ -960,17 +954,6 @@ func (e *Engine) SubmitContentForReview(id, title, content, contentType string, 
 func (e *Engine) RequestPause() {
 	e.feedback.SetPauseRequested(true)
 
-	e.mu.Lock()
-	if e.current != nil {
-		e.current.AgentStatus = types.AgentStatusPaused
-		_ = e.database.UpdateSession(e.current)
-	}
-	e.mu.Unlock()
-
-	e.emit(EventAgentStatusChanged, EventPayload{
-		Kind:   EventAgentStatusChanged,
-		Status: string(types.AgentStatusPaused),
-	})
 	e.emit(EventPauseChanged, EventPayload{
 		Kind:   EventPauseChanged,
 		Status: "pause_requested",
@@ -981,32 +964,10 @@ func (e *Engine) RequestPause() {
 func (e *Engine) CancelPause() {
 	e.feedback.SetPauseRequested(false)
 
-	e.mu.Lock()
-	if e.current != nil {
-		e.current.AgentStatus = types.AgentStatusWorking
-		_ = e.database.UpdateSession(e.current)
-	}
-	e.mu.Unlock()
-
-	e.emit(EventAgentStatusChanged, EventPayload{
-		Kind:   EventAgentStatusChanged,
-		Status: string(types.AgentStatusWorking),
-	})
 	e.emit(EventPauseChanged, EventPayload{
 		Kind:   EventPauseChanged,
 		Status: "cancelled",
 	})
-}
-
-// -- Agent status --
-
-func (e *Engine) GetAgentStatus() types.AgentStatus {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-	if e.current == nil {
-		return types.AgentStatusIdle
-	}
-	return e.current.AgentStatus
 }
 
 func (e *Engine) GetFeedbackStatus() string {
@@ -1091,19 +1052,6 @@ func (e *Engine) handlePollFeedback(msg *protocol.PollFeedbackMsg) *protocol.Pol
 	if msg.Wait {
 		review := e.WaitForFeedback()
 
-		// Update agent status to working now that feedback has been picked up
-		e.mu.Lock()
-		if e.current != nil {
-			e.current.AgentStatus = types.AgentStatusWorking
-			_ = e.database.UpdateSession(e.current)
-		}
-		e.mu.Unlock()
-
-		e.emit(EventAgentStatusChanged, EventPayload{
-			Kind:   EventAgentStatusChanged,
-			Status: string(types.AgentStatusWorking),
-		})
-
 		return &protocol.PollFeedbackResponse{
 			Type:         protocol.TypePollFeedbackResponse,
 			HasFeedback:  true,
@@ -1121,19 +1069,6 @@ func (e *Engine) handlePollFeedback(msg *protocol.PollFeedbackMsg) *protocol.Pol
 			HasFeedback: false,
 		}
 	}
-
-	// Update agent status to working now that feedback has been picked up
-	e.mu.Lock()
-	if e.current != nil {
-		e.current.AgentStatus = types.AgentStatusWorking
-		_ = e.database.UpdateSession(e.current)
-	}
-	e.mu.Unlock()
-
-	e.emit(EventAgentStatusChanged, EventPayload{
-		Kind:   EventAgentStatusChanged,
-		Status: string(types.AgentStatusWorking),
-	})
 
 	return &protocol.PollFeedbackResponse{
 		Type:         protocol.TypePollFeedbackResponse,

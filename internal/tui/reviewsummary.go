@@ -12,10 +12,10 @@ import (
 )
 
 type reviewSummaryModel struct {
-	active          bool
-	summary         *types.ReviewSummary
-	agentStopped    bool
-	action          types.SubmitAction
+	active         bool
+	summary        *types.ReviewSummary
+	agentConnected bool
+	action         types.SubmitAction
 	body            string
 	copyToClipboard bool
 	width           int
@@ -43,10 +43,10 @@ type yankFailMsg struct {
 	err string
 }
 
-func (m *reviewSummaryModel) open(summary *types.ReviewSummary, agentStopped bool) {
+func (m *reviewSummaryModel) open(summary *types.ReviewSummary, agentConnected bool) {
 	m.active = true
 	m.summary = summary
-	m.agentStopped = agentStopped
+	m.agentConnected = agentConnected
 	m.body = ""
 	m.copyToClipboard = false
 
@@ -297,10 +297,10 @@ func (m reviewSummaryModel) View() string {
 	b.WriteString("\n\n")
 
 	// Delivery status
-	if m.agentStopped {
+	if m.agentConnected {
 		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("Review will be sent immediately"))
 	} else {
-		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("Review will be queued until Claude Code checks for feedback"))
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render("Review will be queued until Claude Code connects"))
 	}
 	b.WriteString("\n\n")
 

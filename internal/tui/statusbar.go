@@ -5,30 +5,27 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-
-	"github.com/anthropics/monocle/internal/types"
 )
 
 type statusBarModel struct {
-	agentStatus    types.AgentStatus
-	agentName      string
-	baseRef        string
-	fileCount      int
-	commentCount   int
-	feedbackStatus string
-	connected      bool
-	commandMode    bool
-	commandBuffer  string
-	contextHints   string // override hints when set (e.g. comment-specific keybinds)
-	diffStyle      diffStyle
-	width          int
-	theme          Theme
+	agentName       string
+	baseRef         string
+	fileCount       int
+	commentCount    int
+	feedbackStatus  string
+	subscriberCount int
+	socketStarted   bool
+	commandMode     bool
+	commandBuffer   string
+	contextHints    string // override hints when set (e.g. comment-specific keybinds)
+	diffStyle       diffStyle
+	width           int
+	theme           Theme
 }
 
 func newStatusBarModel(theme Theme) statusBarModel {
 	return statusBarModel{
-		agentStatus: types.AgentStatusIdle,
-		theme:       theme,
+		theme: theme,
 	}
 }
 
@@ -42,35 +39,19 @@ func (m statusBarModel) View() string {
 		return m.theme.StatusBar.Width(m.width).Render(cmdLine)
 	}
 
-	// Agent status
-	var statusStr string
-	var statusStyle lipgloss.Style
-	switch m.agentStatus {
-	case types.AgentStatusIdle:
-		statusStr = "IDLE"
-		statusStyle = m.theme.StatusIdle
-	case types.AgentStatusWorking:
-		statusStr = "WORKING"
-		statusStyle = m.theme.StatusWorking
-	case types.AgentStatusPaused:
-		statusStr = "PAUSED"
-		statusStyle = m.theme.StatusStopped
+	// Connection status
+	var connLabel string
+	switch {
+	case m.subscriberCount > 0:
+		connLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("● Connected")
+	case m.socketStarted:
+		connLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render("○ Waiting")
 	default:
-		statusStr = "IDLE"
-		statusStyle = m.theme.StatusIdle
-	}
-	status := statusStyle.Bold(true).Render(fmt.Sprintf("[%s]", statusStr))
-
-	// Connection indicator
-	var connIndicator string
-	if m.connected {
-		connIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("●")
-	} else {
-		connIndicator = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render("○")
+		connLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Render("● Disconnected")
 	}
 
 	// Info sections
-	parts := []string{status, connIndicator}
+	parts := []string{connLabel}
 
 	if m.baseRef != "" && m.baseRef != "WORKING" {
 		ref := m.baseRef

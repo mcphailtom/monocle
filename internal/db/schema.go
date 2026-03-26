@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-const schemaVersion = 2
+const schemaVersion = 3
 
 const dropSQL = `
 DROP TABLE IF EXISTS review_submissions;
@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS schema_version (
 CREATE TABLE IF NOT EXISTS sessions (
 	id TEXT PRIMARY KEY,
 	agent TEXT NOT NULL,
-	agent_status TEXT NOT NULL DEFAULT 'idle',
 	repo_root TEXT NOT NULL,
 	base_ref TEXT NOT NULL,
 	ignore_patterns TEXT NOT NULL DEFAULT '[]',
@@ -134,7 +133,7 @@ func Migrate(db *sql.DB) error {
 		// Verify schema integrity — check that key columns exist.
 		var colCount int
 		err = db.QueryRow(
-			"SELECT COUNT(*) FROM pragma_table_info('sessions') WHERE name = 'agent_status'",
+			"SELECT COUNT(*) FROM pragma_table_info('sessions') WHERE name = 'repo_root'",
 		).Scan(&colCount)
 		if err != nil || colCount == 1 {
 			return nil // schema looks good
