@@ -53,6 +53,8 @@ class EngineConnection {
   private reconnecting = false;
   private closed = false;
   private _connected = false;
+  private reconnectAttempts = 0;
+  private static readonly MAX_RECONNECT_ATTEMPTS = 50;
 
   get isConnected(): boolean {
     return this._connected;
@@ -181,14 +183,21 @@ class EngineConnection {
 
     const attempt = (delay: number) => {
       if (this.closed) return;
-      setTimeout(async () => {
+      if (this.reconnectAttempts >= EngineConnection.MAX_RECONNECT_ATTEMPTS) {
+        this.close();
+        return;
+      }
+      this.reconnectAttempts++;
+      const timer = setTimeout(async () => {
         try {
           await this.connect();
           this.reconnecting = false;
+          this.reconnectAttempts = 0;
         } catch {
           attempt(Math.min(delay * 2, 10000));
         }
       }, delay);
+      timer.unref();
     };
 
     attempt(1000);
@@ -609,6 +618,15 @@ async function main() {
     engine.close();
     process.exit(0);
   });
+
+  // Detect parent death: when Claude Code exits, stdin's write end closes.
+  // The MCP SDK does not handle this, so we listen directly.
+  const exitOnStdinClose = () => {
+    engine.close();
+    process.exit(0);
+  };
+  process.stdin.on("end", exitOnStdinClose);
+  process.stdin.on("close", exitOnStdinClose);
 }
 
 main().catch((err) => {
