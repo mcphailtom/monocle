@@ -44,10 +44,9 @@ func (m statusBarModel) View() string {
 	name := m.agentName
 	switch {
 	case m.subscriberCount > 0:
+		connLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("● Connected")
 		if name != "" {
-			connLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("● Connected " + name)
-		} else {
-			connLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("● Connected")
+			connLabel += " " + name
 		}
 	case m.socketStarted:
 		connLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render("○ Waiting")
