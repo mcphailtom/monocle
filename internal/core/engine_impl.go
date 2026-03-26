@@ -511,6 +511,45 @@ func (e *Engine) ClearComments() error {
 	return nil
 }
 
+// ClearReview resets the current review to a blank slate: clears all comments,
+// content items/plans, and reviewed states. Does not advance the round or
+// create a submission record.
+func (e *Engine) ClearReview() error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if e.current == nil {
+		return fmt.Errorf("no active session")
+	}
+
+	sessionID := e.current.ID
+
+	if err := e.database.ClearComments(sessionID); err != nil {
+		return fmt.Errorf("clear comments: %w", err)
+	}
+	e.current.Comments = nil
+
+	if err := e.database.DeleteContentItems(sessionID); err != nil {
+		return fmt.Errorf("clear content items: %w", err)
+	}
+	e.current.ContentItems = nil
+
+	if err := e.database.ResetAllReviewed(sessionID); err != nil {
+		return fmt.Errorf("reset reviewed: %w", err)
+	}
+	for i := range e.current.ChangedFiles {
+		e.current.ChangedFiles[i].Reviewed = false
+	}
+	for i := range e.current.AdditionalFiles {
+		e.current.AdditionalFiles[i].Reviewed = false
+	}
+	for k := range e.current.FileStatuses {
+		e.current.FileStatuses[k] = false
+	}
+
+	return nil
+}
+
 // -- Review status --
 
 func (e *Engine) MarkReviewed(path string) error {

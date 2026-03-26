@@ -201,6 +201,7 @@ When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-co
 | `Ctrl+g` | Open external editor (comment/submit modal) |
 | `Ctrl+y` | Copy review to clipboard |
 | `P` / `:pause` | Pause Claude Code (wait for your review) |
+| `D` / `:clear` | Clear review (all comments, plans, reviewed states) |
 | `F` | Toggle focus mode (hide sidebar, enable wrap) |
 | `:mark-all-reviewed` | Mark all files as reviewed |
 | `:mark-all-unreviewed` | Mark all files as unreviewed |

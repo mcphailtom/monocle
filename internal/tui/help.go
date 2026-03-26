@@ -121,6 +121,7 @@ func (m helpModel) View() string {
 			{"Ctrl+g", "Open external editor (comment/submit modal)"},
 			{"Ctrl+y", "Copy review to clipboard"},
 			{Label(km.Pause) + " / :pause", "Toggle pause (ask Claude Code to wait)"},
+			{Label(km.ClearReview) + " / :clear", "Clear review (comments, plans, reviewed)"},
 			{Label(km.ToggleFocusMode), "Toggle focus mode"},
 			{":mark-all-reviewed", "Mark all files as reviewed"},
 			{":mark-all-unreviewed", "Mark all files as unreviewed"},

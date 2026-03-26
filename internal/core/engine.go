@@ -89,6 +89,7 @@ type EngineAPI interface {
 	DeleteComment(commentID string) error
 	ResolveComment(commentID string) error
 	ClearComments() error
+	ClearReview() error
 
 	// Review status
 	MarkReviewed(path string) error

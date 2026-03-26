@@ -372,6 +372,97 @@ func TestClearComments(t *testing.T) {
 	}
 }
 
+func TestClearReview(t *testing.T) {
+	database, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+
+	e := &Engine{
+		feedback:    NewFeedbackQueue(),
+		database:    database,
+		subscribers: make(map[EventKind]map[int]EventCallback),
+	}
+	e.current = &types.ReviewSession{
+		ID:           "sess-1",
+		FileStatuses: make(map[string]bool),
+		ReviewRound:  1,
+		ChangedFiles: []types.ChangedFile{
+			{Path: "main.go", Status: types.FileModified, Reviewed: true},
+		},
+	}
+	e.current.FileStatuses["main.go"] = true
+
+	if err := database.CreateSession(e.current); err != nil {
+		t.Fatalf("create session: %v", err)
+	}
+
+	// Add a comment
+	target := CommentTarget{
+		TargetType: types.TargetFile,
+		TargetRef:  "main.go",
+		LineStart:  1,
+		LineEnd:    1,
+	}
+	if _, err := e.AddComment(target, types.CommentIssue, "fix this"); err != nil {
+		t.Fatalf("AddComment: %v", err)
+	}
+
+	// Add a content item (plan)
+	item := &types.ContentItem{
+		ID:      "plan-1",
+		Title:   "Plan",
+		Content: "some plan",
+		IsPlan:  true,
+	}
+	if err := database.UpsertContentItem("sess-1", item); err != nil {
+		t.Fatalf("UpsertContentItem: %v", err)
+	}
+	e.current.ContentItems = []types.ContentItem{*item}
+
+	// Mark file as reviewed in DB
+	if err := database.MarkFileReviewed("sess-1", "main.go", true); err != nil {
+		t.Fatalf("MarkFileReviewed: %v", err)
+	}
+
+	// Clear the review
+	if err := e.ClearReview(); err != nil {
+		t.Fatalf("ClearReview: %v", err)
+	}
+
+	// Verify comments cleared
+	if len(e.current.Comments) != 0 {
+		t.Errorf("expected 0 comments in memory, got %d", len(e.current.Comments))
+	}
+	dbComments, _ := database.GetComments("sess-1")
+	if len(dbComments) != 0 {
+		t.Errorf("expected 0 comments in DB, got %d", len(dbComments))
+	}
+
+	// Verify content items cleared
+	if len(e.current.ContentItems) != 0 {
+		t.Errorf("expected 0 content items in memory, got %d", len(e.current.ContentItems))
+	}
+	dbItems, _ := database.GetContentItems("sess-1")
+	if len(dbItems) != 0 {
+		t.Errorf("expected 0 content items in DB, got %d", len(dbItems))
+	}
+
+	// Verify reviewed states reset
+	if e.current.ChangedFiles[0].Reviewed {
+		t.Error("expected file reviewed=false")
+	}
+	if e.current.FileStatuses["main.go"] {
+		t.Error("expected file status=false")
+	}
+
+	// Verify round NOT advanced
+	if e.current.ReviewRound != 1 {
+		t.Errorf("expected round to stay at 1, got %d", e.current.ReviewRound)
+	}
+}
+
 func TestMarkReviewedAndUnmark(t *testing.T) {
 	database, err := db.Open(":memory:")
 	if err != nil {

@@ -37,6 +37,16 @@ func (s *stubEngine) ClearComments() error {
 	s.cleared = true
 	return nil
 }
+func (s *stubEngine) ClearReview() error {
+	s.cleared = true
+	s.session.Comments = nil
+	s.session.ContentItems = nil
+	s.contentItems = nil
+	for i := range s.session.ChangedFiles {
+		s.session.ChangedFiles[i].Reviewed = false
+	}
+	return nil
+}
 
 func newTestSession(withComments bool) *types.ReviewSession {
 	session := &types.ReviewSession{ID: "test-session"}
@@ -122,5 +132,71 @@ func TestSubmitSuccess_ClearsStaleContentView(t *testing.T) {
 	}
 	if app.diffView.path != "" {
 		t.Errorf("expected path to be cleared, got %q", app.diffView.path)
+	}
+}
+
+func TestClearReview_OpensConfirmWhenHasState(t *testing.T) {
+	engine := &stubEngine{
+		cfg: &types.Config{},
+		session: &types.ReviewSession{
+			ID:       "test",
+			Comments: []types.ReviewComment{{ID: "c1", Body: "fix"}},
+		},
+	}
+	m := NewApp(engine)
+
+	cmd := m.executeCommand("clear")
+	if cmd == nil {
+		t.Fatal("expected a command from clear")
+	}
+	msg := cmd()
+	confirm, ok := msg.(openConfirmMsg)
+	if !ok {
+		t.Fatalf("expected openConfirmMsg, got %T", msg)
+	}
+	if confirm.action != confirmClear {
+		t.Errorf("expected confirmClear action, got %v", confirm.action)
+	}
+}
+
+func TestClearReview_NoopWhenEmpty(t *testing.T) {
+	engine := &stubEngine{
+		cfg:     &types.Config{},
+		session: &types.ReviewSession{ID: "test"},
+	}
+	m := NewApp(engine)
+
+	cmd := m.executeCommand("clear")
+	if cmd == nil {
+		t.Fatal("expected a command from clear")
+	}
+	msg := cmd()
+	if msg != nil {
+		t.Errorf("expected nil message when nothing to clear, got %T", msg)
+	}
+}
+
+func TestClearReview_ClearsContentView(t *testing.T) {
+	engine := &stubEngine{
+		cfg: &types.Config{},
+		session: &types.ReviewSession{
+			ID:           "test",
+			ContentItems: []types.ContentItem{{ID: "plan-1", Title: "Plan"}},
+		},
+		contentItems: []types.ContentItem{{ID: "plan-1", Title: "Plan"}},
+	}
+	m := NewApp(engine)
+	m.diffView.contentMode = true
+	m.diffView.contentID = "plan-1"
+	m.diffView.path = "plan-1"
+
+	result, _ := m.Update(reviewClearedMsg{reloadPath: "plan-1", isContent: true})
+	app := result.(appModel)
+
+	if app.diffView.contentMode {
+		t.Error("expected contentMode to be cleared")
+	}
+	if app.diffView.contentID != "" {
+		t.Errorf("expected contentID to be cleared, got %q", app.diffView.contentID)
 	}
 }

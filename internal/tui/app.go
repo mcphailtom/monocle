@@ -103,6 +103,12 @@ type commentsClearedMsg struct {
 	isAdditionalFile bool
 }
 
+type reviewClearedMsg struct {
+	reloadPath       string
+	isContent        bool
+	isAdditionalFile bool
+}
+
 type resolveCommentMsg struct {
 	commentID string
 }
@@ -1034,6 +1040,12 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				_ = engine.ClearComments()
 				return commentsClearedMsg{reloadPath: currentPath, isContent: isContent, isAdditionalFile: m.diffView.additionalFilePath != ""}
 			}
+		case confirmClear:
+			isAdditional := m.diffView.additionalFilePath != ""
+			return m, func() tea.Msg {
+				_ = engine.ClearReview()
+				return reviewClearedMsg{reloadPath: currentPath, isContent: isContent, isAdditionalFile: isAdditional}
+			}
 		}
 		return m, nil
 
@@ -1123,6 +1135,37 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	// After full review clear (:clear), refresh everything
+	case reviewClearedMsg:
+		m.sidebar.contentItems = nil
+		m.sidebar.files = m.engine.GetChangedFiles()
+		m.sidebar.applyReviewedFilter()
+		m.sidebar.rebuildTree()
+		m.sidebar.clampOffset()
+		recalcStackedLayout(&m)
+		m.statusBar.fileCount = len(m.sidebar.files)
+		session := m.engine.GetSession()
+		if session != nil {
+			m.statusBar.baseRef = session.BaseRef
+			m.statusBar.commentCount = len(session.Comments)
+		}
+		// If viewing a content item, it no longer exists — clear the view
+		if msg.isContent {
+			m.diffView.contentMode = false
+			m.diffView.contentID = ""
+			m.diffView.path = ""
+			m.diffView.hunks = nil
+			m.diffView.lines = nil
+			m.diffView.comments = nil
+			return m, nil
+		}
+		// Reload current file view to remove inline comment markers
+		if msg.reloadPath != "" && msg.isAdditionalFile {
+			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.reloadPath, isAdditionalFile: true})
+		} else if msg.reloadPath != "" {
+			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.reloadPath})
+		}
+		return m, nil
 
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
@@ -1325,6 +1368,9 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case Matches(key, km.Pause):
 		return m, m.executeCommand("pause")
+
+	case Matches(key, km.ClearReview):
+		return m, m.executeCommand("clear")
 
 	case Matches(key, km.ToggleFocusMode):
 		if m.focusModeActive {
@@ -1560,6 +1606,39 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 				title:   "Discard Review",
 				message: "Discard all pending comments? This cannot be undone.",
 				action:  confirmDiscard,
+			}
+		}
+
+	case "clear":
+		return func() tea.Msg {
+			session := engine.GetSession()
+			if session == nil {
+				return nil
+			}
+			hasComments := len(session.Comments) > 0
+			hasContent := len(session.ContentItems) > 0
+			hasReviewed := false
+			for _, f := range session.ChangedFiles {
+				if f.Reviewed {
+					hasReviewed = true
+					break
+				}
+			}
+			if !hasReviewed {
+				for _, f := range session.AdditionalFiles {
+					if f.Reviewed {
+						hasReviewed = true
+						break
+					}
+				}
+			}
+			if !hasComments && !hasContent && !hasReviewed {
+				return nil
+			}
+			return openConfirmMsg{
+				title:   "Clear Review",
+				message: "Clear all comments, plans, and reviewed states? This cannot be undone.",
+				action:  confirmClear,
 			}
 		}
 
