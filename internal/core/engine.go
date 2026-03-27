@@ -110,6 +110,7 @@ type EngineAPI interface {
 	SetBaseRef(ref string) error
 	SetAutoAdvanceRef(enabled bool)
 	IsAutoAdvanceRef() bool
+	SelectedBaseRef() string
 	RecentCommits(n int) ([]LogEntry, error)
 
 	// Server (socket for MCP channel)

@@ -31,6 +31,7 @@ type Engine struct {
 	// autoAdvanceRef: when true, baseRef advances to HEAD on each refresh
 	autoAdvanceRef bool
 	lastKnownHead  string
+	selectedRef    string // the commit the user picked (BaseRef stores its parent for diffing)
 
 	// event subscribers: EventKind -> subscriber ID -> callback
 	subscribers map[EventKind]map[int]EventCallback
@@ -903,6 +904,12 @@ func (e *Engine) SetBaseRef(ref string) error {
 		}
 	}
 
+	// Remember the user's actual selection for display purposes
+	selected, err := e.git.ResolveRef(ref)
+	if err != nil {
+		selected = resolved
+	}
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -913,6 +920,7 @@ func (e *Engine) SetBaseRef(ref string) error {
 	e.current.BaseRef = resolved
 	e.current.UpdatedAt = time.Now()
 	e.autoAdvanceRef = false
+	e.selectedRef = selected
 	_ = e.database.UpdateSession(e.current)
 
 	return nil
@@ -925,7 +933,17 @@ func (e *Engine) SetAutoAdvanceRef(enabled bool) {
 	e.autoAdvanceRef = enabled
 	if enabled {
 		e.lastKnownHead = "" // Force HEAD re-detection on next refresh
+		e.selectedRef = ""
 	}
+}
+
+// SelectedBaseRef returns the commit the user selected in the ref picker.
+// This differs from session.BaseRef which stores the parent for diffing.
+// Returns empty string when in auto-advance mode.
+func (e *Engine) SelectedBaseRef() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.selectedRef
 }
 
 // IsAutoAdvanceRef returns whether auto-advance is enabled.

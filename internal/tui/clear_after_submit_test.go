@@ -24,6 +24,7 @@ func (s *stubEngine) GetSession() *types.ReviewSession           { return s.sess
 func (s *stubEngine) GetFeedbackStatus() string { return "" }
 func (s *stubEngine) GetQueuedCount() int        { return 0 }
 func (s *stubEngine) ReloadPendingFeedback()     {}
+func (s *stubEngine) SelectedBaseRef() string    { return "" }
 func (s *stubEngine) GetChangedFiles() []types.ChangedFile       { return nil }
 func (s *stubEngine) GetAdditionalFiles() []types.AdditionalFile { return nil }
 func (s *stubEngine) MarkContentReviewed(id string) error        { return nil }

@@ -406,7 +406,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Sync status bar file count
 		session := m.engine.GetSession()
 		if session != nil {
-			m.statusBar.baseRef = session.BaseRef
+			m.statusBar.baseRef = m.displayBaseRef(session)
 			m.statusBar.agentName = session.Agent
 		}
 		m.statusBar.fileCount = len(msg.files)
@@ -480,7 +480,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusBar.fileCount = len(m.sidebar.files)
 		session := m.engine.GetSession()
 		if session != nil {
-			m.statusBar.baseRef = session.BaseRef
+			m.statusBar.baseRef = m.displayBaseRef(session)
 			m.statusBar.commentCount = len(session.Comments)
 		}
 		// Auto-advance to next unreviewed item after marking reviewed
@@ -595,9 +595,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case baseRefChangedMsg:
-		session := m.engine.GetSession()
-		if session != nil {
-			m.statusBar.baseRef = session.BaseRef
+		if session := m.engine.GetSession(); session != nil {
+			m.statusBar.baseRef = m.displayBaseRef(session)
 		}
 		return m, m.refreshFiles()
 
@@ -614,9 +613,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Pre-select the currently active ref
 		m.refPicker.cursor = 0
 		if !msg.autoActive {
-			if session := m.engine.GetSession(); session != nil && session.BaseRef != "" {
+			// Use the user's selected ref for matching (not the parent used for diffing)
+			displayRef := m.engine.SelectedBaseRef()
+			if displayRef == "" {
+				if session := m.engine.GetSession(); session != nil {
+					displayRef = session.BaseRef
+				}
+			}
+			if displayRef != "" {
 				for i, entry := range msg.entries {
-					if strings.HasPrefix(entry.Hash, session.BaseRef) || strings.HasPrefix(session.BaseRef, entry.Hash) {
+					if strings.HasPrefix(entry.Hash, displayRef) || strings.HasPrefix(displayRef, entry.Hash) {
 						m.refPicker.cursor = i + 1
 						break
 					}
@@ -913,7 +919,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if session != nil {
 			m.statusBar.commentCount = len(session.Comments)
 			m.statusBar.fileCount = len(session.ChangedFiles)
-			m.statusBar.baseRef = session.BaseRef
+			m.statusBar.baseRef = m.displayBaseRef(session)
 		}
 
 		// If no push-mode agent was connected, feedback is queued for pull delivery.
@@ -1112,7 +1118,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusBar.fileCount = len(m.sidebar.files)
 		session := m.engine.GetSession()
 		if session != nil {
-			m.statusBar.baseRef = session.BaseRef
+			m.statusBar.baseRef = m.displayBaseRef(session)
 			m.statusBar.commentCount = len(session.Comments)
 		}
 		// Reload current view to remove inline comment markers
@@ -1136,7 +1142,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusBar.fileCount = len(m.sidebar.files)
 		session := m.engine.GetSession()
 		if session != nil {
-			m.statusBar.baseRef = session.BaseRef
+			m.statusBar.baseRef = m.displayBaseRef(session)
 			m.statusBar.commentCount = len(session.Comments)
 		}
 		// If viewing a content item, it no longer exists — clear the view
@@ -1718,6 +1724,16 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 
 type baseRefChangedMsg struct {
 	err string
+}
+
+// displayBaseRef returns the ref to show in the status bar.
+// Prefers the user's selected ref over the internal diff baseline (which is
+// the parent commit used for git diff).
+func (m appModel) displayBaseRef(session *types.ReviewSession) string {
+	if selected := m.engine.SelectedBaseRef(); selected != "" {
+		return selected
+	}
+	return session.BaseRef
 }
 
 // stackedSidebarHeight returns the height for the sidebar in stacked mode.
