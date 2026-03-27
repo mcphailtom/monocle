@@ -8,7 +8,9 @@ You can run monocle either side-by-side with your agent:
 Or full-screen to get maximum space for your review:
 ![image](https://github.com/user-attachments/assets/91daaa6f-c838-46df-a699-aaedae62b240)
 
-Monocle is a TUI that runs alongside [Claude Code](https://claude.com/claude-code). It connects via an [MCP channel](https://code.claude.com/docs/en/channels-reference) that pushes your review feedback directly into the agent's context. No copy-pasting, no window switching, no waiting.
+Monocle is a TUI that runs alongside your AI coding agent. You review diffs in real time as the agent writes code, leave line-level comments — issues, suggestions, notes — and submit a structured review in one batch. The agent receives your feedback and starts fixing things immediately, just like a PR review but live.
+
+Monocle connects to your agent via [MCP](https://modelcontextprotocol.io/). With [Claude Code](https://claude.com/claude-code) and [MCP channels](https://code.claude.com/docs/en/channels-reference), feedback is pushed directly into the agent's context the moment you submit. Any other MCP-compatible agent — [OpenCode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google/gemini-cli) — retrieves feedback via the `get_feedback` tool.
 
 ## Why
 
@@ -18,8 +20,9 @@ Monocle gives you a proper review loop without slowing the agent down. It doesn'
 
 ## Requirements
 
-- [Claude Code](https://claude.com/claude-code) v2.1.80+ (channels require claude.ai login, not API keys)
-- A JavaScript runtime for the MCP channel: [Bun](https://bun.sh), [Deno](https://deno.com), or [Node.js](https://nodejs.org) (auto-detected in that order)
+- An MCP-compatible coding agent: [Claude Code](https://claude.com/claude-code), [OpenCode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google/gemini-cli), or any agent that supports MCP tool servers
+- A JavaScript runtime for the MCP server: [Bun](https://bun.sh), [Deno](https://deno.com), or [Node.js](https://nodejs.org) (auto-detected in that order)
+- For push notifications: [Claude Code](https://claude.com/claude-code) v2.1.80+ with [MCP channel support](https://code.claude.com/docs/en/channels-reference) (requires claude.ai login, not API keys)
 - A terminal with 256-color or true color support
 - A [Nerd Font](https://www.nerdfonts.com/) for file icons (optional but recommended)
 
@@ -91,7 +94,11 @@ devbox run -- make build
 
 ## Quick Start
 
-### 1. Install the plugin
+### Claude Code (recommended — push notifications)
+
+Claude Code supports [MCP channels](https://code.claude.com/docs/en/channels-reference), which let Monocle push review feedback directly into the agent's context as a notification. This means the agent learns about your review the moment you submit — no manual step needed. It's the most seamless integration and the way Monocle was designed to be used.
+
+#### 1. Install the plugin
 
 In Claude Code, add Monocle as a plugin marketplace and install:
 
@@ -100,7 +107,7 @@ In Claude Code, add Monocle as a plugin marketplace and install:
 /plugin install monocle@monocle
 ```
 
-### 2. Start reviewing
+#### 2. Start reviewing
 
 In one terminal, start Claude Code with the channel enabled (the flag is required during the [channels research preview](https://code.claude.com/docs/en/channels)):
 
@@ -119,35 +126,64 @@ Claude Code gets tools for checking review status, retrieving feedback, submitti
 
 > **Tip:** If you start or restart Monocle while Claude Code is already running, the MCP channel may need to reconnect. Type `/mcp` in Claude Code and select Monocle to reconnect.
 
-### 3. The review loop
+### Other agents (pull-based feedback)
+
+Monocle works with any agent that supports MCP tool servers. The agent gets the same review tools — it just retrieves feedback by calling `get_feedback` instead of receiving push notifications.
+
+#### 1. Register the MCP server
+
+```bash
+monocle register
+```
+
+This writes Monocle's MCP server config to `.mcp.json`, which works for Claude Code and other agents that read `.mcp.json`. For agents that use their own config format, copy the pre-built config from Monocle's repo:
+
+| Agent | Config file | Slash commands |
+|-------|-------------|----------------|
+| Claude Code | `.mcp.json` (via `monocle register`) | `plugin/commands/` |
+| OpenCode | `opencode.json` | `.opencode/commands/` |
+| Codex CLI | `.codex/config.toml` | — |
+| Gemini CLI | `.gemini/settings.json` | `.gemini/commands/` |
+
+Copy the relevant config and command files into your project to get started.
+
+#### 2. Start reviewing
+
+Start your agent and Monocle in separate terminals. Review and submit feedback the same way — the only difference is how the agent picks it up.
+
+When you submit a review, Monocle queues it for delivery. The agent retrieves it by calling the `get_feedback` tool, either via the `/get-feedback` slash command or by calling the tool directly.
+
+### The review loop
 
 Navigate with `j`/`k`, add comments with `c`, and use `v` for visual (multi-line) selections. Press `?` to see all keybindings, or see the full [Keybindings](#keybindings) reference.
 
-**Submit** (`S`): Your review is formatted and pushed to Claude Code via the MCP channel. If there are no comments, it's treated as an approval. Toggle the "Copy to clipboard" checkbox with `Shift+Tab` in the submit modal to also copy the formatted review when submitting.
+**Submit** (`S`): Your review is formatted and queued for delivery. With Claude Code channels, a push notification prompts the agent to retrieve it immediately. With other agents, the review waits in the queue until the agent calls `get_feedback` or you trigger it with the `/get-feedback` command. Multiple reviews can accumulate in the queue — the agent receives them all combined when it pulls. If there are no comments, the review is treated as an approval. Toggle the "Copy to clipboard" checkbox with `Shift+Tab` in the submit modal to also copy the formatted review when submitting.
 
 **External editor** (`Ctrl+g`): In the comment or submit modal, opens the current text in your `$VISUAL` or `$EDITOR` (falls back to `vi`). Edit in your preferred editor, save and quit, and the text is brought back into the modal.
 
 **Yank** (`Ctrl+y`): In the submit modal, copies the formatted review to your system clipboard without submitting, then closes the modal.
 
-**Pause** (`P`): Claude Code receives a notification to stop and wait. It calls `get_feedback` with `wait=true` and blocks until you submit your review. This is for when you want to review before the agent moves on.
+**Pause** (`P`): The agent receives a push notification to stop and wait. It calls `get_feedback` with `wait=true` and blocks until you submit your review. This is for when you want to review before the agent moves on. Pause requires MCP channel support (currently Claude Code only).
 
-### 4. Plan review and focus mode
+### Plan review and focus mode
 
-Monocle isn't limited to reviewing file changes. Claude Code can submit **plans, architecture decisions, and other content** directly to Monocle for review using the `submit_plan` tool. These show up alongside your file diffs in the sidebar, and you can leave line-level comments on them the same way.
+Monocle isn't limited to reviewing file changes. Your agent can submit **plans, architecture decisions, and other content** directly to Monocle for review using the `submit_plan` tool. These show up alongside your file diffs in the sidebar, and you can leave line-level comments on them the same way. You can also trigger this yourself with the `/review-plan` or `/review-plan-wait` slash commands — useful when you want to send the agent's plan to Monocle without waiting for the agent to do it on its own.
 
-This means you can review the agent's *thinking* before it writes code — not just the output. Ask Claude Code to submit its plan first, review it, leave feedback, and only then let it start implementing.
+This means you can review the agent's *thinking* before it writes code — not just the output. Ask the agent to submit its plan first, review it, leave feedback, and only then let it start implementing.
 
-When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-code/plan-mode), Monocle provides the `submit_plan_and_wait` tool which submits the plan to your TUI **and blocks** until you respond with feedback. If you approve, the agent starts implementing. If you request changes, the agent updates the plan and submits again.
+The `submit_plan_and_wait` tool submits a plan to your TUI **and blocks** until you respond with feedback. If you approve, the agent starts implementing. If you request changes, the agent updates the plan and submits again — iterating across as many rounds as it takes until you're satisfied before the agent moves on to implementation.
 
 ## Features
 
-- **MCP channel integration** — Push-based feedback delivery to Claude Code, no polling or copy-pasting
-- **Pause flow** — Ask Claude Code to stop and wait while you review, then release it when ready
+- **Works with any MCP agent** — Claude Code, OpenCode, Codex CLI, Gemini CLI, or any agent that supports MCP tool servers
+- **Push notifications** — With Claude Code channels, feedback is pushed directly into the agent's context the moment you submit
+- **Pull-based feedback** — Agents without channel support retrieve feedback via the `get_feedback` tool; multiple reviews queue up and are delivered together
+- **Pause flow** — Ask your agent to stop and wait while you review, then release it when ready (requires MCP channel support)
 - **Live diff viewer** — Unified and split (side-by-side) views with syntax highlighting and intra-line diffs
 - **Structured comments** — Tag feedback as issues, suggestions, notes, or praise with line-level or file-level precision
 - **Suggested edits** — Press `s` to propose exact code changes with GitHub-style `suggestion` blocks
 - **Visual selection** — Select line ranges for comments with vim-style visual mode
-- **Plan review + focus mode** — Claude Code can submit plans for your review before writing code, with markdown rendering and distraction-free focus mode
+- **Plan review + focus mode** — Your agent can submit plans for your review before writing code, with markdown rendering and distraction-free focus mode
 - **Plan mode gating** — `submit_plan_and_wait` blocks the agent until you approve the plan before implementation begins
 - **Markdown rendering** — Plans and changed `.md` files render with styled headings, bold, italic, lists, and code blocks
 - **Horizontal scrolling & line wrapping** — Navigate wide diffs with `h`/`l` or toggle wrapping with `w`
@@ -158,10 +194,34 @@ When Claude Code enters [plan mode](https://docs.anthropic.com/en/docs/claude-co
 - **Mouse support** — Click to focus panes, scroll with the wheel, click files to select, drag to make visual selections, and interact with modal controls
 - **External editor** — Open comment or submit text in `$VISUAL`/`$EDITOR` with `Ctrl+g` for full editing power
 - **Configurable keybindings** — Override any navigation or action key via config
-- **Feedback queue** — Submit reviews while the agent is working; delivered when Claude Code next checks
-- **Connection indicator** — See at a glance whether Claude Code is connected, with manual socket override for troubleshooting
+- **Feedback queue** — Submit reviews while the agent is working; delivered when the agent next calls `get_feedback`
+- **Connection indicator** — See at a glance whether your agent is connected, with manual socket override for troubleshooting
 - **Review tracking** — Mark files as reviewed with `r` (auto-advances to next), filter sidebar to show only unreviewed or reviewed files with `/`, and all reviewed states reset on submit
 - **Session persistence** — Reviews survive restarts via SQLite
+
+## MCP Tools
+
+Monocle exposes the following tools to your agent via its MCP server:
+
+| Tool | Description |
+|------|-------------|
+| `review_status` | Check if the reviewer has pending feedback or has requested a pause |
+| `get_feedback` | Retrieve queued review feedback. Use `wait=true` to block until feedback is available (pause flow) |
+| `submit_plan` | Submit a plan, architecture decision, or other content for the reviewer to see and comment on |
+| `submit_plan_and_wait` | Submit a plan and block until the reviewer responds. Use for plan-mode iteration — if changes are requested, update the plan and call again |
+| `add_files` | Add additional files for the reviewer to see in Monocle (absolute paths to files or directories) |
+
+## Slash Commands
+
+Monocle ships slash commands for agents that support them. These are thin wrappers around the MCP tools above.
+
+| Command | Available for | Description |
+|---------|---------------|-------------|
+| `/get-feedback` | Claude Code, OpenCode, Gemini CLI | Retrieve pending review feedback |
+| `/review-plan` | Claude Code, OpenCode, Gemini CLI | Find the active plan file and submit it via `submit_plan` |
+| `/review-plan-wait` | Claude Code, OpenCode, Gemini CLI | Find the active plan file and submit it via `submit_plan_and_wait`, then iterate on feedback |
+
+Slash commands live in agent-specific directories (`plugin/commands/` for Claude Code, `.opencode/commands/` for OpenCode, `.gemini/commands/` for Gemini CLI). Codex CLI does not support custom slash commands.
 
 ## Keybindings
 
@@ -326,18 +386,23 @@ The help overlay (`?`) dynamically reflects your custom bindings. Modal keys (En
 
 ```
 ┌─────────────┐                ┌───────────────┐              ┌──────────┐
-│ Claude Code │<--stdio/MCP--->│  channel.ts   │<---socket--->│ monocle  │
+│   Agent     │<--stdio/MCP--->│  channel.ts   │<---socket--->│ monocle  │
 │             │                │ (MCP server)  │              │  (TUI)   │
 └─────────────┘                └───────────────┘              └──────────┘
 ```
 
 1. You leave line-level comments on diffs — issues, suggestions, notes, praise
 2. You press `S` to submit your review
-3. Monocle formats the review and pushes it through the MCP channel as a notification
-4. Claude Code receives the feedback immediately and starts addressing your comments
+3. Monocle queues the review for delivery
+4. The agent picks up the feedback — automatically via push notification (Claude Code with channels) or when you trigger `/get-feedback` — and starts addressing your comments
 5. You see the updated diffs in real time, review again, and iterate
 
-The key difference from other approaches: **Claude Code doesn't have to stop and ask for feedback.** The channel pushes your review into its context the moment you submit. And if you want Claude Code to pause and wait for you to finish reviewing, just press `P` — it receives a pause notification and blocks until your review is ready.
+Feedback is always queued for reliability. How the agent learns about it depends on the integration:
+
+- **Claude Code with channels:** A push notification is sent through the MCP channel with a summary of the review (e.g., "Your reviewer requested changes — 2 issues, 1 suggestion"). The agent calls `get_feedback` to retrieve the full review. If the push fails silently (channels not enabled), the review stays in the queue.
+- **Any MCP agent:** The agent calls the `get_feedback` tool directly, either via a `/get-feedback` slash command or on its own. Multiple reviews accumulate in the queue and are delivered together.
+
+If you want the agent to pause and wait for you to finish reviewing, press `P` — the agent receives a pause notification and blocks until your review is ready.
 
 ## License
 
