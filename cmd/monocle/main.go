@@ -82,7 +82,7 @@ func (cmd *RegisterCmd) Run() error {
 	}
 
 	for _, a := range agents {
-		if a.HasConfig() {
+		if a.HasConfig(cmd.Global) {
 			fmt.Printf("  ✓ %s: already registered\n", a.Name())
 			continue
 		}
@@ -107,7 +107,7 @@ func (cmd *UnregisterCmd) Run() error {
 	}
 
 	for _, a := range agents {
-		if !a.HasConfig() {
+		if !a.HasConfig(cmd.Global) {
 			fmt.Printf("  ✓ %s: nothing to remove\n", a.Name())
 			continue
 		}

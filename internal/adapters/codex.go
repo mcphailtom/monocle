@@ -18,17 +18,12 @@ func (a *CodexAdapter) ConfigPaths(global bool) []string {
 	return []string{codexConfigPath(global)}
 }
 
-func (a *CodexAdapter) HasConfig() bool {
-	for _, global := range []bool{true, false} {
-		content, err := os.ReadFile(codexConfigPath(global))
-		if err != nil {
-			continue
-		}
-		if strings.Contains(string(content), "[mcp_servers.monocle]") {
-			return true
-		}
+func (a *CodexAdapter) HasConfig(global bool) bool {
+	content, err := os.ReadFile(codexConfigPath(global))
+	if err != nil {
+		return false
 	}
-	return false
+	return strings.Contains(string(content), "[mcp_servers.monocle]")
 }
 
 func (a *CodexAdapter) Register(global bool) error {

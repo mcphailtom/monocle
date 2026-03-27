@@ -21,22 +21,18 @@ func (a *OpenCodeAdapter) ConfigPaths(global bool) []string {
 	return paths
 }
 
-func (a *OpenCodeAdapter) HasConfig() bool {
-	for _, global := range []bool{true, false} {
-		path := openCodeConfigPath(global)
-		data, err := ReadJSONFile(path)
-		if err != nil {
-			continue
-		}
-		mcp, ok := data["mcp"].(map[string]any)
-		if !ok {
-			continue
-		}
-		if _, ok := mcp["monocle"].(map[string]any); ok {
-			return true
-		}
+func (a *OpenCodeAdapter) HasConfig(global bool) bool {
+	path := openCodeConfigPath(global)
+	data, err := ReadJSONFile(path)
+	if err != nil {
+		return false
 	}
-	return false
+	mcp, ok := data["mcp"].(map[string]any)
+	if !ok {
+		return false
+	}
+	_, ok = mcp["monocle"].(map[string]any)
+	return ok
 }
 
 func (a *OpenCodeAdapter) Register(global bool) error {
@@ -121,8 +117,8 @@ func (a *OpenCodeAdapter) Detect() bool {
 
 func openCodeConfigPath(global bool) string {
 	if global {
-		if configDir, err := os.UserConfigDir(); err == nil {
-			return filepath.Join(configDir, "opencode", "config.json")
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, ".config", "opencode", "opencode.json")
 		}
 	}
 	return "opencode.json"
@@ -130,8 +126,8 @@ func openCodeConfigPath(global bool) string {
 
 func openCodeCommandsDir(global bool) string {
 	if global {
-		if configDir, err := os.UserConfigDir(); err == nil {
-			return filepath.Join(configDir, "opencode", "commands")
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, ".config", "opencode", "commands")
 		}
 	}
 	return filepath.Join(".opencode", "commands")

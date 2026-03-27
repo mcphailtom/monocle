@@ -21,9 +21,16 @@ func (a *ClaudeAdapter) ConfigPaths(global bool) []string {
 	return []string{mcpJSONPath(global)}
 }
 
-// HasConfig returns true if monocle is configured via .mcp.json or Claude Code plugin.
-func (a *ClaudeAdapter) HasConfig() bool {
-	return a.HasMCPConfig() || a.HasPluginConfig()
+// HasConfig returns true if monocle is configured at the given scope via .mcp.json or Claude Code plugin.
+func (a *ClaudeAdapter) HasConfig(global bool) bool {
+	if hasMCPServersEntry(mcpJSONPath(global)) {
+		return true
+	}
+	// Plugin config is always user-level (global)
+	if global {
+		return a.HasPluginConfig()
+	}
+	return false
 }
 
 // Detect returns true if Claude Code appears to be installed.

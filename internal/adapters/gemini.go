@@ -21,13 +21,8 @@ func (a *GeminiAdapter) ConfigPaths(global bool) []string {
 	return paths
 }
 
-func (a *GeminiAdapter) HasConfig() bool {
-	for _, global := range []bool{true, false} {
-		if hasMCPServersEntry(geminiConfigPath(global)) {
-			return true
-		}
-	}
-	return false
+func (a *GeminiAdapter) HasConfig(global bool) bool {
+	return hasMCPServersEntry(geminiConfigPath(global))
 }
 
 func (a *GeminiAdapter) Register(global bool) error {

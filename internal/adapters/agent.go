@@ -13,8 +13,8 @@ type AgentAdapter interface {
 	Label() string
 	// ConfigPaths returns the file paths this adapter writes for display.
 	ConfigPaths(global bool) []string
-	// HasConfig returns true if monocle is already registered for this agent.
-	HasConfig() bool
+	// HasConfig returns true if monocle is already registered for this agent at the given scope.
+	HasConfig(global bool) bool
 	// Register writes the agent's config files.
 	Register(global bool) error
 	// Unregister removes the agent's config files.
