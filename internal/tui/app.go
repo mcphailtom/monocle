@@ -391,81 +391,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		const borderW = 2 // left + right border
-		const borderH = 2 // top + bottom border
-		const titleHeight = 1
-		const statusBarHeight = 1
-		const chrome = titleHeight + statusBarHeight + borderH
-
-		contentHeight := m.height - chrome
-		if contentHeight < 0 {
-			contentHeight = 0
-		}
-
-		switch m.layoutConfig {
-		case "side-by-side":
-			m.layout = layoutHorizontal
-		case "stacked":
-			m.layout = layoutStacked
-		default: // "auto" or ""
-			if m.width < m.minDiffWidth+30 {
-				m.layout = layoutStacked
-			} else {
-				m.layout = layoutHorizontal
-			}
-		}
-
-		if m.sidebarHidden {
-			m.sidebar.width = 0
-			m.sidebar.height = 0
-			diffContentW := m.width - borderW
-			if diffContentW < 0 {
-				diffContentW = 0
-			}
-			m.diffView.width = diffContentW
-			m.diffView.height = contentHeight
-		} else if m.layout == layoutStacked {
-			contentW := m.width - borderW
-			if contentW < 0 {
-				contentW = 0
-			}
-
-			sidebarH := stackedSidebarHeight(contentHeight, len(m.sidebar.files), len(m.sidebar.contentItems), len(m.sidebar.additionalFiles))
-			diffH := contentHeight - sidebarH - borderH // account for sidebar border
-			if diffH < 0 {
-				diffH = 0
-			}
-
-			m.sidebar.width = contentW
-			m.sidebar.height = sidebarH
-			m.diffView.width = contentW
-			m.diffView.height = diffH
-		} else {
-			// Prioritize diff area: guarantee minDiffWidth chars for diff content,
-			// then let sidebar grow up to 1/3 of width (clamped to [30, 50]).
-			maxSidebarForDiff := m.width - m.minDiffWidth - 2*borderW // room left after diff + both borders
-			sidebarContentW := m.width / 3
-			if sidebarContentW > maxSidebarForDiff {
-				sidebarContentW = maxSidebarForDiff
-			}
-			if sidebarContentW < 30 {
-				sidebarContentW = 30
-			}
-			if sidebarContentW > 50 {
-				sidebarContentW = 50
-			}
-
-			sidebarOuter := sidebarContentW + borderW
-			mainOuter := m.width - sidebarOuter
-			if mainOuter < 0 {
-				mainOuter = 0
-			}
-
-			m.sidebar.width = sidebarContentW
-			m.sidebar.height = contentHeight
-			m.diffView.width = mainOuter - borderW
-			m.diffView.height = contentHeight
-		}
+		recalcPaneDimensions(&m)
 
 		m.statusBar.width = m.width
 		m.commentEditor.width = m.width
@@ -1043,6 +969,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.sidebarHidden = m.focusModeSavedSidebar
 				m.diffView.wrap = m.focusModeSavedWrap
 				m.focusModeActive = false
+				recalcPaneDimensions(&m)
 			}
 			return m, nil
 		}
@@ -1075,11 +1002,11 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.sidebarHidden = m.focusModeSavedSidebar
 			m.diffView.wrap = m.focusModeSavedWrap
 			m.focusModeActive = false
-			return m, func() tea.Msg {
-				return tea.WindowSizeMsg{Width: m.width, Height: m.height}
-			}
+			recalcPaneDimensions(&m)
+			return m, nil
 		}
 
+		recalcStackedLayout(&m)
 		return m, nil
 
 	// Confirm overlay actions
@@ -1801,6 +1728,86 @@ func stackedSidebarHeight(totalHeight, fileCount, contentItemCount, additionalFi
 		h = maxH
 	}
 	return h
+}
+
+// recalcPaneDimensions recalculates sidebar and diff view dimensions for the
+// current layout mode and sidebar visibility. Use this when sidebarHidden or
+// layout mode may have changed (e.g. restoring from focus mode). For simple
+// content-count changes in stacked mode, prefer recalcStackedLayout.
+func recalcPaneDimensions(m *appModel) {
+	const borderW = 2
+	const borderH = 2
+	const titleHeight = 1
+	const statusBarHeight = 1
+	const chrome = titleHeight + statusBarHeight + borderH
+
+	contentHeight := m.height - chrome
+	if contentHeight < 0 {
+		contentHeight = 0
+	}
+
+	switch m.layoutConfig {
+	case "side-by-side":
+		m.layout = layoutHorizontal
+	case "stacked":
+		m.layout = layoutStacked
+	default: // "auto" or ""
+		if m.width < m.minDiffWidth+30 {
+			m.layout = layoutStacked
+		} else {
+			m.layout = layoutHorizontal
+		}
+	}
+
+	if m.sidebarHidden {
+		m.sidebar.width = 0
+		m.sidebar.height = 0
+		diffContentW := m.width - borderW
+		if diffContentW < 0 {
+			diffContentW = 0
+		}
+		m.diffView.width = diffContentW
+		m.diffView.height = contentHeight
+	} else if m.layout == layoutStacked {
+		contentW := m.width - borderW
+		if contentW < 0 {
+			contentW = 0
+		}
+
+		sidebarH := stackedSidebarHeight(contentHeight, len(m.sidebar.files), len(m.sidebar.contentItems), len(m.sidebar.additionalFiles))
+		diffH := contentHeight - sidebarH - borderH
+		if diffH < 0 {
+			diffH = 0
+		}
+
+		m.sidebar.width = contentW
+		m.sidebar.height = sidebarH
+		m.diffView.width = contentW
+		m.diffView.height = diffH
+	} else {
+		maxSidebarForDiff := m.width - m.minDiffWidth - 2*borderW
+		sidebarContentW := m.width / 3
+		if sidebarContentW > maxSidebarForDiff {
+			sidebarContentW = maxSidebarForDiff
+		}
+		if sidebarContentW < 30 {
+			sidebarContentW = 30
+		}
+		if sidebarContentW > 50 {
+			sidebarContentW = 50
+		}
+
+		sidebarOuter := sidebarContentW + borderW
+		mainOuter := m.width - sidebarOuter
+		if mainOuter < 0 {
+			mainOuter = 0
+		}
+
+		m.sidebar.width = sidebarContentW
+		m.sidebar.height = contentHeight
+		m.diffView.width = mainOuter - borderW
+		m.diffView.height = contentHeight
+	}
 }
 
 // recalcStackedLayout recalculates sidebar and diff view heights for stacked

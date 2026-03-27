@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/anthropics/monocle/internal/core"
 	"github.com/anthropics/monocle/internal/types"
 )
@@ -173,6 +175,109 @@ func TestClearReview_NoopWhenEmpty(t *testing.T) {
 	msg := cmd()
 	if msg != nil {
 		t.Errorf("expected nil message when nothing to clear, got %T", msg)
+	}
+}
+
+func TestSubmitSuccess_RecalcsStackedLayout(t *testing.T) {
+	engine := &stubEngine{
+		cfg:     &types.Config{},
+		session: newTestSession(true),
+	}
+	m := NewApp(engine)
+	// Set initial dimensions — 80 wide triggers stacked layout
+	result, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	m = result.(appModel)
+	if m.layout != layoutStacked {
+		t.Fatalf("expected stacked layout, got %v", m.layout)
+	}
+
+	// Add content items to establish a baseline sidebar height
+	m.sidebar.contentItems = []types.ContentItem{{ID: "plan-1", Title: "Plan"}}
+	m.sidebar.rebuildTree()
+	recalcStackedLayout(&m)
+
+	// Submit feedback (clears content items)
+	result, _ = m.Update(submitSuccessMsg{agentConnected: true})
+	app := result.(appModel)
+
+	if len(app.sidebar.contentItems) != 0 {
+		t.Errorf("expected 0 content items, got %d", len(app.sidebar.contentItems))
+	}
+	if app.sidebar.height == 0 {
+		t.Error("expected non-zero sidebar height after submit")
+	}
+	if app.diffView.height == 0 {
+		t.Error("expected non-zero diffView height after submit")
+	}
+}
+
+func TestSubmitSuccess_FocusModeRestoresDimensions(t *testing.T) {
+	engine := &stubEngine{
+		cfg:     &types.Config{},
+		session: newTestSession(true),
+	}
+	m := NewApp(engine)
+	// Set initial dimensions
+	result, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	m = result.(appModel)
+
+	// Enter focus mode (sidebar hidden)
+	m.focusModeSavedSidebar = false
+	m.focusModeSavedWrap = false
+	m.sidebarHidden = true
+	m.focusModeActive = true
+	result, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	m = result.(appModel)
+	if m.sidebar.width != 0 || m.sidebar.height != 0 {
+		t.Fatal("expected zero sidebar dimensions in focus mode")
+	}
+
+	// Submit feedback (restores focus mode)
+	result, cmd := m.Update(submitSuccessMsg{agentConnected: true})
+	app := result.(appModel)
+
+	if app.sidebarHidden {
+		t.Error("expected sidebar to be visible after focus mode restore")
+	}
+	if app.sidebar.width == 0 {
+		t.Error("expected non-zero sidebar width after focus mode restore")
+	}
+	if app.sidebar.height == 0 {
+		t.Error("expected non-zero sidebar height after focus mode restore")
+	}
+	if cmd != nil {
+		t.Error("expected nil command (inline recalc, no deferred WindowSizeMsg)")
+	}
+}
+
+func TestSubmitSuccess_NoAgent_FocusModeRestoresDimensions(t *testing.T) {
+	engine := &stubEngine{
+		cfg:     &types.Config{},
+		session: newTestSession(true),
+	}
+	m := NewApp(engine)
+	result, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	m = result.(appModel)
+
+	// Enter focus mode
+	m.focusModeSavedSidebar = false
+	m.sidebarHidden = true
+	m.focusModeActive = true
+	result, _ = m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	m = result.(appModel)
+
+	// Submit with no agent connected
+	result, _ = m.Update(submitSuccessMsg{agentConnected: false})
+	app := result.(appModel)
+
+	if app.sidebarHidden {
+		t.Error("expected sidebar visible after no-agent focus restore")
+	}
+	if app.sidebar.width == 0 {
+		t.Error("expected non-zero sidebar width")
+	}
+	if app.sidebar.height == 0 {
+		t.Error("expected non-zero sidebar height")
 	}
 }
 
