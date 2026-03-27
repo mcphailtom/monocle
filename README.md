@@ -2,11 +2,7 @@
 
 **Review your AI agent's code as it writes it.** Leave comments on diffs, submit structured feedback, and watch the agent fix things in real time — all from your terminal.
 
-You can run monocle either side-by-side with your agent:
-![image](https://github.com/user-attachments/assets/c9c2b7ed-ce1b-417e-9fcb-b5086c6e94d4)
-
-Or full-screen to get maximum space for your review:
-![image](https://github.com/user-attachments/assets/91daaa6f-c838-46df-a699-aaedae62b240)
+![image](https://github.com/user-attachments/assets/cb9b32f8-6f6b-434e-a6b5-afbc022a407c)
 
 Monocle is a TUI that runs alongside your AI coding agent. You review diffs in real time as the agent writes code, leave line-level comments — issues, suggestions, notes — and submit a structured review in one batch. The agent receives your feedback and starts fixing things immediately, just like a PR review but live.
 
