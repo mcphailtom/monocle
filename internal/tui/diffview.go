@@ -182,9 +182,9 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 		} else {
 			m.cursor = m.nearestSelectable(0, 1)
 			m.offset = 0
+			m.visualMode = false
 		}
 		m.hOffset = 0
-		m.visualMode = false
 		return m, nil
 
 	case loadFileContentMsg:
