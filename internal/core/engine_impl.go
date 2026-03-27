@@ -923,6 +923,9 @@ func (e *Engine) SetAutoAdvanceRef(enabled bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.autoAdvanceRef = enabled
+	if enabled {
+		e.lastKnownHead = "" // Force HEAD re-detection on next refresh
+	}
 }
 
 // IsAutoAdvanceRef returns whether auto-advance is enabled.

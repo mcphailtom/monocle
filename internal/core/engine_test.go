@@ -704,6 +704,7 @@ func TestSetAutoAdvanceRef(t *testing.T) {
 	e := &Engine{
 		feedback:       NewFeedbackQueue(),
 		autoAdvanceRef: false,
+		lastKnownHead:  "abc123",
 		subscribers:    make(map[EventKind]map[int]EventCallback),
 	}
 
@@ -717,11 +718,80 @@ func TestSetAutoAdvanceRef(t *testing.T) {
 	if !e.IsAutoAdvanceRef() {
 		t.Error("expected IsAutoAdvanceRef to be true after SetAutoAdvanceRef(true)")
 	}
+	if e.lastKnownHead != "" {
+		t.Errorf("expected lastKnownHead to be reset to empty, got %q", e.lastKnownHead)
+	}
 
 	// Disable auto-advance
 	e.SetAutoAdvanceRef(false)
 	if e.IsAutoAdvanceRef() {
 		t.Error("expected IsAutoAdvanceRef to be false after SetAutoAdvanceRef(false)")
+	}
+}
+
+func TestAutoAdvanceRefAfterManualSelect(t *testing.T) {
+	database, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+
+	headRef := "head123head123head123head123head123head12"
+	manualRef := "manual456manual456manual456manual456manual"
+
+	stub := &gitStub{
+		repoRoot:   "/tmp/repo",
+		currentRef: headRef,
+	}
+
+	now := time.Now()
+	session := &types.ReviewSession{
+		ID: "sess-1", Agent: "claude",
+		RepoRoot: "/tmp/repo", BaseRef: headRef, ReviewRound: 1,
+		FileStatuses: make(map[string]bool), CreatedAt: now, UpdatedAt: now,
+	}
+	database.CreateSession(session)
+
+	e := &Engine{
+		feedback:       NewFeedbackQueue(),
+		database:       database,
+		git:            stub,
+		sessions:       NewSessionManager(database, stub),
+		autoAdvanceRef: true,
+		subscribers:    make(map[EventKind]map[int]EventCallback),
+	}
+	e.current = session
+
+	// Step 1: Initial refresh in auto mode — tracks HEAD
+	if _, err := e.RefreshChangedFiles(); err != nil {
+		t.Fatalf("initial RefreshChangedFiles: %v", err)
+	}
+	if e.current.BaseRef != headRef {
+		t.Errorf("step 1: expected BaseRef %q, got %q", headRef, e.current.BaseRef)
+	}
+
+	// Step 2: Manually select a different ref
+	stub.currentRef = manualRef
+	if err := e.SetBaseRef("some-commit"); err != nil {
+		t.Fatalf("SetBaseRef: %v", err)
+	}
+	if e.current.BaseRef != manualRef {
+		t.Errorf("step 2: expected BaseRef %q, got %q", manualRef, e.current.BaseRef)
+	}
+	if e.autoAdvanceRef {
+		t.Error("step 2: expected autoAdvanceRef to be false")
+	}
+
+	// Step 3: Switch back to auto mode
+	stub.currentRef = headRef
+	e.SetAutoAdvanceRef(true)
+
+	// Step 4: Refresh — should update BaseRef back to HEAD
+	if _, err := e.RefreshChangedFiles(); err != nil {
+		t.Fatalf("RefreshChangedFiles after re-enable: %v", err)
+	}
+	if e.current.BaseRef != headRef {
+		t.Errorf("step 4: expected BaseRef to return to %q, got %q", headRef, e.current.BaseRef)
 	}
 }
 
