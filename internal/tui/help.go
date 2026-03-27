@@ -129,6 +129,7 @@ func (m helpModel) View() string {
 			{":history", "View submission history"},
 		}},
 		{"General", []struct{ key, desc string }{
+			{Label(km.OpenInEditor), "Open file in editor at cursor"},
 			{Label(km.ToggleDiff), "Cycle diff style (unified/split/file) (any pane)"},
 			{Label(km.CycleLayout), "Cycle layout (auto/side-by-side/stacked)"},
 			{Label(km.Refresh), "Force reload files"},

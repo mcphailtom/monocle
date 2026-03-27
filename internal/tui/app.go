@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -918,6 +919,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case openFileInEditorDoneMsg:
+		return m, m.refreshFiles()
+
 	case closeHelpMsg:
 		m.overlay = overlayNone
 		return m, nil
@@ -1458,6 +1462,35 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, func() tea.Msg {
 			return tea.WindowSizeMsg{Width: m.width, Height: m.height}
 		}
+
+	case Matches(key, km.OpenInEditor):
+		var filePath string
+		var line int
+		if m.focus == focusSidebar {
+			if f := m.sidebar.selectedFile(); f != nil {
+				filePath = filepath.Join(m.repoRoot, f.Path)
+			} else if af := m.sidebar.selectedAdditionalFile(); af != nil {
+				filePath = af.Path
+			}
+			line = 1
+		} else {
+			if m.diffView.contentMode {
+				break
+			}
+			if m.diffView.additionalFilePath != "" {
+				filePath = m.diffView.additionalFilePath
+			} else if m.diffView.path != "" {
+				filePath = filepath.Join(m.repoRoot, m.diffView.path)
+			}
+			line = m.diffView.currentDiffLine()
+			if line < 1 {
+				line = 1
+			}
+		}
+		if filePath == "" {
+			break
+		}
+		return m, openFileInEditor(filePath, line)
 
 	case Matches(key, km.Refresh):
 		return m, m.refreshFiles()

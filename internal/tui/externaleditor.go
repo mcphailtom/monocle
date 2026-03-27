@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -60,6 +61,27 @@ func openExternalEditor(body string, origin overlayKind) tea.Cmd {
 		}
 
 		return externalEditorResultMsg{body: string(content), origin: origin}
+	})
+}
+
+// openFileInEditorDoneMsg is returned after the external editor exits when
+// editing an actual file (not a temp file for modal body text).
+type openFileInEditorDoneMsg struct {
+	err error
+}
+
+// openFileInEditor opens the given file in the user's $VISUAL/$EDITOR at the
+// specified line number. Unlike openExternalEditor, this opens the actual file
+// on disk rather than a temp file copy.
+func openFileInEditor(filePath string, line int) tea.Cmd {
+	name, args := resolveEditor()
+	if line > 0 {
+		args = append(args, fmt.Sprintf("+%d", line))
+	}
+	args = append(args, filePath)
+	cmd := exec.Command(name, args...)
+	return tea.ExecProcess(cmd, func(execErr error) tea.Msg {
+		return openFileInEditorDoneMsg{err: execErr}
 	})
 }
 

@@ -51,12 +51,13 @@ type KeyMap struct {
 	ToggleFocusMode []string
 
 	// General
-	BaseRef     []string
-	CycleLayout []string
-	Refresh     []string
-	Help        []string
-	Quit        []string
-	CommandMode []string
+	OpenInEditor []string
+	BaseRef      []string
+	CycleLayout  []string
+	Refresh      []string
+	Help         []string
+	Quit         []string
+	CommandMode  []string
 }
 
 // DefaultKeyMap returns the built-in default keybindings.
@@ -103,7 +104,8 @@ func DefaultKeyMap() KeyMap {
 		ClearReview:     []string{"D"},
 		ToggleFocusMode: []string{"F"},
 
-		BaseRef:     []string{"b"},
+		OpenInEditor: []string{"ctrl+g"},
+		BaseRef:      []string{"b"},
 		CycleLayout: []string{"T"},
 		Refresh:     []string{"R"},
 		Help:        []string{"?"},
@@ -123,7 +125,7 @@ var actionNames = []string{
 	"tree_mode", "collapse_all", "expand_all", "prev_section", "next_section", "filter_reviewed",
 	"comment", "file_comment", "suggest", "visual", "reviewed",
 	"submit", "pause", "clear_review", "dismiss_outdated", "toggle_focus_mode",
-	"base_ref", "cycle_layout", "refresh", "help", "quit", "command_mode",
+	"open_in_editor", "base_ref", "cycle_layout", "refresh", "help", "quit", "command_mode",
 }
 
 // ApplyOverrides merges user-configured keybinding overrides into the keymap.
@@ -201,6 +203,8 @@ func (km KeyMap) ApplyOverrides(overrides map[string]string) KeyMap {
 			km.ClearReview = []string{key}
 		case "toggle_focus_mode":
 			km.ToggleFocusMode = []string{key}
+		case "open_in_editor":
+			km.OpenInEditor = []string{key}
 		case "base_ref":
 			km.BaseRef = []string{key}
 		case "cycle_layout":
