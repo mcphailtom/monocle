@@ -3,7 +3,7 @@ window_prefix: wm-
 panes:
   - command: <agent>
     focus: true
-  - command: devbox run -- make build && ./bin/monocle
+  - command: devbox run -- make run
     split: horizontal
 
 files:

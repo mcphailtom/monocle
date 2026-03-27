@@ -1,4 +1,4 @@
-.PHONY: build test vet lint bundle
+.PHONY: build run test vet lint bundle
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
@@ -7,6 +7,9 @@ bundle:
 
 build: bundle
 	go build -ldflags "-X main.version=$(VERSION)" -o bin/monocle ./cmd/monocle
+
+run: build
+	./bin/monocle
 
 install: bundle
 	go install ./cmd/monocle
