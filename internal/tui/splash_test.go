@@ -18,8 +18,8 @@ func TestRenderSplashFullTier(t *testing.T) {
 	if !strings.Contains(result, "/plugin install monocle@monocle") {
 		t.Error("full splash should contain plugin install instruction")
 	}
-	if !strings.Contains(result, "plugin:monocle@monocle") {
-		t.Error("full splash should contain plugin launch instruction")
+	if !strings.Contains(result, "monocle register") {
+		t.Error("full splash should contain register instruction")
 	}
 	if !strings.Contains(result, "to submit your review") {
 		t.Error("full splash should contain review hint")

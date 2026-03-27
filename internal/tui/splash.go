@@ -29,29 +29,34 @@ func splashFull() []string {
 		return dim.Render("press ") + cmd.Render(lipgloss.NewStyle().Width(cmdCol).Render(command)) + dim.Render(desc)
 	}
 
+	section := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+
 	return []string{
 		logo.Render("o_(◉) monocle"),
-		dim.Render("code review companion for Claude Code"),
+		dim.Render("code review companion for your AI agent"),
 		"",
-		dim.Render("Install the plugin in Claude Code:"),
+		dim.Render("For Claude Code, install the plugin for push notifications:"),
 		dim.Render("  " + cmd.Render("/plugin marketplace add josephschmitt/monocle")),
 		dim.Render("  " + cmd.Render("/plugin install monocle@monocle")),
 		"",
-		dim.Render("Then launch Claude Code with:"),
-		dim.Render("  " + cmd.Render("claude --dangerously-load-development-channels plugin:monocle@monocle")),
+		dim.Render("For other agents, register via the CLI:"),
+		dim.Render("  " + cmd.Render("monocle register")),
 		"",
-		dim.Render("If you start Monocle mid-session, type ") + cmd.Render("/mcp") + dim.Render(" in Claude Code to reconnect."),
+		dim.Render("Diffs appear here as your agent works."),
 		"",
 		dim.Render("─────"),
 		"",
-		dim.Render("Diffs appear here as Claude Code works."),
+		section.Render("Review"),
+		hint("c", " to comment on a line"),
+		hint("C", " to comment on a file"),
+		hint("S", " to submit your review"),
 		"",
-		hint("c", "to comment on a line"),
-		hint("C", "to comment on a file"),
-		hint("S", "to submit your review"),
+		section.Render("Feedback"),
+		dim.Render("Submit sends your review to the feedback queue."),
+		dim.Render("The agent picks it up via ") + cmd.Render("get_feedback") + dim.Render("."),
 		"",
-		hint("?", "for keybinding help"),
-		hint("q", "to quit"),
+		hint("?", " for keybinding help"),
+		hint("q", " to quit"),
 	}
 }
 
