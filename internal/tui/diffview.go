@@ -81,6 +81,10 @@ type diffViewModel struct {
 	contentDiffContent string // current content text, for toggling back from diff view
 	mdStyler           *markdownStyler
 
+	// Content diff auto-switch (from config diff_style)
+	preferredContentDiffStyle diffStyle // unified or split
+	autoContentDiff           bool      // true when plans should auto-show diffs on version 2+
+
 	// Additional file mode (external files, no diff)
 	additionalFilePath string
 
@@ -189,6 +193,16 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 			m.visualMode = false
 		}
 		m.hOffset = 0
+
+		// Auto-switch to preferred diff style when a previous version exists
+		if msg.autoSwitchDiff && m.autoContentDiff {
+			contentID := m.contentID
+			style := m.preferredContentDiffStyle
+			return m, func() tea.Msg {
+				return requestContentDiffMsg{contentID: contentID, preferredStyle: style}
+			}
+		}
+
 		return m, nil
 
 	case loadContentDiffMsg:
@@ -198,7 +212,7 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 		m.contentMode = false
 		m.hunks = msg.result.Hunks
 		m.comments = msg.comments
-		m.style = diffStyleUnified
+		m.style = msg.preferredStyle
 		m.buildLines()
 		m.cursor = m.nearestSelectable(0, 1)
 		m.offset = 0

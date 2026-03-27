@@ -78,15 +78,17 @@ type connectionChangedMsg struct {
 
 // requestContentDiffMsg requests async computation of a content item diff.
 type requestContentDiffMsg struct {
-	contentID string
+	contentID      string
+	preferredStyle diffStyle // style to use when diff loads (0=unified for manual cycle)
 }
 
 // loadContentDiffMsg carries the computed content diff result.
 type loadContentDiffMsg struct {
-	contentID string
-	result    *types.DiffResult
-	comments  []types.ReviewComment
-	err       error
+	contentID      string
+	result         *types.DiffResult
+	comments       []types.ReviewComment
+	err            error
+	preferredStyle diffStyle // style to render the diff in
 }
 
 type pauseChangedMsg struct {
@@ -233,8 +235,14 @@ func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 			switch cfg.DiffStyle {
 			case "split":
 				dv.style = diffStyleSplit
+				dv.preferredContentDiffStyle = diffStyleSplit
+				dv.autoContentDiff = true
 			case "file":
 				dv.style = diffStyleFile
+				// autoContentDiff stays false: "file" mode = no auto-switch for plans
+			default:
+				dv.autoContentDiff = true
+				// preferredContentDiffStyle stays at diffStyleUnified (zero value)
 			}
 			if cfg.Layout != "" {
 				layoutCfg = cfg.Layout
@@ -765,6 +773,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case requestContentDiffMsg:
 		engine := m.engine
 		contentID := msg.contentID
+		preferredStyle := msg.preferredStyle
 		return m, func() tea.Msg {
 			result, err := engine.GetContentDiff(contentID)
 			if err != nil || result == nil {
@@ -779,7 +788,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-			return loadContentDiffMsg{contentID: contentID, result: result, comments: comments}
+			return loadContentDiffMsg{contentID: contentID, result: result, comments: comments, preferredStyle: preferredStyle}
 		}
 
 	// Content diff loaded
@@ -1842,6 +1851,7 @@ func (m appModel) handleSidebarSelect(msg sidebarSelectMsg) tea.Cmd {
 				contentType:        item.ContentType,
 				comments:           comments,
 				hasPreviousVersion: item.PreviousContent != "",
+				autoSwitchDiff:     item.PreviousContent != "",
 			}
 		}
 	}
@@ -2140,6 +2150,7 @@ type loadContentMsg struct {
 	contentType        string
 	comments           []types.ReviewComment
 	hasPreviousVersion bool // true if a previous version exists for diffing
+	autoSwitchDiff     bool // true to auto-switch to preferred diff style
 }
 
 // View renders the full TUI layout.
