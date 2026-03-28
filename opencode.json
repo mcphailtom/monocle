@@ -6,5 +6,12 @@
       "command": ["./bin/monocle", "serve-mcp-channel"],
       "enabled": true
     }
+  },
+  "agent": {
+    "plan": {
+      "permission": {
+        "mcp__monocle": "allow"
+      }
+    }
   }
 }
