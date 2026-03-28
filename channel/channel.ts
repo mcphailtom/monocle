@@ -292,6 +292,8 @@ async function blockingGetFeedback(socketPath: string): Promise<Message> {
 // -- Instructions --
 
 const INSTRUCTIONS = [
+  "IMPORTANT: submit_for_review and submit_for_review_and_wait are restricted to the top-level agent. Subagents and background tasks must NEVER call these tools.",
+  "",
   "Your human reviewer is watching your code changes in real-time using Monocle.",
   "",
   "When you receive a feedback_submitted event, call the get_feedback tool to retrieve the review.",
@@ -299,7 +301,6 @@ const INSTRUCTIONS = [
   "",
   "Sharing content for review:",
   "When you produce content your reviewer should see (plans, decisions, summaries, etc.), call submit_for_review_and_wait. Use file_path if the content is on disk, otherwise pass it inline as content.",
-  "Only use submit_for_review and submit_for_review_and_wait from the top-level agent — never from subagents or background tasks.",
   "Use a stable id (e.g. the filename if available) so updates replace the previous version.",
   "You can check the current review status at any time using the review_status tool.",
   "Never try to exit plan mode yourself — only the user can do that.",
@@ -412,7 +413,7 @@ const TOOLS = [
     {
       name: "submit_for_review",
       description:
-        "Submit content for your reviewer to see and comment on in Monocle. Only call this from the top-level agent, not from subagents.",
+        "TOP-LEVEL AGENT ONLY — do not call from subagents or background tasks. Submits content for your reviewer to see and comment on in Monocle.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -461,11 +462,9 @@ const TOOLS = [
     {
       name: "submit_for_review_and_wait",
       description:
-        "Submit content to your reviewer and wait for their feedback before continuing. " +
-        "Only call this from the top-level agent, not from subagents. " +
-        "Unlike submit_for_review, this tool blocks until the reviewer responds — do not proceed until it returns. " +
-        "An empty response simply means the reviewer had no comments. " +
-        "If they request changes, update the content and call this again.",
+        "TOP-LEVEL AGENT ONLY — do not call from subagents or background tasks. " +
+        "Submits content to your reviewer and blocks until they respond. " +
+        "An empty response means no comments. If they request changes, update and call again.",
       inputSchema: {
         type: "object" as const,
         properties: {
