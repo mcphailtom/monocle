@@ -908,6 +908,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusBar.feedbackStatus = "copy_failed"
 		return m, nil
 
+	case submitErrorMsg:
+		m.statusBar.feedbackStatus = "submit_failed"
+		return m, nil
+
 	case cancelSubmitMsg:
 		m.overlay = overlayNone
 		return m, nil

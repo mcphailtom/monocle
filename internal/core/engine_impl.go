@@ -733,6 +733,9 @@ func (e *Engine) GetReviewSummary() (*types.ReviewSummary, error) {
 	}
 
 	for _, c := range e.current.Comments {
+		if c.Resolved {
+			continue
+		}
 		switch c.TargetType {
 		case types.TargetFile:
 			summary.FileComments[c.TargetRef] = append(summary.FileComments[c.TargetRef], c)
@@ -763,6 +766,21 @@ func (e *Engine) Submit(action types.SubmitAction, body string) (*SubmitResult, 
 
 	if session == nil {
 		return nil, fmt.Errorf("no active session")
+	}
+
+	// Validate: request_changes must include at least one unresolved comment or body text
+	if action == types.ActionRequestChanges {
+		hasBody := strings.TrimSpace(body) != ""
+		hasUnresolved := false
+		for _, c := range session.Comments {
+			if !c.Resolved {
+				hasUnresolved = true
+				break
+			}
+		}
+		if !hasBody && !hasUnresolved {
+			return nil, fmt.Errorf("request_changes requires at least one comment or review body")
+		}
 	}
 
 	formatted := e.formatter.Format(session, session.Comments, action, body)

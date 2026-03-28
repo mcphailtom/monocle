@@ -657,6 +657,120 @@ func TestSubmit(t *testing.T) {
 	}
 }
 
+func TestSubmitRequestChangesRequiresContent(t *testing.T) {
+	database, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+
+	formatter := NewReviewFormatter(func(path string, start, end int) string {
+		return ""
+	}, types.ReviewFormatConfig{IncludeSnippets: true, MaxSnippetLines: 10, IncludeSummary: true})
+
+	e := &Engine{
+		feedback:    NewFeedbackQueue(),
+		database:    database,
+		formatter:   formatter,
+		subscribers: make(map[EventKind]map[int]EventCallback),
+	}
+
+	setup := func(comments []types.ReviewComment) {
+		e.current = &types.ReviewSession{
+			ID:           "sess-1",
+			FileStatuses: make(map[string]bool),
+			ReviewRound:  1,
+			Comments:     comments,
+		}
+		_ = database.CreateSession(e.current)
+	}
+
+	t.Run("reject empty request_changes", func(t *testing.T) {
+		setup(nil)
+		_, err := e.Submit(types.ActionRequestChanges, "")
+		if err == nil {
+			t.Error("expected error for empty request_changes")
+		}
+	})
+
+	t.Run("reject request_changes with only resolved comments", func(t *testing.T) {
+		setup([]types.ReviewComment{
+			{ID: "c1", TargetType: types.TargetFile, TargetRef: "main.go", Type: types.CommentIssue, Body: "Bug", Resolved: true},
+		})
+		_, err := e.Submit(types.ActionRequestChanges, "")
+		if err == nil {
+			t.Error("expected error for request_changes with only resolved comments")
+		}
+	})
+
+	t.Run("accept request_changes with body", func(t *testing.T) {
+		setup(nil)
+		_, err := e.Submit(types.ActionRequestChanges, "Please fix")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("accept request_changes with unresolved comment", func(t *testing.T) {
+		setup([]types.ReviewComment{
+			{ID: "c1", TargetType: types.TargetFile, TargetRef: "main.go", Type: types.CommentIssue, Body: "Bug"},
+		})
+		_, err := e.Submit(types.ActionRequestChanges, "")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("accept empty approve", func(t *testing.T) {
+		setup(nil)
+		_, err := e.Submit(types.ActionApprove, "")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+}
+
+func TestGetReviewSummaryExcludesResolved(t *testing.T) {
+	e := &Engine{
+		feedback:    NewFeedbackQueue(),
+		subscribers: make(map[EventKind]map[int]EventCallback),
+	}
+	e.current = &types.ReviewSession{
+		ID:           "sess-1",
+		FileStatuses: make(map[string]bool),
+		Comments: []types.ReviewComment{
+			{ID: "c1", TargetType: types.TargetFile, TargetRef: "main.go", Type: types.CommentIssue, Body: "Bug"},
+			{ID: "c2", TargetType: types.TargetFile, TargetRef: "main.go", Type: types.CommentIssue, Body: "Resolved bug", Resolved: true},
+			{ID: "c3", TargetType: types.TargetFile, TargetRef: "util.go", Type: types.CommentSuggestion, Body: "Resolved suggestion", Resolved: true},
+			{ID: "c4", TargetType: types.TargetContent, TargetRef: "plan-1", Type: types.CommentNote, Body: "Note"},
+		},
+	}
+
+	summary, err := e.GetReviewSummary()
+	if err != nil {
+		t.Fatalf("GetReviewSummary: %v", err)
+	}
+
+	if summary.IssueCt != 1 {
+		t.Errorf("expected 1 issue, got %d", summary.IssueCt)
+	}
+	if summary.SuggestionCt != 0 {
+		t.Errorf("expected 0 suggestions, got %d", summary.SuggestionCt)
+	}
+	if summary.NoteCt != 1 {
+		t.Errorf("expected 1 note, got %d", summary.NoteCt)
+	}
+
+	// Resolved comments should not appear in file groupings
+	mainComments := summary.FileComments["main.go"]
+	if len(mainComments) != 1 {
+		t.Errorf("expected 1 comment on main.go (resolved excluded), got %d", len(mainComments))
+	}
+	if _, ok := summary.FileComments["util.go"]; ok {
+		t.Error("expected no comments on util.go (all resolved)")
+	}
+}
+
 func TestSetBaseRef(t *testing.T) {
 	database, err := db.Open(":memory:")
 	if err != nil {

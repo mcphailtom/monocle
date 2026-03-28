@@ -63,6 +63,21 @@ func (m reviewSummaryModel) Init() tea.Cmd {
 	return nil
 }
 
+// canSubmit returns true if the current state is valid for submission.
+// Request changes requires at least one unresolved comment or body text.
+func (m reviewSummaryModel) canSubmit() bool {
+	if m.action != types.ActionRequestChanges {
+		return true
+	}
+	if strings.TrimSpace(m.body) != "" {
+		return true
+	}
+	if m.summary != nil && (m.summary.IssueCt+m.summary.SuggestionCt+m.summary.NoteCt+m.summary.PraiseCt > 0) {
+		return true
+	}
+	return false
+}
+
 func (m reviewSummaryModel) Update(msg tea.Msg) (reviewSummaryModel, tea.Cmd) {
 	if !m.active {
 		return m, nil
@@ -72,6 +87,9 @@ func (m reviewSummaryModel) Update(msg tea.Msg) (reviewSummaryModel, tea.Cmd) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "enter":
+			if !m.canSubmit() {
+				return m, nil
+			}
 			m.active = false
 			submitMsg := confirmSubmitMsg{
 				action:          m.action,
@@ -90,6 +108,9 @@ func (m reviewSummaryModel) Update(msg tea.Msg) (reviewSummaryModel, tea.Cmd) {
 				m.action = types.ActionApprove
 			}
 		case "ctrl+y":
+			if !m.canSubmit() {
+				return m, nil
+			}
 			m.active = false
 			yank := yankReviewMsg{
 				action: m.action,
@@ -285,7 +306,11 @@ func (m reviewSummaryModel) View() string {
 	}
 
 	// General review comment input
-	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Comment (optional):"))
+	commentLabel := "Comment (optional):"
+	if !m.canSubmit() {
+		commentLabel = "Comment (required):"
+	}
+	b.WriteString(lipgloss.NewStyle().Bold(true).Render(commentLabel))
 	b.WriteString("\n")
 	bodyDisplay := m.body + "█"
 	b.WriteString(bodyDisplay)
@@ -308,7 +333,13 @@ func (m reviewSummaryModel) View() string {
 	}
 	b.WriteString("\n\n")
 
-	b.WriteString(lipgloss.NewStyle().Faint(true).Render("Enter: submit  Ctrl+g: editor  Ctrl+y: yank  Esc: cancel"))
+	if m.canSubmit() {
+		b.WriteString(lipgloss.NewStyle().Faint(true).Render("Enter: submit  Ctrl+g: editor  Ctrl+y: yank  Esc: cancel"))
+	} else {
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Render("Add a comment or body text to request changes"))
+		b.WriteString("\n")
+		b.WriteString(lipgloss.NewStyle().Faint(true).Render("Ctrl+g: editor  Ctrl+y: yank  Esc: cancel"))
+	}
 
 	return m.theme.ModalBorder.Width(modalWidth).Render(b.String())
 }
