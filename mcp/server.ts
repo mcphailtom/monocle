@@ -91,8 +91,8 @@ class EngineConnection {
       }
 
       this.conn = connect(this.socketPath, () => {
-        // Always use ConnectMsg: receives event notifications for channel
-        // forwarding but does not increment subscriberCount (feedback always
+        // Always use ConnectMsg: receives event notifications for push
+        // delivery but does not increment subscriberCount (feedback always
         // queues for pull delivery via get_feedback).
         const msg = JSON.stringify({
           type: "connect",
@@ -309,8 +309,8 @@ const socketPath = process.env.MONOCLE_SOCKET || defaultSocketPath(repoRoot);
 // same feedback twice.
 let waitingForFeedback = false;
 
-// Create MCP server with channel capability (fire-and-forget: if the client
-// supports channels, notifications arrive as channel events; if not, they're
+// Create MCP server with notification capability (fire-and-forget: if the client
+// supports notifications, they arrive as push events; if not, they're
 // silently ignored and the agent uses get_feedback manually).
 const mcp = new Server(
   { name: "monocle", version: "1.0.0" },
@@ -323,8 +323,8 @@ const mcp = new Server(
   },
 );
 
-// Engine connection with event handler that tries to push channel notifications.
-// These are fire-and-forget: if channels are active, the agent gets prompted
+// Engine connection with event handler that pushes notifications.
+// These are fire-and-forget: if push is active, the agent gets prompted
 // to call get_feedback. If not, the notification is silently dropped.
 const engine = new EngineConnection(
   socketPath,
@@ -343,7 +343,7 @@ const engine = new EngineConnection(
               meta: { event: "feedback_submitted" },
             },
           })
-          .catch(() => { /* channel not available — agent uses /get-feedback manually */ });
+          .catch(() => { /* push not available — agent uses get_feedback manually */ });
         break;
       case "pause_changed":
         if (payload.status === "pause_requested") {
@@ -357,7 +357,7 @@ const engine = new EngineConnection(
                 meta: { event: "pause_requested" },
               },
             })
-            .catch(() => { /* channel not available */ });
+            .catch(() => { /* push not available */ });
         }
         break;
       case "content_item_added":

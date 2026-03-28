@@ -29,8 +29,8 @@ func TestCodexRegister(t *testing.T) {
 	if !strings.Contains(string(content), "[mcp_servers.monocle]") {
 		t.Fatal("expected [mcp_servers.monocle] section")
 	}
-	if !strings.Contains(string(content), `args = ["serve-mcp-channel"]`) {
-		t.Fatal("expected serve-mcp-channel args")
+	if !strings.Contains(string(content), `args = ["serve-mcp"]`) {
+		t.Fatal("expected serve-mcp args")
 	}
 }
 
@@ -73,7 +73,7 @@ func TestCodexRegister_OverwriteUpdatesConfig(t *testing.T) {
 	defer os.Chdir(origDir)
 
 	// Write an old config with a stale command
-	oldConfig := "[mcp_servers.monocle]\ncommand = \"old-monocle\"\nargs = [\"serve-mcp-channel\"]\n"
+	oldConfig := "[mcp_servers.monocle]\ncommand = \"old-monocle\"\nargs = [\"serve-mcp\"]\n"
 	if err := os.WriteFile(filepath.Join(codexDir, "config.toml"), []byte(oldConfig), 0644); err != nil {
 		t.Fatalf("write old config: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestCodexRegister_PreservesOtherSections(t *testing.T) {
 	defer os.Chdir(origDir)
 
 	// Write config with monocle and another tool
-	oldConfig := "[mcp_servers.other_tool]\ncommand = \"other\"\nargs = [\"run\"]\n\n[mcp_servers.monocle]\ncommand = \"old-monocle\"\nargs = [\"serve-mcp-channel\"]\n"
+	oldConfig := "[mcp_servers.other_tool]\ncommand = \"other\"\nargs = [\"run\"]\n\n[mcp_servers.monocle]\ncommand = \"old-monocle\"\nargs = [\"serve-mcp\"]\n"
 	if err := os.WriteFile(filepath.Join(codexDir, "config.toml"), []byte(oldConfig), 0644); err != nil {
 		t.Fatalf("write old config: %v", err)
 	}

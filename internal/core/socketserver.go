@@ -233,7 +233,7 @@ func (s *SocketServer) handleSubscription(conn net.Conn, scanner *bufio.Scanner,
 // handleQueuedConnection manages a persistent connection that receives event
 // notifications but does NOT increment subscriberCount. This means Submit()
 // always queues feedback for pull delivery via get_feedback, while the client
-// can still forward event notifications as channel hints (fire-and-forget).
+// can still forward event notifications as push hints (fire-and-forget).
 func (s *SocketServer) handleQueuedConnection(conn net.Conn, scanner *bufio.Scanner, cm *protocol.ConnectMsg) {
 	defer conn.Close()
 
@@ -250,7 +250,7 @@ func (s *SocketServer) handleQueuedConnection(conn net.Conn, scanner *bufio.Scan
 	}
 
 	// Subscribe to requested events (like handleSubscription) but do NOT
-	// increment subscriberCount. This allows event forwarding for channel
+	// increment subscriberCount. This allows event forwarding for push
 	// notifications without affecting the push/queue decision in Submit().
 	var unsubs []UnsubscribeFunc
 	for _, eventName := range cm.Events {

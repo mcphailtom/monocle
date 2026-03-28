@@ -1,12 +1,12 @@
 import { build } from "esbuild";
 
 await build({
-  entryPoints: ["channel.ts"],
+  entryPoints: ["server.ts"],
   bundle: true,
   minify: true,
   platform: "node",
   format: "esm",
   target: "node18",
-  outfile: "../internal/adapters/channel.bundle.js",
+  outfile: "../internal/adapters/mcp.bundle.js",
   external: ["net", "crypto", "fs", "path", "process"],
 });

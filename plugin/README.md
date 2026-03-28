@@ -21,7 +21,7 @@ Terminal-based code review companion for AI coding agents. Run Monocle alongside
    /plugin install monocle@monocle
    ```
 
-3. Start Claude Code with the channel enabled:
+3. Start Claude Code with the plugin channel enabled:
    ```
    claude --channels plugin:monocle@monocle
    ```
@@ -45,7 +45,7 @@ Monocle's TUI will display diffs as Claude makes changes. Add comments, then sub
 
 ## How it works
 
-Monocle runs a TUI that watches your repo for changes. When Claude modifies files, Monocle shows you the diffs. You review, add inline comments, and submit. The plugin registers Monocle's built-in MCP channel server, which connects to the engine via a Unix domain socket and pushes your feedback to Claude as channel notifications.
+Monocle runs a TUI that watches your repo for changes. When Claude modifies files, Monocle shows you the diffs. You review, add inline comments, and submit. The plugin registers Monocle's built-in MCP server, which connects to the engine via a Unix domain socket and pushes your feedback to Claude as notifications.
 
 Claude can also submit content (plans, summaries, decisions) for your review — these appear in Monocle's TUI so you can provide early feedback.
 

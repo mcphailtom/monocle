@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestClaudeChannelRegister(t *testing.T) {
+func TestClaudeRegister(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", filepath.Join(dir, "home"))
 
@@ -53,14 +53,14 @@ func TestClaudeChannelRegister(t *testing.T) {
 		t.Fatal("monocle should be in mcpServers")
 	}
 
-	// Verify the entry points to monocle serve-mcp-channel
+	// Verify the entry points to monocle serve-mcp
 	command, _ := entry["command"].(string)
 	if command != "monocle" {
 		t.Fatalf("command should be 'monocle', got %q", command)
 	}
 	args, _ := entry["args"].([]any)
-	if len(args) != 1 || args[0] != "serve-mcp-channel" {
-		t.Fatalf("args should be ['serve-mcp-channel'], got %v", args)
+	if len(args) != 1 || args[0] != "serve-mcp" {
+		t.Fatalf("args should be ['serve-mcp'], got %v", args)
 	}
 
 	// Should no longer need registration
@@ -69,7 +69,7 @@ func TestClaudeChannelRegister(t *testing.T) {
 	}
 }
 
-func TestClaudeChannelRegister_Global(t *testing.T) {
+func TestClaudeRegister_Global(t *testing.T) {
 	dir := t.TempDir()
 	homeDir := filepath.Join(dir, "home")
 	os.MkdirAll(homeDir, 0755)
@@ -136,7 +136,7 @@ func TestHasMCPConfig_GlobalExists(t *testing.T) {
 	// Write global .mcp.json with monocle entry
 	mcpData := map[string]any{
 		"mcpServers": map[string]any{
-			"monocle": map[string]any{"command": "monocle", "args": []any{"serve-mcp-channel"}},
+			"monocle": map[string]any{"command": "monocle", "args": []any{"serve-mcp"}},
 		},
 	}
 	data, _ := json.Marshal(mcpData)
@@ -161,7 +161,7 @@ func TestHasMCPConfig_LocalExists(t *testing.T) {
 	// Write local .mcp.json with monocle entry
 	mcpData := map[string]any{
 		"mcpServers": map[string]any{
-			"monocle": map[string]any{"command": "monocle", "args": []any{"serve-mcp-channel"}},
+			"monocle": map[string]any{"command": "monocle", "args": []any{"serve-mcp"}},
 		},
 	}
 	data, _ := json.Marshal(mcpData)
@@ -233,7 +233,7 @@ func TestNeedsRegister_Registered(t *testing.T) {
 	// Create .mcp.json with monocle entry
 	mcpData := map[string]any{
 		"mcpServers": map[string]any{
-			"monocle": map[string]any{"command": "monocle", "args": []any{"serve-mcp-channel"}},
+			"monocle": map[string]any{"command": "monocle", "args": []any{"serve-mcp"}},
 		},
 	}
 	data, _ := json.Marshal(mcpData)
@@ -245,7 +245,7 @@ func TestNeedsRegister_Registered(t *testing.T) {
 	}
 }
 
-func TestClaudeChannelRegister_Idempotent(t *testing.T) {
+func TestClaudeRegister_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", filepath.Join(dir, "home"))
 
@@ -268,7 +268,7 @@ func TestClaudeChannelRegister_Idempotent(t *testing.T) {
 	}
 }
 
-func TestClaudeChannelUnregister(t *testing.T) {
+func TestClaudeUnregister(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", filepath.Join(dir, "home"))
 
@@ -412,10 +412,10 @@ func TestNeedsRegister_PluginRegistered(t *testing.T) {
 	}
 }
 
-func TestWriteChannelBundle(t *testing.T) {
-	path, err := WriteChannelBundle()
+func TestWriteMCPBundle(t *testing.T) {
+	path, err := WriteMCPBundle()
 	if err != nil {
-		t.Fatalf("WriteChannelBundle: %v", err)
+		t.Fatalf("WriteMCPBundle: %v", err)
 	}
 
 	// Verify the file was written
@@ -428,9 +428,9 @@ func TestWriteChannelBundle(t *testing.T) {
 	}
 
 	// Verify idempotency - second call should return same path
-	path2, err := WriteChannelBundle()
+	path2, err := WriteMCPBundle()
 	if err != nil {
-		t.Fatalf("second WriteChannelBundle: %v", err)
+		t.Fatalf("second WriteMCPBundle: %v", err)
 	}
 	if path != path2 {
 		t.Fatalf("paths should be the same: %q vs %q", path, path2)
@@ -438,4 +438,29 @@ func TestWriteChannelBundle(t *testing.T) {
 
 	// Clean up
 	os.Remove(path)
+}
+
+func TestHasMCPConfig_LegacyCommandName(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", filepath.Join(dir, "home"))
+
+	origDir, _ := os.Getwd()
+	projDir := filepath.Join(dir, "project")
+	os.MkdirAll(projDir, 0755)
+	os.Chdir(projDir)
+	defer os.Chdir(origDir)
+
+	// Config with legacy serve-mcp-channel arg should still be detected
+	mcpData := map[string]any{
+		"mcpServers": map[string]any{
+			"monocle": map[string]any{"command": "monocle", "args": []any{"serve-mcp-channel"}},
+		},
+	}
+	data, _ := json.Marshal(mcpData)
+	os.WriteFile(filepath.Join(projDir, ".mcp.json"), data, 0644)
+
+	adapter := &ClaudeAdapter{}
+	if !adapter.HasMCPConfig() {
+		t.Fatal("should return true for legacy serve-mcp-channel config")
+	}
 }

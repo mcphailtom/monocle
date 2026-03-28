@@ -20,14 +20,15 @@ type CLI struct {
 	Run             RunCmd             `cmd:"" default:"withargs" help:"Start a review session"`
 	Register        RegisterCmd        `cmd:"" help:"Register Monocle for an agent"`
 	Unregister      UnregisterCmd      `cmd:"" help:"Remove Monocle registration"`
-	ServeMcpChannel ServeMCPChannelCmd `cmd:"serve-mcp-channel" help:"Run the MCP channel server" hidden:""`
-	Install         InstallCmd         `cmd:"" help:"Install MCP channel (alias for register)" hidden:""`
-	Uninstall       UninstallCmd       `cmd:"" help:"Remove MCP channel (alias for unregister)" hidden:""`
+	ServeMcp        ServeMCPCmd        `cmd:"serve-mcp" help:"Run the MCP server" hidden:""`
+	ServeMcpChannel ServeMCPChannelCmd `cmd:"serve-mcp-channel" help:"Run the MCP server (deprecated)" hidden:""`
+	Install         InstallCmd         `cmd:"" help:"Install MCP server (alias for register)" hidden:""`
+	Uninstall       UninstallCmd       `cmd:"" help:"Remove MCP server (alias for unregister)" hidden:""`
 	Version         kong.VersionFlag   `help:"Print version" name:"version"`
 }
 
 type RunCmd struct {
-	Socket         string   `help:"Override socket path for MCP channel connection" env:"MONOCLE_SOCKET" default:""`
+	Socket         string   `help:"Override socket path for MCP server connection" env:"MONOCLE_SOCKET" default:""`
 	AdditionalPath []string `help:"Additional file or directory paths to include for review (repeatable)" name:"additional-path" short:"a" type:"path"`
 	Continue       bool     `help:"Resume the most recent session for this repo" name:"continue" short:"c" xor:"session-mode"`
 	Resume         bool     `help:"Show a picker to resume a previous session" name:"resume" short:"r" xor:"session-mode"`
@@ -43,6 +44,8 @@ type UnregisterCmd struct {
 	Agent  string `arg:"" optional:"" help:"Agent to unregister (claude, opencode, codex, gemini, all)"`
 	Global bool   `help:"Remove from user-level config instead of project" default:"false"`
 }
+
+type ServeMCPCmd struct{}
 
 type ServeMCPChannelCmd struct{}
 
@@ -135,9 +138,9 @@ func resolveAgents(name, pickerTitle string) ([]adapters.AgentAdapter, error) {
 	}
 }
 
-func (cmd *ServeMCPChannelCmd) Run() error {
+func (cmd *ServeMCPCmd) Run() error {
 	// Write the embedded bundle to a temp file
-	bundlePath, err := adapters.WriteChannelBundle()
+	bundlePath, err := adapters.WriteMCPBundle()
 	if err != nil {
 		return err
 	}
@@ -145,7 +148,7 @@ func (cmd *ServeMCPChannelCmd) Run() error {
 	// Detect JS runtime
 	rt, err := adapters.DetectJSRuntime()
 	if err != nil {
-		return fmt.Errorf("monocle serve-mcp-channel requires a JavaScript runtime: %w", err)
+		return fmt.Errorf("monocle serve-mcp requires a JavaScript runtime: %w", err)
 	}
 
 	// Exec into the JS runtime, replacing this process
@@ -155,6 +158,12 @@ func (cmd *ServeMCPChannelCmd) Run() error {
 	}
 
 	return syscall.Exec(binPath, argv, os.Environ())
+}
+
+// Deprecated: use 'monocle serve-mcp' instead.
+func (cmd *ServeMCPChannelCmd) Run() error {
+	fmt.Fprintln(os.Stderr, "Note: 'monocle serve-mcp-channel' is deprecated, use 'monocle serve-mcp' instead")
+	return (&ServeMCPCmd{}).Run()
 }
 
 // Deprecated: use 'monocle register' instead.
@@ -272,7 +281,7 @@ func runTUI(socketOverride string, additionalPaths []string, continueSession boo
 		}
 	}
 
-	// Check if MCP channel needs registration
+	// Check if MCP server needs registration
 	var appOpts tui.AppOptions
 	appOpts.NonGitMode = nonGitMode
 	adapter := &adapters.ClaudeAdapter{}

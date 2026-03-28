@@ -17,13 +17,13 @@ devbox run -- make lint               # Vet + build check
 
 Single binary with CLI subcommands:
 - **`monocle`** — TUI + CLI (Kong). Manages sessions, renders diffs/plans, collects comments, delivers reviews.
-- **`monocle register`** — Register MCP channel for Claude Code (.mcp.json entry).
-- **`monocle unregister`** — Remove MCP channel registration.
-- **`monocle serve-mcp-channel`** — (hidden) Run the MCP channel server. Called by Claude Code, not users.
+- **`monocle register`** — Register MCP server for an agent (.mcp.json entry).
+- **`monocle unregister`** — Remove MCP server registration.
+- **`monocle serve-mcp`** — (hidden) Run the MCP server. Called by agents, not users.
 
-### Integration Model: MCP Channel
+### Integration Model: MCP Server
 
-Claude Code integrates with Monocle via an **MCP channel** — a stdio MCP server (bundled JS, served by `monocle serve-mcp-channel`) that connects to Monocle's Unix domain socket. The channel exposes MCP tools (`review_status`, `get_feedback`, `submit_for_review`) and pushes review feedback to Claude Code via notifications.
+Agents integrate with Monocle via an **MCP server** — a stdio MCP server (bundled JS, served by `monocle serve-mcp`) that connects to Monocle's Unix domain socket. The server exposes MCP tools (`review_status`, `get_feedback`, `submit_for_review`) and pushes review feedback to agents via notifications.
 
 **Key design:**
 - **Push-based** — Monocle pushes feedback to Claude Code via MCP notifications, no polling needed
@@ -34,13 +34,13 @@ Claude Code integrates with Monocle via an **MCP channel** — a stdio MCP serve
 
 ```
 cmd/monocle/          Main CLI entry point (Kong commands)
-channel/              MCP channel source (TypeScript) + esbuild bundling
+mcp/                  MCP server source (TypeScript) + esbuild bundling
 internal/
   types/              Domain types (ReviewSession, ChangedFile, ReviewComment, Config)
   protocol/           NDJSON message types + marshal/unmarshal (GetReviewStatus, PollFeedback, SubmitContent)
   db/                 SQLite layer (schema, migrations, typed queries)
   core/               Engine, git client, feedback queue, formatter, session manager, socket server
-  adapters/           Claude Code MCP channel registration, repo/socket utilities
+  adapters/           MCP server registration, repo/socket utilities
   tui/                Bubble Tea v2 UI (app shell, sidebar, diff view, plan view, modals, theme)
 ```
 
@@ -51,9 +51,9 @@ internal/
 ### Data Flow
 
 ```
-Claude Code calls MCP tool → channel.ts → Unix socket → SocketServer → Engine
+Agent calls MCP tool → server.ts → Unix socket → SocketServer → Engine
 Engine → emits events → BridgeEngineEvents → tea.Program.Send() → TUI updates
-User submits review → Engine → FeedbackQueue → channel.ts sends MCP notification → Claude Code
+User submits review → Engine → FeedbackQueue → server.ts sends MCP notification → Agent
 ```
 
 ### Pause Flow

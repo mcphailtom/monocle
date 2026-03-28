@@ -3,7 +3,7 @@
   "mcp": {
     "monocle": {
       "type": "local",
-      "command": ["./bin/monocle", "serve-mcp-channel"],
+      "command": ["./bin/monocle", "serve-mcp"],
       "enabled": true
     }
   },

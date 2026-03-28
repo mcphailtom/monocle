@@ -62,9 +62,9 @@ func (m registerPromptModel) View() string {
 
 	var b strings.Builder
 
-	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Register MCP Channel"))
+	b.WriteString(lipgloss.NewStyle().Bold(true).Render("Register MCP Server"))
 	b.WriteString("\n\n")
-	b.WriteString("Monocle's MCP channel is not registered. This is needed to directly communicate with Claude Code during reviews.")
+	b.WriteString("Monocle's MCP server is not registered. This is needed to directly communicate with your agent during reviews.")
 	b.WriteString("\n\n")
 
 	// Scope selector (Tab to cycle)

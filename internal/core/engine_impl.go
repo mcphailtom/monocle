@@ -785,7 +785,7 @@ func (e *Engine) Submit(action types.SubmitAction, body string) (*SubmitResult, 
 
 	formatted := e.formatter.Format(session, session.Comments, action, body)
 
-	// Check if a push-mode agent is connected (subscriber = channel mode)
+	// Check if a push-mode agent is connected (subscriber = push mode)
 	agentConnected := e.server != nil && e.server.SubscriberCount() > 0
 
 	e.feedback.Submit(formatted, agentConnected)
@@ -802,7 +802,7 @@ func (e *Engine) Submit(action types.SubmitAction, body string) (*SubmitResult, 
 		SubmittedAt:     now,
 	}
 	if agentConnected {
-		sub.DeliveredAt = &now // Channel delivers immediately
+		sub.DeliveredAt = &now // Push delivers immediately
 	}
 	_ = e.database.CreateSubmission(session.ID, sub)
 
@@ -821,7 +821,7 @@ func (e *Engine) Submit(action types.SubmitAction, body string) (*SubmitResult, 
 	})
 
 	if agentConnected {
-		// Push mode: advance round for a clean slate (channel delivers immediately)
+		// Push mode: advance round for a clean slate (push delivers immediately)
 		e.mu.Lock()
 		_ = e.sessions.AdvanceRound(session)
 		e.mu.Unlock()
@@ -840,7 +840,7 @@ func (e *Engine) Submit(action types.SubmitAction, body string) (*SubmitResult, 
 	return &SubmitResult{AgentConnected: agentConnected}, nil
 }
 
-// buildFeedbackSummary creates a human-readable one-liner for channel notifications.
+// buildFeedbackSummary creates a human-readable one-liner for push notifications.
 func buildFeedbackSummary(action string, comments []types.ReviewComment) string {
 	issues, suggestions, notes, _ := countByType(comments)
 
@@ -983,7 +983,7 @@ func (e *Engine) StartServer(socketPath string) error {
 	return e.server.Start(socketPath)
 }
 
-// -- Feedback (MCP channel) --
+// -- Feedback (MCP) --
 
 // PollFeedback returns pending feedback without blocking.
 func (e *Engine) PollFeedback() *FormattedReview {
@@ -1202,7 +1202,7 @@ func (e *Engine) handleGetReviewStatus(_ *protocol.GetReviewStatusMsg) *protocol
 }
 
 // handlePollFeedback returns pending feedback, optionally blocking until available.
-// In push (channel) mode, round advancement happens in Submit().
+// In push mode, round advancement happens in Submit().
 // In queue mode, round advancement happens here when feedback is picked up.
 func (e *Engine) handlePollFeedback(msg *protocol.PollFeedbackMsg) *protocol.PollFeedbackResponse {
 	var result *PollResult
@@ -1220,9 +1220,9 @@ func (e *Engine) handlePollFeedback(msg *protocol.PollFeedbackMsg) *protocol.Pol
 		}
 	}
 
-	// If this feedback was NOT already channel-delivered, perform queue delivery
+	// If this feedback was NOT already push-delivered, perform queue delivery
 	// side effects: advance round, mark delivered, clear comments, emit events.
-	if !result.ChannelDelivered {
+	if !result.PushDelivered {
 		e.completeQueuedDelivery()
 	}
 

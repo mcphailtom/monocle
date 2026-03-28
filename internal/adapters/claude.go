@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// ClaudeAdapter handles Claude Code MCP channel registration.
+// ClaudeAdapter handles Claude Code MCP server registration.
 type ClaudeAdapter struct{}
 
 func (a *ClaudeAdapter) Name() string  { return "claude" }
@@ -67,7 +67,7 @@ func (a *ClaudeAdapter) Unregister(global bool) error {
 }
 
 // HasMCPConfig checks if monocle is correctly configured in any .mcp.json (global or local).
-// Returns true only if the entry uses the serve-mcp-channel subcommand (not old-style bun/node configs).
+// Returns true only if the entry uses the serve-mcp (or legacy serve-mcp-channel) subcommand (not old-style bun/node configs).
 func (a *ClaudeAdapter) HasMCPConfig() bool {
 	for _, global := range []bool{true, false} {
 		if hasMCPServersEntry(mcpJSONPath(global)) {
@@ -178,23 +178,23 @@ func (r *JSRuntime) ExecArgs(scriptPath string) (string, []string, error) {
 	}
 }
 
-// ChannelBundlePath returns the path where the channel bundle should be written.
+// MCPBundlePath returns the path where the MCP bundle should be written.
 // Uses a content hash so the file is only written once per version.
-func ChannelBundlePath() string {
-	hash := sha256.Sum256(ChannelBundle)
+func MCPBundlePath() string {
+	hash := sha256.Sum256(MCPBundle)
 	hexHash := hex.EncodeToString(hash[:])[:8]
-	return filepath.Join(os.TempDir(), fmt.Sprintf("monocle-channel-%s.mjs", hexHash))
+	return filepath.Join(os.TempDir(), fmt.Sprintf("monocle-mcp-%s.mjs", hexHash))
 }
 
-// WriteChannelBundle writes the embedded channel bundle to its temp path if needed.
+// WriteMCPBundle writes the embedded MCP bundle to its temp path if needed.
 // Returns the path to the written file.
-func WriteChannelBundle() (string, error) {
-	path := ChannelBundlePath()
+func WriteMCPBundle() (string, error) {
+	path := MCPBundlePath()
 	if _, err := os.Stat(path); err == nil {
 		return path, nil // already exists with correct hash
 	}
-	if err := os.WriteFile(path, ChannelBundle, 0644); err != nil {
-		return "", fmt.Errorf("write channel bundle: %w", err)
+	if err := os.WriteFile(path, MCPBundle, 0644); err != nil {
+		return "", fmt.Errorf("write mcp bundle: %w", err)
 	}
 	return path, nil
 }
@@ -225,7 +225,7 @@ func configureMCPServersJSON(path, command string) error {
 
 	servers["monocle"] = map[string]any{
 		"command": command,
-		"args":    []any{"serve-mcp-channel"},
+		"args":    []any{"serve-mcp"},
 	}
 
 	return WriteJSONFile(path, data)
@@ -257,7 +257,7 @@ func unconfigureMCPServersJSON(path string) error {
 }
 
 // hasMCPServersEntry checks if a JSON file has a monocle entry under "mcpServers"
-// with the serve-mcp-channel subcommand.
+// with the serve-mcp or legacy serve-mcp-channel subcommand.
 func hasMCPServersEntry(path string) bool {
 	data, err := ReadJSONFile(path)
 	if err != nil {
@@ -273,7 +273,7 @@ func hasMCPServersEntry(path string) bool {
 	}
 	args, _ := entry["args"].([]any)
 	if len(args) > 0 {
-		if arg, ok := args[0].(string); ok && arg == "serve-mcp-channel" {
+		if arg, ok := args[0].(string); ok && (arg == "serve-mcp" || arg == "serve-mcp-channel") {
 			return true
 		}
 	}

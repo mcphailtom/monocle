@@ -108,7 +108,7 @@ In Claude Code, add Monocle as a plugin marketplace and install:
 
 #### 2. Start reviewing
 
-In one terminal, start Claude Code with the channel enabled (the flag is required during the [channels research preview](https://code.claude.com/docs/en/channels)):
+In one terminal, start Claude Code with the plugin channel enabled (the flag is required during the [channels research preview](https://code.claude.com/docs/en/channels)):
 
 ```bash
 claude --dangerously-load-development-channels plugin:monocle@monocle
@@ -123,7 +123,7 @@ Claude Code gets tools for checking review status, retrieving feedback, submitti
 
 > **Note:** The `--dangerously-load-development-channels` flag is required during the [channels research preview](https://code.claude.com/docs/en/channels-reference).
 
-> **Tip:** If you start or restart Monocle while Claude Code is already running, the MCP channel may need to reconnect. Type `/mcp` in Claude Code and select Monocle to reconnect.
+> **Tip:** If you start or restart Monocle while Claude Code is already running, the MCP server may need to reconnect. Type `/mcp` in Claude Code and select Monocle to reconnect.
 
 ### Other agents (pull-based feedback)
 
@@ -160,7 +160,7 @@ Navigate with `j`/`k`, add comments with `c`, and use `v` for visual (multi-line
 
 **Yank** (`Ctrl+y`): In the submit modal, copies the formatted review to your system clipboard without submitting, then closes the modal.
 
-**Pause** (`P`): The agent receives a push notification to stop and wait. It calls `get_feedback` with `wait=true` and blocks until you submit your review. This is for when you want to review before the agent moves on. Pause requires MCP channel support (currently Claude Code only).
+**Pause** (`P`): The agent receives a push notification to stop and wait. It calls `get_feedback` with `wait=true` and blocks until you submit your review. This is for when you want to review before the agent moves on. Pause requires MCP push notification support (currently Claude Code only).
 
 ### Plan review and focus mode
 
@@ -177,7 +177,7 @@ The `submit_for_review_and_wait` tool submits content to your TUI **and blocks**
 - **Works with any MCP agent** — Claude Code, OpenCode, Codex CLI, Gemini CLI, or any agent that supports MCP tool servers
 - **Push notifications** — With Claude Code channels, feedback is pushed directly into the agent's context the moment you submit
 - **Pull-based feedback** — Agents without channel support retrieve feedback via the `get_feedback` tool; multiple reviews queue up and are delivered together
-- **Pause flow** — Ask your agent to stop and wait while you review, then release it when ready (requires MCP channel support)
+- **Pause flow** — Ask your agent to stop and wait while you review, then release it when ready (requires MCP push notification support)
 - **Live diff viewer** — Unified and split (side-by-side) views with syntax highlighting and intra-line diffs
 - **Structured comments** — Tag feedback as issues, suggestions, notes, or praise with line-level or file-level precision
 - **Suggested edits** — Press `s` to propose exact code changes with GitHub-style `suggestion` blocks
@@ -305,7 +305,7 @@ The `agent` argument is one of `claude`, `opencode`, `codex`, `gemini`, or `all`
 If auto-pairing fails (e.g., Claude Code's working directory differs from Monocle's), you can manually specify the socket path on either side:
 
 - **Monocle:** `monocle --socket /tmp/monocle-abc123.sock`
-- **Channel (env var):** Set `MONOCLE_SOCKET` in your `.mcp.json`:
+- **MCP Server (env var):** Set `MONOCLE_SOCKET` in your `.mcp.json`:
   ```json
   {
     "mcpServers": {
@@ -387,7 +387,7 @@ The help overlay (`?`) dynamically reflects your custom bindings. Modal keys (En
 
 ```
 ┌─────────────┐                ┌───────────────┐              ┌──────────┐
-│   Agent     │<--stdio/MCP--->│  channel.ts   │<---socket--->│ monocle  │
+│   Agent     │<--stdio/MCP--->│  server.ts    │<---socket--->│ monocle  │
 │             │                │ (MCP server)  │              │  (TUI)   │
 └─────────────┘                └───────────────┘              └──────────┘
 ```
@@ -400,7 +400,7 @@ The help overlay (`?`) dynamically reflects your custom bindings. Modal keys (En
 
 Feedback is always queued for reliability. How the agent learns about it depends on the integration:
 
-- **Claude Code with channels:** A push notification is sent through the MCP channel with a summary of the review (e.g., "Your reviewer requested changes — 2 issues, 1 suggestion"). The agent calls `get_feedback` to retrieve the full review. If the push fails silently (channels not enabled), the review stays in the queue.
+- **Claude Code with channels:** A push notification is sent through MCP with a summary of the review (e.g., "Your reviewer requested changes — 2 issues, 1 suggestion"). The agent calls `get_feedback` to retrieve the full review. If the push fails silently (channels not enabled), the review stays in the queue.
 - **Any MCP agent:** The agent calls the `get_feedback` tool directly, either via a `/get-feedback` slash command or on its own. Multiple reviews accumulate in the queue and are delivered together.
 
 If you want the agent to pause and wait for you to finish reviewing, press `P` — the agent receives a pause notification and blocks until your review is ready.

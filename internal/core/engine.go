@@ -113,10 +113,10 @@ type EngineAPI interface {
 	SelectedBaseRef() string
 	RecentCommits(n int) ([]LogEntry, error)
 
-	// Server (socket for MCP channel)
+	// Server (socket for MCP server)
 	StartServer(socketPath string) error
 
-	// Feedback (MCP channel)
+	// Feedback (MCP)
 	PollFeedback() *FormattedReview
 	WaitForFeedback() *FormattedReview
 	GetReviewStatusInfo() *ReviewStatusInfo

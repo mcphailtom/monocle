@@ -2,7 +2,7 @@
   "mcpServers": {
     "monocle": {
       "command": "./bin/monocle",
-      "args": ["serve-mcp-channel"]
+      "args": ["serve-mcp"]
     }
   }
 }

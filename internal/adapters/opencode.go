@@ -54,7 +54,7 @@ func (a *OpenCodeAdapter) Register(global bool) error {
 	}
 	mcp["monocle"] = map[string]any{
 		"type":    "local",
-		"command": []any{command, "serve-mcp-channel"},
+		"command": []any{command, "serve-mcp"},
 		"enabled": true,
 	}
 

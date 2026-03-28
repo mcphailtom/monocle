@@ -1073,7 +1073,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 		registerFn := m.mcpRegisterFn
 		global := msg.global
-		m.statusBar.feedbackStatus = "Registering MCP channel..."
+		m.statusBar.feedbackStatus = "Registering MCP server..."
 		return m, func() tea.Msg {
 			return mcpRegisterResultMsg{err: registerFn(global)}
 		}
@@ -1086,7 +1086,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.statusBar.feedbackStatus = "MCP registration failed"
 		} else {
-			m.statusBar.feedbackStatus = "MCP channel registered"
+			m.statusBar.feedbackStatus = "MCP server registered"
 			m.mcpRegisterFn = nil
 		}
 		return m, nil

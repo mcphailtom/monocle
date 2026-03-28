@@ -16,7 +16,7 @@ type FormattedReview struct {
 // PollResult holds the result of polling the feedback queue.
 type PollResult struct {
 	Reviews          []*FormattedReview
-	ChannelDelivered bool
+	PushDelivered bool
 }
 
 // CombinedFeedback returns the reviews combined into a single formatted string.
@@ -48,7 +48,7 @@ func (r *PollResult) CombinedFeedback() (string, int, string) {
 	return b.String(), totalComments, action
 }
 
-// ReviewStatusInfo holds the current review status for MCP channel queries.
+// ReviewStatusInfo holds the current review status for MCP queries.
 type ReviewStatusInfo struct {
 	Status       string // "no_feedback" | "pending" | "pause_requested"
 	CommentCount int
@@ -56,11 +56,11 @@ type ReviewStatusInfo struct {
 }
 
 // FeedbackQueue manages the synchronization between user review actions
-// and MCP channel/tool feedback retrieval. Supports both non-blocking and
-// blocking wait (pause flow) models, and both push (channel) and queue modes.
+// and MCP tool feedback retrieval. Supports both non-blocking and
+// blocking wait (pause flow) models, and both push and queue modes.
 //
-// In push mode (channelDelivered=true), pending is replaced on each submit.
-// In queue mode (channelDelivered=false), reviews accumulate until polled.
+// In push mode (pushDelivered=true), pending is replaced on each submit.
+// In queue mode (pushDelivered=false), reviews accumulate until polled.
 type FeedbackQueue struct {
 	mu   sync.Mutex
 	cond *sync.Cond
@@ -68,9 +68,9 @@ type FeedbackQueue struct {
 	// pending holds reviews waiting to be delivered (slice for queue mode)
 	pending []*FormattedReview
 
-	// channelDelivered is true when the latest submit was already delivered
-	// via channel push (so handlePollFeedback should not advance the round)
-	channelDelivered bool
+	// pushDelivered is true when the latest submit was already delivered
+	// via push notification (so handlePollFeedback should not advance the round)
+	pushDelivered bool
 
 	// pauseRequested is set when the user wants the agent to stop and wait
 	pauseRequested bool
@@ -89,15 +89,15 @@ func NewFeedbackQueue() *FeedbackQueue {
 // Submit stores a review for delivery. If a wait handler is blocking,
 // it wakes it to deliver immediately.
 //
-// channelDelivered controls accumulation behavior:
-//   - true (push mode): replaces any pending review (channel delivers immediately)
+// pushDelivered controls accumulation behavior:
+//   - true (push mode): replaces any pending review (push delivers immediately)
 //   - false (queue mode): appends to the pending queue
-func (fq *FeedbackQueue) Submit(review *FormattedReview, channelDelivered bool) {
+func (fq *FeedbackQueue) Submit(review *FormattedReview, pushDelivered bool) {
 	fq.mu.Lock()
 	defer fq.mu.Unlock()
 
-	fq.channelDelivered = channelDelivered
-	if channelDelivered {
+	fq.pushDelivered = pushDelivered
+	if pushDelivered {
 		// Push mode: replace pending (will be cleared by ClearStatus shortly)
 		fq.pending = []*FormattedReview{review}
 	} else {
@@ -135,7 +135,7 @@ func (fq *FeedbackQueue) PollWithInfo() *PollResult {
 
 	result := &PollResult{
 		Reviews:          fq.pending,
-		ChannelDelivered: fq.channelDelivered,
+		PushDelivered: fq.pushDelivered,
 	}
 	fq.pending = nil
 	fq.status = "delivered"
@@ -163,7 +163,7 @@ func (fq *FeedbackQueue) WaitForFeedbackWithInfo() *PollResult {
 	if len(fq.pending) > 0 {
 		result := &PollResult{
 			Reviews:          fq.pending,
-			ChannelDelivered: fq.channelDelivered,
+			PushDelivered: fq.pushDelivered,
 		}
 		fq.pending = nil
 		fq.status = "delivered"
@@ -178,7 +178,7 @@ func (fq *FeedbackQueue) WaitForFeedbackWithInfo() *PollResult {
 
 	result := &PollResult{
 		Reviews:          fq.pending,
-		ChannelDelivered: fq.channelDelivered,
+		PushDelivered: fq.pushDelivered,
 	}
 	fq.pending = nil
 	fq.status = "delivered"

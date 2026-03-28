@@ -37,7 +37,7 @@ func (a *CodexAdapter) Register(global bool) error {
 
 	existing := removeMonocleTOMLSection(string(content))
 
-	block := fmt.Sprintf("\n[mcp_servers.monocle]\ncommand = %q\nargs = [\"serve-mcp-channel\"]\n", command)
+	block := fmt.Sprintf("\n[mcp_servers.monocle]\ncommand = %q\nargs = [\"serve-mcp\"]\n", command)
 
 	if len(existing) > 0 && !strings.HasSuffix(existing, "\n") {
 		block = "\n" + block

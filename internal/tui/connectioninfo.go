@@ -79,7 +79,7 @@ func (m connectionInfoModel) View() string {
 	b.WriteString("  Monocle:    ")
 	b.WriteString(codeStyle.Render(fmt.Sprintf("monocle --socket %s", m.socketPath)))
 	b.WriteString("\n")
-	b.WriteString("  Channel:    ")
+	b.WriteString("  MCP Server: ")
 	b.WriteString(codeStyle.Render(fmt.Sprintf("MONOCLE_SOCKET=%s", m.socketPath)))
 	b.WriteString("\n\n")
 
