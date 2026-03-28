@@ -4,7 +4,7 @@ Submit a plan file to Monocle so your reviewer can see it. This does NOT wait fo
 
 Find the most recently modified plan file in the project (or use the path the user provided). Read it to get the filename and first heading.
 
-Call the monocle `submit_plan` tool with:
+Call the monocle `submit_for_review` tool with:
 - `title`: The first markdown heading from the plan, or the filename
 - `file_path`: Absolute path to the plan file
 - `id`: The plan filename (so updates replace the previous version)

@@ -10,7 +10,7 @@ Submit a plan file to Monocle so the reviewer can see it. This does NOT wait for
 
 2. **Read the plan file** to confirm it exists and get its filename
 
-3. **Call the `submit_plan` MCP tool** with:
+3. **Call the `submit_for_review` MCP tool** with:
    - `title`: The first markdown heading from the plan, or the filename if no heading found
    - `file_path`: Absolute path to the plan file
    - `id`: The plan filename (e.g. `my-plan.md`) — this ensures updates replace the previous version

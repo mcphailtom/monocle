@@ -119,7 +119,7 @@ In another, start Monocle:
 monocle
 ```
 
-Claude Code gets tools for checking review status, retrieving feedback, submitting plans, and more — and starts receiving your review feedback as push notifications.
+Claude Code gets tools for checking review status, retrieving feedback, submitting content for review, and more — and starts receiving your review feedback as push notifications.
 
 > **Note:** The `--dangerously-load-development-channels` flag is required during the [channels research preview](https://code.claude.com/docs/en/channels-reference).
 
@@ -164,11 +164,11 @@ Navigate with `j`/`k`, add comments with `c`, and use `v` for visual (multi-line
 
 ### Plan review and focus mode
 
-Monocle isn't limited to reviewing file changes. Your agent can submit **plans, architecture decisions, and other content** directly to Monocle for review using the `submit_plan` tool. These show up alongside your file diffs in the sidebar, and you can leave line-level comments on them the same way. You can also trigger this yourself with the `/review-plan` or `/review-plan-wait` slash commands — useful when you want to send the agent's plan to Monocle without waiting for the agent to do it on its own.
+Monocle isn't limited to reviewing file changes. Your agent can submit **plans, architecture decisions, summaries, and other content** directly to Monocle for review using the `submit_for_review` tool. These show up alongside your file diffs in the sidebar, and you can leave line-level comments on them the same way. You can also trigger this yourself with the `/review-plan` or `/review-plan-wait` slash commands — useful when you want to send the agent's plan to Monocle without waiting for the agent to do it on its own.
 
-This means you can review the agent's *thinking* before it writes code — not just the output. Ask the agent to submit its plan first, review it, leave feedback, and only then let it start implementing.
+This means you can review the agent's *thinking* before it writes code — not just the output. Ask the agent to submit its content first, review it, leave feedback, and only then let it proceed.
 
-The `submit_plan_and_wait` tool submits a plan to your TUI **and blocks** until you respond with feedback. If you approve, the agent starts implementing. If you request changes, the agent updates the plan and submits again — iterating across as many rounds as it takes until you're satisfied before the agent moves on to implementation.
+The `submit_for_review_and_wait` tool submits content to your TUI **and blocks** until you respond with feedback. If you approve, the agent continues. If you request changes, the agent updates and submits again — iterating across as many rounds as it takes until you're satisfied.
 
 ## Features
 
@@ -180,8 +180,8 @@ The `submit_plan_and_wait` tool submits a plan to your TUI **and blocks** until 
 - **Structured comments** — Tag feedback as issues, suggestions, notes, or praise with line-level or file-level precision
 - **Suggested edits** — Press `s` to propose exact code changes with GitHub-style `suggestion` blocks
 - **Visual selection** — Select line ranges for comments with vim-style visual mode
-- **Plan review + focus mode** — Your agent can submit plans for your review before writing code, with markdown rendering and distraction-free focus mode
-- **Plan mode gating** — `submit_plan_and_wait` blocks the agent until you approve the plan before implementation begins
+- **Content review + focus mode** — Your agent can submit plans, summaries, and other content for your review, with markdown rendering and distraction-free focus mode
+- **Review gating** — `submit_for_review_and_wait` blocks the agent until you approve the submitted content before it proceeds
 - **Markdown rendering** — Plans and changed `.md` files render with styled headings, bold, italic, lists, and code blocks
 - **Horizontal scrolling & line wrapping** — Navigate wide diffs with `h`/`l` or toggle wrapping with `w`
 - **Responsive layout** — Automatically stacks panes vertically in narrow terminals
@@ -204,8 +204,8 @@ Monocle exposes the following tools to your agent via its MCP server:
 |------|-------------|
 | `review_status` | Check if the reviewer has pending feedback or has requested a pause |
 | `get_feedback` | Retrieve queued review feedback. Use `wait=true` to block until feedback is available (pause flow) |
-| `submit_plan` | Submit a plan, architecture decision, or other content for the reviewer to see and comment on |
-| `submit_plan_and_wait` | Submit a plan and block until the reviewer responds. Use for plan-mode iteration — if changes are requested, update the plan and call again |
+| `submit_for_review` | Submit content (plans, summaries, decisions, etc.) for the reviewer to see and comment on |
+| `submit_for_review_and_wait` | Submit content and block until the reviewer responds — if changes are requested, update and call again |
 | `add_files` | Add additional files for the reviewer to see in Monocle (absolute paths to files or directories) |
 
 ## Slash Commands
@@ -215,8 +215,8 @@ Monocle ships slash commands for agents that support them. These are thin wrappe
 | Command | Available for | Description |
 |---------|---------------|-------------|
 | `/get-feedback` | Claude Code, OpenCode, Gemini CLI | Retrieve pending review feedback |
-| `/review-plan` | Claude Code, OpenCode, Gemini CLI | Find the active plan file and submit it via `submit_plan` |
-| `/review-plan-wait` | Claude Code, OpenCode, Gemini CLI | Find the active plan file and submit it via `submit_plan_and_wait`, then iterate on feedback |
+| `/review-plan` | Claude Code, OpenCode, Gemini CLI | Find the active plan file and submit it for review via `submit_for_review` |
+| `/review-plan-wait` | Claude Code, OpenCode, Gemini CLI | Find the active plan file and submit it for review via `submit_for_review_and_wait`, then iterate on feedback |
 
 Slash commands live in agent-specific directories (`plugin/commands/` for Claude Code, `.opencode/commands/` for OpenCode, `.gemini/commands/` for Gemini CLI). Codex CLI does not support custom slash commands.
 
@@ -257,7 +257,7 @@ Slash commands live in agent-specific directories (`plugin/commands/` for Claude
 | `S` / `:submit` | Submit review |
 | `Ctrl+g` | Open external editor (comment/submit modal) |
 | `Ctrl+y` | Copy review to clipboard |
-| `P` / `:pause` | Pause Claude Code (wait for your review) |
+| `P` / `:pause` | Pause the agent (wait for your review) |
 | `D` / `:clear` | Clear review (all comments, plans, reviewed states) |
 | `F` | Toggle focus mode (hide sidebar, enable wrap) |
 | `:mark-all-reviewed` | Mark all files as reviewed |

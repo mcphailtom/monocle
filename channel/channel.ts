@@ -311,7 +311,7 @@ const cwd = process.cwd();
 const repoRoot = findRepoRoot(cwd);
 const socketPath = process.env.MONOCLE_SOCKET || defaultSocketPath(repoRoot);
 
-// When a tool (submit_plan_and_wait, get_feedback --wait) is blocking for
+// When a tool (submit_for_review_and_wait, get_feedback --wait) is blocking for
 // feedback, suppress the event-based notification to avoid delivering the
 // same feedback twice.
 let waitingForFeedback = false;

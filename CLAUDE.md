@@ -1,6 +1,6 @@
 # Monocle
 
-Terminal-based code review companion for Claude Code. Developers run it alongside Claude Code — the agent writes code, the developer reviews diffs and leaves structured feedback, and Monocle delivers that feedback via an MCP channel.
+Terminal-based code review companion for AI coding agents. Developers run it alongside their agent — the agent writes code, the developer reviews diffs and leaves structured feedback, and Monocle delivers that feedback via MCP.
 
 ## Quick Start
 
@@ -23,7 +23,7 @@ Single binary with CLI subcommands:
 
 ### Integration Model: MCP Channel
 
-Claude Code integrates with Monocle via an **MCP channel** — a stdio MCP server (bundled JS, served by `monocle serve-mcp-channel`) that connects to Monocle's Unix domain socket. The channel exposes MCP tools (`review_status`, `get_feedback`, `submit_plan`) and pushes review feedback to Claude Code via notifications.
+Claude Code integrates with Monocle via an **MCP channel** — a stdio MCP server (bundled JS, served by `monocle serve-mcp-channel`) that connects to Monocle's Unix domain socket. The channel exposes MCP tools (`review_status`, `get_feedback`, `submit_for_review`) and pushes review feedback to Claude Code via notifications.
 
 **Key design:**
 - **Push-based** — Monocle pushes feedback to Claude Code via MCP notifications, no polling needed
