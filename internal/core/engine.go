@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/anthropics/monocle/internal/types"
+	"github.com/josephschmitt/monocle/internal/types"
 )
 
 // SubmitResult contains information about the outcome of a review submission.

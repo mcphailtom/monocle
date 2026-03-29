@@ -7,7 +7,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/anthropics/monocle/internal/protocol"
+	"github.com/josephschmitt/monocle/internal/protocol"
 )
 
 // SocketServer listens on a Unix domain socket for CLI subcommand messages.

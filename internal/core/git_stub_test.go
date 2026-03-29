@@ -1,6 +1,6 @@
 package core
 
-import "github.com/anthropics/monocle/internal/types"
+import "github.com/josephschmitt/monocle/internal/types"
 
 // gitStub implements GitAPI for unit tests without requiring a real git repo.
 type gitStub struct {

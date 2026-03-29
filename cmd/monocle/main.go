@@ -8,10 +8,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/alecthomas/kong"
 
-	"github.com/anthropics/monocle/internal/adapters"
-	"github.com/anthropics/monocle/internal/core"
-	"github.com/anthropics/monocle/internal/db"
-	"github.com/anthropics/monocle/internal/tui"
+	"github.com/josephschmitt/monocle/internal/adapters"
+	"github.com/josephschmitt/monocle/internal/core"
+	"github.com/josephschmitt/monocle/internal/db"
+	"github.com/josephschmitt/monocle/internal/tui"
 )
 
 var version = "dev"

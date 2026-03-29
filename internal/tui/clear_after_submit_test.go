@@ -6,8 +6,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/anthropics/monocle/internal/core"
-	"github.com/anthropics/monocle/internal/types"
+	"github.com/josephschmitt/monocle/internal/core"
+	"github.com/josephschmitt/monocle/internal/types"
 )
 
 // stubEngine is a minimal EngineAPI stub for testing TUI behavior.
