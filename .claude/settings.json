@@ -22,7 +22,8 @@
       "Bash(printenv:*)",
       "Bash(uname:*)",
       "Bash(date:*)",
-      "Bash(diff:*)"
+      "Bash(diff:*)",
+      "Bash(devbox run -- make*)"
     ]
   }
 }

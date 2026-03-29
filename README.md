@@ -282,7 +282,10 @@ The comment editor supports standard emacs-style shortcuts:
 | `Ctrl+D` or `Delete` | Delete character at cursor |
 | `Ctrl+K` | Kill to end of line |
 | `Ctrl+U` | Kill to start of line |
-| `Ctrl+W` | Delete word before cursor |
+| `Ctrl+W` or `Alt+Backspace` | Delete word before cursor |
+| `Alt+D` | Delete word after cursor |
+| `Alt+←` or `Alt+B` | Move cursor back one word |
+| `Alt+→` or `Alt+F` | Move cursor forward one word |
 | `Shift+Enter` or `Alt+Enter` | Insert newline |
 | `Ctrl+G` | Open in external editor (`$VISUAL`/`$EDITOR`) |
 | `Tab` | Cycle comment type |

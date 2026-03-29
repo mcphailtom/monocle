@@ -97,8 +97,14 @@ func (m commentEditorModel) Update(msg tea.Msg) (commentEditorModel, tea.Cmd) {
 			m.killToLineEnd()
 		case "ctrl+u":
 			m.killToLineStart()
-		case "ctrl+w":
+		case "ctrl+w", "alt+backspace":
 			m.deleteWordBeforeCursor()
+		case "alt+d":
+			m.deleteWordForward()
+		case "alt+left", "alt+b":
+			m.moveWordBackward()
+		case "alt+right", "alt+f":
+			m.moveWordForward()
 		case "left", "ctrl+b":
 			if m.cursor > 0 {
 				m.cursor--
@@ -194,6 +200,57 @@ func (m *commentEditorModel) killToLineStart() {
 	}
 	m.body = string(runes[:start]) + string(runes[m.cursor:])
 	m.cursor = start
+}
+
+// moveWordBackward moves the cursor to the start of the previous word (Alt+Left / Alt+B).
+func (m *commentEditorModel) moveWordBackward() {
+	if m.cursor == 0 {
+		return
+	}
+	runes := []rune(m.body)
+	pos := m.cursor
+	// Skip whitespace backward
+	for pos > 0 && (runes[pos-1] == ' ' || runes[pos-1] == '\t') {
+		pos--
+	}
+	// Skip word chars backward (stop at whitespace or newline)
+	for pos > 0 && runes[pos-1] != ' ' && runes[pos-1] != '\t' && runes[pos-1] != '\n' {
+		pos--
+	}
+	m.cursor = pos
+}
+
+// moveWordForward moves the cursor to the start of the next word (Alt+Right / Alt+F).
+func (m *commentEditorModel) moveWordForward() {
+	runes := []rune(m.body)
+	pos := m.cursor
+	// Skip word chars forward (stop at whitespace or newline)
+	for pos < len(runes) && runes[pos] != ' ' && runes[pos] != '\t' && runes[pos] != '\n' {
+		pos++
+	}
+	// Skip whitespace forward
+	for pos < len(runes) && (runes[pos] == ' ' || runes[pos] == '\t') {
+		pos++
+	}
+	m.cursor = pos
+}
+
+// deleteWordForward deletes the word after the cursor (Alt+D).
+func (m *commentEditorModel) deleteWordForward() {
+	runes := []rune(m.body)
+	if m.cursor >= len(runes) {
+		return
+	}
+	end := m.cursor
+	// Skip whitespace forward
+	for end < len(runes) && (runes[end] == ' ' || runes[end] == '\t') {
+		end++
+	}
+	// Skip word chars forward (stop at whitespace or newline)
+	for end < len(runes) && runes[end] != ' ' && runes[end] != '\t' && runes[end] != '\n' {
+		end++
+	}
+	m.body = string(runes[:m.cursor]) + string(runes[end:])
 }
 
 // deleteWordBeforeCursor deletes the word before the cursor (Ctrl+W).

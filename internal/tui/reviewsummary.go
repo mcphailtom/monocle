@@ -129,6 +129,8 @@ func (m reviewSummaryModel) Update(msg tea.Msg) (reviewSummaryModel, tea.Cmd) {
 			if len(m.body) > 0 {
 				m.body = m.body[:len(m.body)-1]
 			}
+		case "ctrl+w", "alt+backspace":
+			m.deleteLastWord()
 		case "space":
 			m.body += " "
 		default:
@@ -139,6 +141,24 @@ func (m reviewSummaryModel) Update(msg tea.Msg) (reviewSummaryModel, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// deleteLastWord deletes the word at the end of the body (Ctrl+W / Alt+Backspace).
+func (m *reviewSummaryModel) deleteLastWord() {
+	if len(m.body) == 0 {
+		return
+	}
+	runes := []rune(m.body)
+	end := len(runes)
+	// Skip trailing whitespace
+	for end > 0 && (runes[end-1] == ' ' || runes[end-1] == '\t') {
+		end--
+	}
+	// Delete back to start of word
+	for end > 0 && runes[end-1] != ' ' && runes[end-1] != '\t' && runes[end-1] != '\n' {
+		end--
+	}
+	m.body = string(runes[:end])
 }
 
 // handleClick processes a mouse click at content-relative coordinates.
