@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anthropics/monocle/internal/db"
-	"github.com/anthropics/monocle/internal/protocol"
-	"github.com/anthropics/monocle/internal/types"
+	"github.com/josephschmitt/monocle/internal/db"
+	"github.com/josephschmitt/monocle/internal/protocol"
+	"github.com/josephschmitt/monocle/internal/types"
 )
 
 func setupTestEngine(t *testing.T) (*Engine, string) {

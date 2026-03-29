@@ -10,8 +10,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/anthropics/monocle/internal/adapters"
-	"github.com/anthropics/monocle/internal/protocol"
+	"github.com/josephschmitt/monocle/internal/adapters"
+	"github.com/josephschmitt/monocle/internal/protocol"
 )
 
 // ErrNotRunning is returned when the Monocle socket is not reachable.

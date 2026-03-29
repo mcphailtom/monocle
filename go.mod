@@ -1,4 +1,4 @@
-module github.com/anthropics/monocle
+module github.com/josephschmitt/monocle
 
 go 1.25.0
 

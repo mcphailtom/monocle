@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/anthropics/monocle/internal/types"
+	"github.com/josephschmitt/monocle/internal/types"
 )
 
 // fileTreeNode represents a node in the file tree hierarchy.

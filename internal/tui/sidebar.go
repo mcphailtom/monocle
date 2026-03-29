@@ -7,7 +7,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/anthropics/monocle/internal/types"
+	"github.com/josephschmitt/monocle/internal/types"
 )
 
 type sidebarModel struct {

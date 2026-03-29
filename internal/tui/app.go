@@ -11,9 +11,9 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/anthropics/monocle/internal/clipboard"
-	"github.com/anthropics/monocle/internal/core"
-	"github.com/anthropics/monocle/internal/types"
+	"github.com/josephschmitt/monocle/internal/clipboard"
+	"github.com/josephschmitt/monocle/internal/core"
+	"github.com/josephschmitt/monocle/internal/types"
 )
 
 // focusTarget identifies which pane holds keyboard focus.

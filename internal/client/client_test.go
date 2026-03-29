@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/anthropics/monocle/internal/client"
-	"github.com/anthropics/monocle/internal/core"
-	"github.com/anthropics/monocle/internal/db"
-	"github.com/anthropics/monocle/internal/protocol"
+	"github.com/josephschmitt/monocle/internal/client"
+	"github.com/josephschmitt/monocle/internal/core"
+	"github.com/josephschmitt/monocle/internal/db"
+	"github.com/josephschmitt/monocle/internal/protocol"
 )
 
 func setupTestEngine(t *testing.T) (*core.Engine, string) {

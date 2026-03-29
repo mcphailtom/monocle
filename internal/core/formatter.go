@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/anthropics/monocle/internal/types"
+	"github.com/josephschmitt/monocle/internal/types"
 )
 
 // ContentProvider is a callback to get file content for code snippets.

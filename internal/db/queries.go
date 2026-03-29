@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/anthropics/monocle/internal/types"
+	"github.com/josephschmitt/monocle/internal/types"
 )
 
 // CreateSession inserts a new review session.

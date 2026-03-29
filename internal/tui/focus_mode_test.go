@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	"github.com/anthropics/monocle/internal/types"
+	"github.com/josephschmitt/monocle/internal/types"
 )
 
 func TestAutoFocusMode_EntersOnPlanContentItem(t *testing.T) {
