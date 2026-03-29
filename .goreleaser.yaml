@@ -53,6 +53,7 @@ changelog:
 
 brews:
   - name: monocle
+    skip_upload: auto
     repository:
       owner: josephschmitt
       name: homebrew-tap
