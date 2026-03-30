@@ -313,6 +313,7 @@ The comment editor supports standard emacs-style shortcuts:
 
 ```
 monocle [--socket PATH]              Start a review session
+monocle status [--json]              Check if Monocle is running
 monocle register [agent] [--global]  Register Monocle for an agent
 monocle unregister [agent] [--global] Remove Monocle registration
 monocle --version                    Print version

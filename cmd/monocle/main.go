@@ -25,6 +25,7 @@ var version = "dev"
 type CLI struct {
 	Run             RunCmd             `cmd:"" default:"withargs" help:"Start a review session"`
 	Review          ReviewCmd          `cmd:"review" help:"Commands for interacting with a Monocle review session"`
+	Status          StatusCmd          `cmd:"" help:"Check if Monocle is running"`
 	Register        RegisterCmd        `cmd:"" help:"Register Monocle for an agent"`
 	Unregister      UnregisterCmd      `cmd:"" help:"Remove Monocle registration"`
 	ServeMcpChannel ServeMCPChannelCmd `cmd:"serve-mcp-channel" help:"Run the MCP channel server" hidden:""`
@@ -84,6 +85,11 @@ type RegisterCmd struct {
 type UnregisterCmd struct {
 	Agent  string `arg:"" optional:"" help:"Agent to unregister (claude, opencode, codex, gemini, all)"`
 	Global bool   `help:"Remove from user-level config instead of project" default:"false"`
+}
+
+type StatusCmd struct {
+	Socket string `help:"Override socket path" env:"MONOCLE_SOCKET" default:""`
+	JSON   bool   `help:"Output as JSON" default:"false"`
 }
 
 type ServeMCPChannelCmd struct{}
@@ -175,6 +181,28 @@ func resolveAgents(name, pickerTitle string) ([]adapters.AgentAdapter, error) {
 		}
 		return []adapters.AgentAdapter{a}, nil
 	}
+}
+
+func (cmd *StatusCmd) Run() error {
+	c, err := client.ConnectWithOverride(cmd.Socket)
+	if err != nil {
+		if errors.Is(err, client.ErrNotRunning) {
+			if cmd.JSON {
+				printJSON(map[string]any{"running": false})
+				return nil
+			}
+			fmt.Println("not running")
+			return nil
+		}
+		return err
+	}
+	defer c.Close()
+
+	if cmd.JSON {
+		return printJSON(map[string]any{"running": true})
+	}
+	fmt.Println("running")
+	return nil
 }
 
 func (cmd *ServeMCPChannelCmd) Run() error {
