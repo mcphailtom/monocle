@@ -3,8 +3,6 @@ package tui
 import (
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/josephschmitt/monocle/internal/types"
 )
 
@@ -251,12 +249,4 @@ func TestDiffViewShowsValidFile_ContentDiff(t *testing.T) {
 	if !m.diffViewShowsValidFile() {
 		t.Error("expected diffViewShowsValidFile() = true for content item in diff mode")
 	}
-}
-
-// runCmd executes a tea.Cmd and returns the message, or nil if cmd is nil.
-func runCmd(cmd tea.Cmd) tea.Msg {
-	if cmd == nil {
-		return nil
-	}
-	return cmd()
 }

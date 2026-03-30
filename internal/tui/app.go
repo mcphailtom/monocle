@@ -463,9 +463,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.contentItem != nil && m.diffView.isViewingContentItem() && m.diffView.contentID == msg.contentItem.ID {
 			// Only update if content or comments actually changed to avoid
 			// flicker from the content→auto-switch→diff cycle on every refresh tick.
-			contentChanged := msg.contentItem.Content != m.diffView.contentDiffContent
-			commentsChanged := len(msg.contentComments) != len(m.diffView.comments)
-			if contentChanged || commentsChanged {
+			if contentItemChanged(msg.contentItem, msg.contentComments, &m.diffView) {
 				m.diffView, diffCmd = m.diffView.Update(loadContentMsg{
 					id:                 msg.contentItem.ID,
 					title:              msg.contentItem.Title,
@@ -473,7 +471,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					contentType:        msg.contentItem.ContentType,
 					comments:           msg.contentComments,
 					hasPreviousVersion: msg.contentItem.PreviousContent != "",
-					autoSwitchDiff:     msg.contentItem.PreviousContent != "",
+					autoSwitchDiff:     msg.contentItem.PreviousContent != "" && m.diffView.contentMode,
 				})
 			}
 		} else if msg.path != "" && msg.result != nil {
@@ -487,15 +485,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(msg.files) > 0 && !m.diffViewShowsValidFile() {
 			m.sidebar.selectPath(msg.files[0].Path)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.files[0].Path})
-		} else if len(msg.files) == 0 && !m.diffView.isViewingContentItem() && !m.diffView.contentMode && m.diffView.path != "" {
-			m.diffView.path = ""
-			m.diffView.hunks = nil
-			m.diffView.lines = nil
-			m.diffView.comments = nil
-			m.diffView.cursor = 0
-			m.diffView.offset = 0
-			m.diffView.hOffset = 0
-			m.diffView.visualMode = false
+		} else if len(msg.files) == 0 && !m.diffView.isViewingContentItem() && m.diffView.path != "" {
+			m.diffView.clearFileState()
 		}
 		return m, diffCmd
 
@@ -523,15 +514,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.sidebar.files) > 0 && !m.diffViewShowsValidFile() {
 			m.sidebar.selectPath(m.sidebar.files[0].Path)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: m.sidebar.files[0].Path})
-		} else if len(m.sidebar.files) == 0 && !m.diffView.isViewingContentItem() && !m.diffView.contentMode && m.diffView.path != "" {
-			m.diffView.path = ""
-			m.diffView.hunks = nil
-			m.diffView.lines = nil
-			m.diffView.comments = nil
-			m.diffView.cursor = 0
-			m.diffView.offset = 0
-			m.diffView.hOffset = 0
-			m.diffView.visualMode = false
+		} else if len(m.sidebar.files) == 0 && !m.diffView.isViewingContentItem() && m.diffView.path != "" {
+			m.diffView.clearFileState()
 		}
 		return m, nil
 
@@ -591,7 +575,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		// Refresh currently displayed content item if it matches (content or diff mode)
+		// Refresh currently displayed content item if it matches
 		if m.diffView.isViewingContentItem() && m.diffView.contentID == msg.id && msg.id != "" {
 			return m, m.handleSidebarSelect(sidebarSelectMsg{isContent: true, contentID: msg.id})
 		}
@@ -2215,7 +2199,7 @@ func (m appModel) refreshFiles() tea.Cmd {
 		}
 		session := engine.GetSession()
 
-		// Refresh content item if one is currently displayed (content or diff mode)
+		// Refresh content item if one is currently displayed
 		if isContentItem && contentID != "" {
 			item, itemErr := engine.GetContentItem(contentID)
 			var contentComments []types.ReviewComment
@@ -2257,6 +2241,24 @@ func (m appModel) refreshFiles() tea.Cmd {
 			comments: comments,
 		}
 	}
+}
+
+// contentItemChanged reports whether a refreshed content item differs from what
+// the diff view is currently showing (content text or comment state).
+func contentItemChanged(item *types.ContentItem, comments []types.ReviewComment, dv *diffViewModel) bool {
+	if item.Content != dv.contentDiffContent {
+		return true
+	}
+	if len(comments) != len(dv.comments) {
+		return true
+	}
+	for i, c := range comments {
+		prev := dv.comments[i]
+		if c.ID != prev.ID || c.Body != prev.Body || c.Resolved != prev.Resolved {
+			return true
+		}
+	}
+	return false
 }
 
 type refreshResultMsg struct {

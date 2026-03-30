@@ -97,6 +97,19 @@ func (m diffViewModel) isViewingContentItem() bool {
 	return m.contentID != ""
 }
 
+// clearFileState resets all file-display fields without touching content item
+// metadata (contentID, contentMode). Call when no file should be shown.
+func (m *diffViewModel) clearFileState() {
+	m.path = ""
+	m.hunks = nil
+	m.lines = nil
+	m.comments = nil
+	m.cursor = 0
+	m.offset = 0
+	m.hOffset = 0
+	m.visualMode = false
+}
+
 func newDiffViewModel(theme *Theme, keys *KeyMap) diffViewModel {
 	return diffViewModel{
 		theme:    theme,
