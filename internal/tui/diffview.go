@@ -257,18 +257,19 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 		}
 		m.style = diffStyleFile
 		m.comments = msg.comments
+		sameFile := msg.path == m.path
 		prevCursor := m.cursor
 		prevOffset := m.offset
 		m.buildFileViewLines(msg.content)
-		if prevCursor < len(m.lines) {
+		if sameFile && prevCursor < len(m.lines) {
 			m.cursor = m.nearestSelectable(prevCursor, 1)
 			m.offset = prevOffset
 		} else {
 			m.cursor = m.nearestSelectable(0, 1)
 			m.offset = 0
+			m.visualMode = false
 		}
 		m.hOffset = 0
-		m.visualMode = false
 		return m, nil
 
 	case loadAdditionalFileMsg:
