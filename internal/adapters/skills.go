@@ -4,20 +4,26 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/josephschmitt/monocle/skills"
 )
 
-// SkillNames lists the skill directories embedded in the binary.
-var SkillNames = skills.Names
+// SkillNames lists the skill directories packaged in releases.
+var SkillNames = []string{"get-feedback", "review-plan", "review-plan-wait"}
 
-// InstallSkills writes the embedded skill directories to the given parent directory.
+// SkillsSourceOverride, if non-empty, is used instead of downloading or
+// reading the local directory. Used by tests.
+var SkillsSourceOverride string
+
+// InstallSkills writes skill files to the given parent directory.
 // Each skill is written as skillsDir/<name>/SKILL.md.
 func InstallSkills(skillsDir string) error {
+	srcDir, err := resolveSkillsSource()
+	if err != nil {
+		return err
+	}
 	for _, name := range SkillNames {
-		content, err := skills.FS.ReadFile(filepath.Join(name, "SKILL.md"))
+		content, err := os.ReadFile(filepath.Join(srcDir, name, "SKILL.md"))
 		if err != nil {
-			return fmt.Errorf("read embedded skill %s: %w", name, err)
+			return fmt.Errorf("read skill %s: %w", name, err)
 		}
 		dest := filepath.Join(skillsDir, name, "SKILL.md")
 		if err := WriteFileAtomic(dest, content); err != nil {
@@ -25,6 +31,20 @@ func InstallSkills(skillsDir string) error {
 		}
 	}
 	return nil
+}
+
+// resolveSkillsSource returns the directory containing skill subdirectories.
+func resolveSkillsSource() (string, error) {
+	if SkillsSourceOverride != "" {
+		return SkillsSourceOverride, nil
+	}
+	if Version == "dev" {
+		if _, err := os.Stat("skills"); err == nil {
+			return "skills", nil
+		}
+		return "", fmt.Errorf("skills directory not found (dev build must be run from repo root)")
+	}
+	return EnsureSkillsCached(Version)
 }
 
 // RemoveSkills removes installed skill directories from the given parent directory.
