@@ -20,3 +20,5 @@ Submits a plan file to Monocle so the reviewer can see it. Does NOT wait for fee
    - `--type`: `md`
 
 4. **Confirm** to the user that the plan was sent to Monocle.
+
+If any command fails with a message that Monocle is not running, let the user know they need to start Monocle with `monocle` in the same directory as the project.

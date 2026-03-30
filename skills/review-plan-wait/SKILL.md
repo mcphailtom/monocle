@@ -7,10 +7,6 @@ description: Sends a plan file to Monocle and blocks until the reviewer responds
 
 Submits a plan file to Monocle and blocks until the reviewer responds with feedback.
 
-## Prerequisite
-
-Run `monocle status` to check if Monocle is active. If the output is "not running", **do not execute this skill**. Instead, let the user know that Monocle is not running, and they can start it with `monocle` if they'd like to use it for this session.
-
 ## Steps
 
 1. **Find the plan file** — if the user provided a path via `$ARGUMENTS`, use that. Otherwise, find the most recently modified plan file in the project.
@@ -28,3 +24,5 @@ Run `monocle status` to check if Monocle is active. If the output is "not runnin
    - If the reviewer approved with no comments, inform the user and continue
    - If the reviewer provided feedback requesting changes, share the feedback with the user and act on it — update the plan, then run `monocle review send-artifact --wait` again
    - Keep iterating until the reviewer approves
+
+If any command fails with a message that Monocle is not running, let the user know they need to start Monocle with `monocle` in the same directory as the project.

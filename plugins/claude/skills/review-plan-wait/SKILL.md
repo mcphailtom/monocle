@@ -24,3 +24,5 @@ Submits a plan file to Monocle and blocks until the reviewer responds with feedb
    - If the reviewer approved with no comments, inform the user and continue
    - If the reviewer provided feedback requesting changes, share the feedback with the user and act on it — update the plan, then run `monocle review send-artifact --wait` again
    - Keep iterating until the reviewer approves
+
+If any command fails with a message that Monocle is not running, let the user know they need to start Monocle with `monocle` in the same directory as the project.

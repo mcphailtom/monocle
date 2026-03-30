@@ -12,7 +12,6 @@ import (
 
 // MonocleClaudePermissions are the permission entries added to .claude/settings.json.
 var MonocleClaudePermissions = []string{
-	"Bash(monocle status:*)",
 	"Bash(monocle review:*)",
 	"Skill(get-feedback)",
 	"Skill(review-plan)",

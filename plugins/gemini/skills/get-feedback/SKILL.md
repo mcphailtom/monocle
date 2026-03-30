@@ -5,6 +5,8 @@ description: Retrieves pending review feedback from Monocle. Use when the review
 
 # Get Review Feedback
 
+## Usage
+
 Run `monocle review get-feedback` to retrieve pending review feedback.
 
 ## Handling the response
@@ -13,3 +15,5 @@ Run `monocle review get-feedback` to retrieve pending review feedback.
 - If no feedback is pending, inform the user that no review feedback is available yet
 
 After receiving feedback, address the reviewer's comments in your code, then continue with your work.
+
+If the command fails with a message that Monocle is not running, let the user know they need to start Monocle with `monocle` in the same directory as the project.
