@@ -1673,6 +1673,7 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 	engine := m.engine
 	switch strings.TrimSpace(cmd) {
 	case "submit":
+		agentConnected := m.statusBar.subscriberCount > 0 || m.statusBar.connectionMode == "queue"
 		return func() tea.Msg {
 			summary, err := engine.GetReviewSummary()
 			if err != nil {
@@ -1684,7 +1685,6 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 					ContentComments: map[string][]types.ReviewComment{},
 				}
 			}
-			agentConnected := engine.GetSubscriberCount() > 0
 			return openReviewMsg{summary: summary, agentConnected: agentConnected}
 		}
 
