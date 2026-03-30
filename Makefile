@@ -1,4 +1,4 @@
-.PHONY: build run test vet lint bundle sync-skills
+.PHONY: build run test vet lint bundle sync-skills skills-tarball
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
@@ -34,4 +34,8 @@ sync-skills:
 			cp -r skills/$$skill plugins/$$agent/skills/$$skill; \
 		done; \
 	done
+
+skills-tarball:
+	mkdir -p dist
+	tar -czf dist/skills.tar.gz --exclude='*.go' -C skills .
 

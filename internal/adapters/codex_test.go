@@ -8,6 +8,7 @@ import (
 )
 
 func TestCodexRegister(t *testing.T) {
+	setupTestSkills(t)
 	dir := t.TempDir()
 	projDir := filepath.Join(dir, "project")
 	os.MkdirAll(projDir, 0755)
@@ -31,6 +32,7 @@ func TestCodexRegister(t *testing.T) {
 }
 
 func TestCodexRegister_Idempotent(t *testing.T) {
+	setupTestSkills(t)
 	dir := t.TempDir()
 	projDir := filepath.Join(dir, "project")
 	os.MkdirAll(projDir, 0755)
@@ -56,6 +58,7 @@ func TestCodexRegister_Idempotent(t *testing.T) {
 }
 
 func TestCodexRegister_CleansLegacyMCP(t *testing.T) {
+	setupTestSkills(t)
 	dir := t.TempDir()
 	projDir := filepath.Join(dir, "project")
 	codexDir := filepath.Join(projDir, ".codex")
@@ -94,6 +97,7 @@ func TestCodexRegister_CleansLegacyMCP(t *testing.T) {
 }
 
 func TestCodexRegister_PreservesOtherSections(t *testing.T) {
+	setupTestSkills(t)
 	dir := t.TempDir()
 	projDir := filepath.Join(dir, "project")
 	codexDir := filepath.Join(projDir, ".codex")
