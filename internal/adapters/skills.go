@@ -7,7 +7,7 @@ import (
 )
 
 // SkillNames lists the skill directories packaged in releases.
-var SkillNames = []string{"get-feedback", "review-plan", "review-plan-wait"}
+var SkillNames = []string{"get-feedback", "get-feedback-wait", "review-plan", "review-plan-wait"}
 
 // SkillsSourceOverride, if non-empty, is used instead of downloading or
 // reading the local directory. Used by tests.

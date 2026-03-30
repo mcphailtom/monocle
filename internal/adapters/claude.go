@@ -14,6 +14,7 @@ import (
 var MonocleClaudePermissions = []string{
 	"Bash(monocle review:*)",
 	"Skill(get-feedback)",
+	"Skill(get-feedback-wait)",
 	"Skill(review-plan)",
 	"Skill(review-plan-wait)",
 }
