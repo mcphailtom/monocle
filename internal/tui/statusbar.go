@@ -20,10 +20,11 @@ type statusBarModel struct {
 	commandBuffer   string
 	contextHints    string // override hints when set (e.g. comment-specific keybinds)
 	diffStyle       diffStyle
-	contentMode     bool // true when viewing content (plan/doc) in raw mode
-	contentID       string // non-empty when viewing a content item (raw or diff)
-	width           int
-	theme           Theme
+	contentMode      bool // true when viewing content (plan/doc) in raw mode
+	contentID        string // non-empty when viewing a content item (raw or diff)
+	waitingForReview bool
+	width            int
+	theme            Theme
 }
 
 func newStatusBarModel(theme Theme) statusBarModel {
@@ -46,6 +47,13 @@ func (m statusBarModel) View() string {
 	var connLabel string
 	name := m.agentName
 	switch {
+	case m.waitingForReview:
+		waitStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+		icon := "●"
+		if m.subscriberCount == 0 && m.connectionMode != "queue" {
+			icon = "○"
+		}
+		connLabel = waitStyle.Render(icon + " Waiting for Review")
 	case m.subscriberCount > 0 || m.connectionMode == "queue":
 		connLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render("● Connected")
 		if name != "" {

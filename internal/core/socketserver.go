@@ -16,6 +16,7 @@ type SocketServer struct {
 	engine          *Engine
 	socketPath      string
 	subscriberCount int
+	queuedCount     int // active queue-mode connections (not counted in subscriberCount)
 	subscriberMu    sync.Mutex
 }
 
@@ -280,6 +281,11 @@ func (s *SocketServer) handleQueuedConnection(conn net.Conn, scanner *bufio.Scan
 		return
 	}
 
+	// Track queue connection
+	s.subscriberMu.Lock()
+	s.queuedCount++
+	s.subscriberMu.Unlock()
+
 	// Notify TUI that an agent connected (without push subscription)
 	s.engine.emit(EventConnectionChanged, EventPayload{
 		Kind:   EventConnectionChanged,
@@ -287,6 +293,10 @@ func (s *SocketServer) handleQueuedConnection(conn net.Conn, scanner *bufio.Scan
 	})
 
 	defer func() {
+		s.subscriberMu.Lock()
+		s.queuedCount--
+		s.subscriberMu.Unlock()
+
 		for _, unsub := range unsubs {
 			unsub()
 		}
@@ -339,11 +349,17 @@ func (s *SocketServer) handleMessage(msg any) any {
 func (s *SocketServer) handleIdentify(msg *protocol.IdentifyMsg) {
 	s.subscriberMu.Lock()
 	count := s.subscriberCount
+	queued := s.queuedCount
 	s.subscriberMu.Unlock()
+
+	status := fmt.Sprintf("%d", count)
+	if count == 0 && queued > 0 {
+		status = "queue"
+	}
 
 	s.engine.emit(EventConnectionChanged, EventPayload{
 		Kind:    EventConnectionChanged,
-		Status:  fmt.Sprintf("%d", count),
+		Status:  status,
 		Message: msg.Agent,
 	})
 }

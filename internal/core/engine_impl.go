@@ -1226,7 +1226,15 @@ func (e *Engine) handlePollFeedback(msg *protocol.PollFeedbackMsg) *protocol.Pol
 	var result *PollResult
 
 	if msg.Wait {
+		e.emit(EventWaitStatusChanged, EventPayload{
+			Kind:   EventWaitStatusChanged,
+			Status: "waiting",
+		})
 		result = e.feedback.WaitForFeedbackWithInfo()
+		e.emit(EventWaitStatusChanged, EventPayload{
+			Kind:   EventWaitStatusChanged,
+			Status: "",
+		})
 	} else {
 		result = e.feedback.PollWithInfo()
 	}

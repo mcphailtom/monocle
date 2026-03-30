@@ -100,6 +100,10 @@ type pauseChangedMsg struct {
 	status string
 }
 
+type waitStatusMsg struct {
+	waiting bool
+}
+
 type contentReviewedMsg struct {
 	id      string
 	advance bool // auto-advance to next unreviewed item
@@ -553,6 +557,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.count == 0 && msg.mode == "" {
 			m.statusBar.agentName = ""
 		}
+		m.reviewSummary.agentConnected = msg.count > 0 || msg.mode == "queue"
 		return m, nil
 
 	case feedbackStatusMsg:
@@ -624,6 +629,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case pauseChangedMsg:
+		return m, nil
+
+	case waitStatusMsg:
+		m.statusBar.waitingForReview = msg.waiting
 		return m, nil
 
 	case baseRefChangedMsg:
@@ -2592,5 +2601,8 @@ func BridgeEngineEvents(engine core.EngineAPI, p *tea.Program) {
 	})
 	engine.On(core.EventFeedbackPickedUp, func(e core.EventPayload) {
 		p.Send(feedbackPickedUpMsg{})
+	})
+	engine.On(core.EventWaitStatusChanged, func(e core.EventPayload) {
+		p.Send(waitStatusMsg{waiting: e.Status == "waiting"})
 	})
 }
