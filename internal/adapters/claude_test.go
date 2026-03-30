@@ -8,6 +8,7 @@ import (
 )
 
 func TestClaudeChannelRegister(t *testing.T) {
+	setupTestSkills(t)
 	dir := t.TempDir()
 	t.Setenv("HOME", filepath.Join(dir, "home"))
 
@@ -70,6 +71,7 @@ func TestClaudeChannelRegister(t *testing.T) {
 }
 
 func TestClaudeChannelRegister_Global(t *testing.T) {
+	setupTestSkills(t)
 	dir := t.TempDir()
 	homeDir := filepath.Join(dir, "home")
 	os.MkdirAll(homeDir, 0755)
@@ -246,6 +248,7 @@ func TestNeedsRegister_Registered(t *testing.T) {
 }
 
 func TestClaudeChannelRegister_Idempotent(t *testing.T) {
+	setupTestSkills(t)
 	dir := t.TempDir()
 	t.Setenv("HOME", filepath.Join(dir, "home"))
 
@@ -269,6 +272,7 @@ func TestClaudeChannelRegister_Idempotent(t *testing.T) {
 }
 
 func TestClaudeChannelUnregister(t *testing.T) {
+	setupTestSkills(t)
 	dir := t.TempDir()
 	t.Setenv("HOME", filepath.Join(dir, "home"))
 
