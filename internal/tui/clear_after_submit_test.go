@@ -196,7 +196,9 @@ func TestSubmitSuccess_RecalcsStackedLayout(t *testing.T) {
 		t.Fatalf("expected stacked layout, got %v", m.layout)
 	}
 
-	// Add content items to establish a baseline sidebar height
+	// Add files and content items to establish a baseline sidebar height.
+	// Files persist across submit so the sidebar remains visible.
+	m.sidebar.files = []types.ChangedFile{{Path: "file.go", Status: "M"}}
 	m.sidebar.contentItems = []types.ContentItem{{ID: "plan-1", Title: "Plan"}}
 	m.sidebar.rebuildTree()
 	recalcStackedLayout(&m)
@@ -225,6 +227,9 @@ func TestSubmitSuccess_FocusModeRestoresDimensions(t *testing.T) {
 	// Set initial dimensions
 	result, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
 	m = result.(appModel)
+
+	// Add files so the sidebar stays visible after focus mode restore
+	m.sidebar.files = []types.ChangedFile{{Path: "file.go", Status: "M"}}
 
 	// Enter focus mode (sidebar hidden)
 	m.focusModeSavedSidebar = false
@@ -263,6 +268,9 @@ func TestSubmitSuccess_NoAgent_FocusModeRestoresDimensions(t *testing.T) {
 	m := NewApp(engine)
 	result, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
 	m = result.(appModel)
+
+	// Add files so the sidebar stays visible after focus mode restore
+	m.sidebar.files = []types.ChangedFile{{Path: "file.go", Status: "M"}}
 
 	// Enter focus mode
 	m.focusModeSavedSidebar = false

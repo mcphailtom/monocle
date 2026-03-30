@@ -184,7 +184,9 @@ type appModel struct {
 	overlay       overlayKind
 	layout        layoutMode
 	layoutConfig  string
-	sidebarHidden bool
+	sidebarHidden     bool
+	sidebarAutoHidden bool // true when sidebar was hidden due to empty state (not user action)
+	sidebarUserShown  bool // true when user explicitly showed the sidebar (prevents auto-hide)
 
 	commandMode   bool
 	commandBuffer string
@@ -434,6 +436,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusBar.socketStarted = m.engine.GetSocketPath() != ""
 		m.statusBar.subscriberCount = m.engine.GetSubscriberCount()
 		m.statusBar.feedbackStatus = m.engine.GetFeedbackStatus()
+		// Auto-hide sidebar when empty, auto-show when items arrive
+		if m.autoToggleSidebar() {
+			recalcPaneDimensions(&m)
+		}
 		// Auto-select the first file, or first content item if no files
 		if len(msg.files) > 0 {
 			m.sidebar.selectPath(msg.files[0].Path)
@@ -459,6 +465,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
 		m.statusBar.fileCount = len(msg.files)
+		if m.autoToggleSidebar() {
+			recalcPaneDimensions(&m)
+		}
 		var diffCmd tea.Cmd
 		if msg.contentItem != nil && m.diffView.isViewingContentItem() && m.diffView.contentID == msg.contentItem.ID {
 			// Only update if content or comments actually changed to avoid
@@ -498,6 +507,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
 		m.statusBar.fileCount = len(m.sidebar.files)
+		if m.autoToggleSidebar() {
+			recalcPaneDimensions(&m)
+		}
 		session := m.engine.GetSession()
 		if session != nil {
 			m.statusBar.baseRef = m.displayBaseRef(session)
@@ -553,6 +565,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sidebar.rebuildTree()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
+		if m.autoToggleSidebar() {
+			recalcPaneDimensions(&m)
+		}
 		// Auto-enter focus mode if enabled and this is a plan
 		if !m.focusModeActive && msg.id != "" {
 			if cfg := m.engine.GetConfig(); cfg != nil && cfg.AutoFocusMode {
@@ -560,6 +575,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.focusModeSavedSidebar = m.sidebarHidden
 					m.focusModeSavedWrap = m.diffView.wrap
 					m.sidebarHidden = true
+					m.sidebarAutoHidden = false // focus mode owns the hidden state
 					m.diffView.wrap = true
 					m.diffView.hOffset = 0
 					m.focus = focusMain
@@ -591,6 +607,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sidebar.applyReviewedFilter()
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
+		if m.autoToggleSidebar() {
+			recalcPaneDimensions(&m)
+		}
 		// Auto-advance to next unreviewed item after marking reviewed
 		if msg.advance {
 			if cmd := m.sidebar.nextUnreviewed(); cmd != nil {
@@ -994,6 +1013,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.sidebarHidden = m.focusModeSavedSidebar
 				m.diffView.wrap = m.focusModeSavedWrap
 				m.focusModeActive = false
+				m.sidebarAutoHidden = m.sidebarHidden && !m.sidebarHasItems()
+				m.autoToggleSidebar()
 				recalcPaneDimensions(&m)
 			}
 			return m, nil
@@ -1027,11 +1048,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.sidebarHidden = m.focusModeSavedSidebar
 			m.diffView.wrap = m.focusModeSavedWrap
 			m.focusModeActive = false
+			m.sidebarAutoHidden = m.sidebarHidden && !m.sidebarHasItems()
+			m.autoToggleSidebar()
 			recalcPaneDimensions(&m)
 			return m, nil
 		}
 
 		recalcStackedLayout(&m)
+		if m.autoToggleSidebar() {
+			recalcPaneDimensions(&m)
+		}
 		return m, nil
 
 	// Queued feedback was picked up by the agent (pull delivery completed)
@@ -1062,6 +1088,14 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.sidebarHidden = m.focusModeSavedSidebar
 			m.diffView.wrap = m.focusModeSavedWrap
 			m.focusModeActive = false
+			m.sidebarAutoHidden = m.sidebarHidden && !m.sidebarHasItems()
+			m.autoToggleSidebar()
+			return m, func() tea.Msg {
+				return tea.WindowSizeMsg{Width: m.width, Height: m.height}
+			}
+		}
+
+		if m.autoToggleSidebar() {
 			return m, func() tea.Msg {
 				return tea.WindowSizeMsg{Width: m.width, Height: m.height}
 			}
@@ -1367,14 +1401,15 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case Matches(key, km.ToggleSidebar):
 		m.sidebarHidden = !m.sidebarHidden
+		m.sidebarAutoHidden = false          // user explicitly toggled
+		m.sidebarUserShown = !m.sidebarHidden // track if user forced it visible
 		if m.sidebarHidden {
 			m.focus = focusMain
 			m.sidebar.focused = false
 			m.diffView.focused = true
 		}
-		return m, func() tea.Msg {
-			return tea.WindowSizeMsg{Width: m.width, Height: m.height}
-		}
+		recalcPaneDimensions(&m)
+		return m, nil
 
 	case Matches(key, km.FileComment):
 		// File-level comment from sidebar
@@ -1419,6 +1454,8 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.sidebarHidden = m.focusModeSavedSidebar
 			m.diffView.wrap = m.focusModeSavedWrap
 			m.focusModeActive = false
+			m.sidebarAutoHidden = m.sidebarHidden && !m.sidebarHasItems()
+			m.autoToggleSidebar()
 			return m, func() tea.Msg {
 				return tea.WindowSizeMsg{Width: m.width, Height: m.height}
 			}
@@ -1427,7 +1464,7 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.focusModeSavedSidebar = m.sidebarHidden
 		m.focusModeSavedWrap = m.diffView.wrap
 		m.sidebarHidden = true
-		m.diffView.wrap = true
+		m.sidebarAutoHidden = false // focus mode owns the hidden state
 		m.diffView.hOffset = 0
 		m.focus = focusMain
 		m.sidebar.focused = false
@@ -1932,6 +1969,38 @@ func (m appModel) diffViewShowsValidFile() bool {
 		if f.Path == m.diffView.path {
 			return true
 		}
+	}
+	return false
+}
+
+// sidebarHasItems returns true if the sidebar has any displayable items.
+func (m appModel) sidebarHasItems() bool {
+	return len(m.sidebar.files) > 0 || len(m.sidebar.contentItems) > 0 || len(m.sidebar.additionalFiles) > 0
+}
+
+// autoToggleSidebar hides the sidebar when it has no items, or shows it when
+// items arrive and it was auto-hidden. Returns true if layout recalculation
+// is needed.
+func (m *appModel) autoToggleSidebar() bool {
+	hasItems := m.sidebarHasItems()
+	// Clear user override once items arrive — auto behavior resumes
+	if hasItems {
+		m.sidebarUserShown = false
+	}
+	if !hasItems && !m.sidebarHidden && !m.sidebarUserShown {
+		// Auto-hide: no items to show and user hasn't forced it visible
+		m.sidebarHidden = true
+		m.sidebarAutoHidden = true
+		m.focus = focusMain
+		m.sidebar.focused = false
+		m.diffView.focused = true
+		return true
+	}
+	if hasItems && m.sidebarHidden && m.sidebarAutoHidden {
+		// Auto-show: items arrived and we were the ones who hid it
+		m.sidebarHidden = false
+		m.sidebarAutoHidden = false
+		return true
 	}
 	return false
 }
