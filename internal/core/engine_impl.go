@@ -430,7 +430,7 @@ func (e *Engine) AddComment(target CommentTarget, commentType types.CommentType,
 	return comment, nil
 }
 
-func (e *Engine) EditComment(commentID string, body string) (*types.ReviewComment, error) {
+func (e *Engine) EditComment(commentID string, commentType types.CommentType, body string) (*types.ReviewComment, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -449,6 +449,7 @@ func (e *Engine) EditComment(commentID string, body string) (*types.ReviewCommen
 		return nil, fmt.Errorf("comment %s not found", commentID)
 	}
 
+	found.Type = commentType
 	found.Body = body
 	found.UpdatedAt = time.Now()
 

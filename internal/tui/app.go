@@ -2105,7 +2105,7 @@ func (m appModel) handleSaveComment(msg saveCommentMsg) tea.Cmd {
 		}
 
 		if msg.editingID != "" {
-			_, _ = m.engine.EditComment(msg.editingID, msg.body)
+			_, _ = m.engine.EditComment(msg.editingID, msg.commentType, msg.body)
 		} else {
 			_, _ = m.engine.AddComment(target, msg.commentType, msg.body)
 		}

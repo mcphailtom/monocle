@@ -243,17 +243,23 @@ func TestEditComment(t *testing.T) {
 	}
 
 	// Edit the comment
-	edited, err := e.EditComment(comment.ID, "Updated body")
+	edited, err := e.EditComment(comment.ID, types.CommentIssue, "Updated body")
 	if err != nil {
 		t.Fatalf("EditComment: %v", err)
 	}
 	if edited.Body != "Updated body" {
 		t.Errorf("expected edited body 'Updated body', got %q", edited.Body)
 	}
+	if edited.Type != types.CommentIssue {
+		t.Errorf("expected edited type %q, got %q", types.CommentIssue, edited.Type)
+	}
 
 	// Verify in-memory
 	if e.current.Comments[0].Body != "Updated body" {
 		t.Errorf("in-memory body not updated: %q", e.current.Comments[0].Body)
+	}
+	if e.current.Comments[0].Type != types.CommentIssue {
+		t.Errorf("in-memory type not updated: %q", e.current.Comments[0].Type)
 	}
 
 	// Verify in DB
@@ -263,6 +269,9 @@ func TestEditComment(t *testing.T) {
 	}
 	if dbComments[0].Body != "Updated body" {
 		t.Errorf("DB body not updated: %q", dbComments[0].Body)
+	}
+	if dbComments[0].Type != types.CommentIssue {
+		t.Errorf("DB type not updated: %q", dbComments[0].Type)
 	}
 }
 

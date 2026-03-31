@@ -209,11 +209,11 @@ func (d *DB) CreateComment(sessionID string, c *types.ReviewComment) error {
 	return err
 }
 
-// UpdateComment updates a comment's body and updated_at.
+// UpdateComment updates a comment's type, body, and updated_at.
 func (d *DB) UpdateComment(c *types.ReviewComment) error {
 	_, err := d.Exec(
-		`UPDATE comments SET body = ?, updated_at = ? WHERE id = ?`,
-		c.Body, time.Now(), c.ID,
+		`UPDATE comments SET type = ?, body = ?, updated_at = ? WHERE id = ?`,
+		string(c.Type), c.Body, time.Now(), c.ID,
 	)
 	return err
 }
