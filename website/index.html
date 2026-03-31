@@ -472,8 +472,9 @@ nav {
 }
 .feat-player-close:hover { background: var(--surface0); color: var(--text); }
 .feat-player-close svg { width: 14px; height: 14px; }
-.feat-player-body { flex: 1; position: relative; }
+.feat-player-body { flex: 1; position: relative; aspect-ratio: 16/9; background: var(--base); }
 .feat-player-body div[id^="player"] { height: 100%; }
+.feat-player-body .ap-wrapper, .feat-player-body .ap-player { background: var(--base) !important; }
 
 /* ───── How it works ───── */
 .steps {
