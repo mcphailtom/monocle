@@ -107,6 +107,7 @@ User reviews, adds comments, submits → FeedbackQueue releases → notification
   - `test: ...` — Test changes (no release)
   - `feat!: ...` or `BREAKING CHANGE:` in body — Breaking change (major version bump)
   - Scope is optional: `feat(tui): ...`, `fix(db): ...`
+  - **Website & docs changes** (`website/`, `docs/`) should use `docs: ...` to avoid triggering releases. These paths are also excluded in `release-please-config.json`.
 
 ## Documentation
 

@@ -5,6 +5,10 @@
       "bump-minor-pre-major": true,
       "extra-files": [
         "README.md"
+      ],
+      "exclude-paths": [
+        "website",
+        "docs"
       ]
     }
   },
