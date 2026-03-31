@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monocle — Terminal Code Review for AI Agents</title>
+<meta name="description" content="A terminal UI that runs alongside your AI coding agent. Review diffs, leave comments, submit structured feedback.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ───── Reset ───── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ───── Catppuccin Mocha ───── */
+:root {
+  --rosewater: #f5e0dc; --flamingo: #f2cdcd; --pink: #f5c2e7;
+  --mauve: #cba6f7; --red: #f38ba8; --maroon: #eba0ac;
+  --peach: #fab387; --yellow: #f9e2af; --green: #a6e3a1;
+  --teal: #94e2d5; --sky: #89dceb; --sapphire: #74c7ec;
+  --blue: #89b4fa; --lavender: #b4befe;
+  --text: #cdd6f4; --subtext1: #bac2de; --subtext0: #a6adc8;
+  --overlay2: #9399b2; --overlay1: #7f849c; --overlay0: #6c7086;
+  --surface2: #585b70; --surface1: #45475a; --surface0: #313244;
+  --base: #1e1e2e; --mantle: #181825; --crust: #11111b;
+}
+
+/* ───── Base ───── */
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background: var(--base);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+::selection { background: rgba(137,180,250,0.3); color: var(--text); }
+a { color: inherit; text-decoration: none; }
+
+/* Dot grid atmosphere */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(rgba(205,214,244,0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ───── Typography ───── */
+h1, h2, h3, .serif { font-family: 'Instrument Serif', serif; font-weight: 400; }
+code, .mono { font-family: 'JetBrains Mono', monospace; }
+
+/* ───── Layout ───── */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+.section-pad { padding: 7rem 2rem; }
+
+/* ───── Nav ───── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  padding: 1rem 2rem;
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  background: rgba(30,30,46,0.75);
+  border-bottom: 1px solid rgba(69,71,90,0.25);
+}
+.nav-inner {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-logo {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600; font-size: 1.05rem; color: var(--blue);
+  letter-spacing: -0.01em;
+}
+.nav-logo .eye { color: var(--lavender); }
+.nav-links { display: flex; align-items: center; gap: 2rem; list-style: none; }
+.nav-links a {
+  font-size: 0.85rem; font-weight: 500; color: var(--subtext0); transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--text); }
+.nav-gh {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  padding: 0.45rem 0.9rem; border-radius: 8px;
+  border: 1px solid var(--surface1); font-size: 0.8rem; font-weight: 600;
+  color: var(--text); transition: all 0.2s;
+}
+.nav-gh:hover { border-color: var(--blue); background: rgba(137,180,250,0.08); }
+.nav-gh svg { width: 15px; height: 15px; fill: currentColor; }
+
+/* ───── Hero ───── */
+.hero {
+  position: relative;
+  min-height: 100vh;
+  display: grid; grid-template-columns: 1fr 1.25fr;
+  gap: 4rem; align-items: center;
+  padding: 7rem 2rem 4rem;
+  max-width: 1400px; margin: 0 auto;
+}
+.hero::before {
+  content: ''; position: absolute;
+  top: 15%; right: 5%; width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(137,180,250,0.06) 0%, transparent 65%);
+  pointer-events: none;
+}
+.hero-text { position: relative; z-index: 1; }
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem; font-weight: 500;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--blue); margin-bottom: 1.5rem;
+}
+.hero h1 {
+  font-size: clamp(2.8rem, 5vw, 4.25rem);
+  line-height: 1.08; letter-spacing: -0.025em;
+  margin-bottom: 1.5rem;
+}
+.hero h1 em { font-style: italic; color: var(--blue); }
+.hero-body {
+  font-size: 1.05rem; color: var(--subtext0);
+  max-width: 460px; margin-bottom: 2.5rem; line-height: 1.75;
+}
+
+/* ───── Install box ───── */
+.install-wrap { max-width: 480px; }
+.install-box {
+  background: var(--mantle);
+  border: 1px solid var(--surface0);
+  border-radius: 12px;
+  padding: 0.875rem 1rem 0.875rem 1.25rem;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.75rem; cursor: pointer;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+.install-box:hover {
+  border-color: var(--blue);
+  box-shadow: 0 0 40px -8px rgba(137,180,250,0.15), 0 0 80px -15px rgba(137,180,250,0.06);
+}
+.install-cmd {
+  display: flex; align-items: center; gap: 0.6rem;
+  overflow: hidden; min-width: 0;
+}
+.install-cmd .prompt { color: var(--overlay0); user-select: none; font-size: 0.875rem; }
+.install-cmd code { color: var(--text); font-size: 0.875rem; white-space: nowrap; }
+.caret {
+  display: inline-block; width: 2px; height: 1.1em;
+  background: var(--blue); vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+.copy-btn {
+  background: none; border: none; color: var(--overlay1); cursor: pointer;
+  padding: 0.35rem; border-radius: 6px;
+  display: flex; align-items: center; flex-shrink: 0; transition: all 0.2s;
+}
+.copy-btn:hover { background: var(--surface0); color: var(--blue); }
+.copy-btn:active { transform: scale(0.9); }
+.copy-btn svg { width: 17px; height: 17px; }
+.copy-btn .check-icon { display: none; color: var(--green); }
+.copy-btn.copied .copy-icon { display: none; }
+.copy-btn.copied .check-icon { display: block; }
+.install-hint {
+  font-size: 0.8rem; color: var(--overlay0);
+  margin-top: 0.65rem;
+}
+.install-hint a { color: var(--blue); text-decoration: underline; text-underline-offset: 2px; }
+.install-hint a:hover { color: var(--lavender); }
+
+/* ───── Terminal mockup ───── */
+.terminal-wrap {
+  position: relative; z-index: 1; perspective: 1200px;
+}
+.terminal {
+  background: var(--crust);
+  border-radius: 12px; border: 1px solid var(--surface0);
+  overflow: hidden;
+  box-shadow: 0 30px 60px -15px rgba(0,0,0,0.5), 0 0 120px -30px rgba(137,180,250,0.07);
+  transition: transform 0.5s cubic-bezier(0.16,1,0.3,1);
+}
+.terminal-wrap:hover .terminal {
+  transform: rotateY(-1.5deg) rotateX(0.5deg) translateY(-4px);
+}
+.term-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.35rem 0.6rem;
+  background: var(--mantle); border-bottom: 1px solid var(--surface0);
+}
+.term-dots { display: flex; gap: 4px; }
+.term-dots span { width: 7px; height: 7px; border-radius: 50%; }
+.term-dots .r { background: var(--red); opacity: 0.45; }
+.term-dots .y { background: var(--yellow); opacity: 0.45; }
+.term-dots .g { background: var(--green); opacity: 0.45; }
+.term-title { font-family: 'JetBrains Mono', monospace; font-size: 0.55rem; color: var(--overlay1); }
+.term-body {
+  display: flex;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem; line-height: 1.7;
+}
+
+/* TUI sidebar */
+.tui-side {
+  width: 140px; flex-shrink: 0;
+  padding: 0.65rem 0.5rem;
+  border-right: 1px solid var(--surface0);
+  background: rgba(24,24,37,0.4);
+}
+.tui-side-hdr {
+  font-size: 0.6rem; color: var(--overlay0);
+  letter-spacing: 0.05em;
+  padding: 0 0.2rem; margin-bottom: 0.4rem;
+}
+.tui-dir {
+  display: flex; align-items: center; gap: 5px;
+  padding: 1px 0.2rem; font-size: 0.65rem; color: var(--overlay1);
+}
+.tui-f {
+  display: flex; align-items: center; gap: 4px;
+  padding: 1.5px 0.2rem; border-radius: 3px;
+  font-size: 0.65rem; color: var(--subtext0);
+}
+.tui-f.sel { background: rgba(137,180,250,0.1); color: var(--blue); }
+.tui-f .git-st {
+  width: 10px; font-size: 0.6rem; flex-shrink: 0; font-weight: 600;
+}
+.tui-f .git-st.mod { color: var(--yellow); }
+.tui-f .git-st.add { color: var(--green); }
+.tui-f .fname { flex: 1; }
+.tui-f .rev {
+  font-size: 0.55rem; flex-shrink: 0; color: var(--overlay0); margin-left: auto;
+}
+.tui-f .rev.done { color: var(--green); }
+
+/* TUI diff pane */
+.tui-diff { flex: 1; padding: 0.65rem 0.75rem; overflow: hidden; }
+.tui-diff-hdr { font-size: 0.6rem; color: var(--overlay0); margin-bottom: 0.4rem; }
+.dl {
+  display: flex; gap: 0.6rem;
+  padding: 1px 0.4rem; margin: 0 -0.4rem;
+}
+.dl .ln {
+  width: 18px; text-align: right; color: var(--overlay0);
+  opacity: 0.35; flex-shrink: 0; user-select: none;
+}
+.dl.rm {
+  background: rgba(243,139,168,0.07);
+  border-left: 2px solid rgba(243,139,168,0.45);
+}
+.dl.rm .ln { color: var(--red); opacity: 0.35; }
+.dl.rm code { color: rgba(243,139,168,0.8); }
+.dl.ad {
+  background: rgba(166,227,161,0.07);
+  border-left: 2px solid rgba(166,227,161,0.45);
+}
+.dl.ad .ln { color: var(--green); opacity: 0.35; }
+.dl.ad code { color: rgba(166,227,161,0.85); }
+.dl code { font-size: inherit; }
+.kw { color: var(--mauve); }
+.fn { color: var(--blue); }
+.str { color: var(--green); }
+.typ { color: var(--yellow); }
+
+/* Inline comment — matches real TUI fieldset-legend style */
+.tui-cmt {
+  margin: 0.5rem 0 0.25rem 26px;
+  background: var(--surface0);
+  border: 1px solid var(--surface2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tui-cmt-legend {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.3rem 0.65rem 0;
+}
+.tui-cmt-rule { flex: 1; height: 1px; background: var(--surface2); }
+.tui-cmt-tag {
+  font-size: 0.55rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--yellow); white-space: nowrap; padding: 0 0.15rem;
+}
+.tui-cmt-body {
+  padding: 0.3rem 0.65rem 0.45rem;
+  color: var(--subtext1); line-height: 1.55; font-size: 0.65rem;
+}
+.tui-cmt-body .hl { color: var(--blue); }
+
+/* Status bar */
+.tui-stat {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.3rem 0.75rem;
+  background: var(--mantle); border-top: 1px solid var(--surface0);
+  font-size: 0.55rem; color: var(--overlay0); white-space: nowrap;
+}
+.tui-stat .l, .tui-stat .r { display: flex; align-items: center; gap: 0.65rem; }
+.tui-stat .conn { display: flex; align-items: center; gap: 3px; }
+.tui-stat .conn::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--green);
+}
+
+/* ───── Agents bar ───── */
+.agents {
+  padding: 2.5rem 2rem;
+  border-top: 1px solid var(--surface0); border-bottom: 1px solid var(--surface0);
+  background: var(--mantle);
+}
+.agents-inner {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  gap: 2.5rem; flex-wrap: wrap;
+}
+.agents-label {
+  font-size: 0.75rem; font-weight: 600; color: var(--overlay0);
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.agent-name {
+  font-size: 0.9rem; font-weight: 500; color: var(--subtext1);
+  display: flex; align-items: center; gap: 0.45rem;
+}
+.agent-name::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--green); opacity: 0.6;
+}
+
+/* ───── Problem section ───── */
+.problem {
+  padding: 7rem 2rem;
+  text-align: center;
+}
+.problem h2 {
+  font-size: clamp(1.8rem, 3.5vw, 2.75rem);
+  line-height: 1.2; letter-spacing: -0.02em;
+  max-width: 720px; margin: 0 auto 1.25rem;
+}
+.problem p {
+  font-size: 1.05rem; color: var(--subtext0);
+  max-width: 580px; margin: 0 auto; line-height: 1.75;
+}
+
+/* ───── Features ───── */
+.section-hdr {
+  text-align: center; margin-bottom: 3.5rem;
+}
+.section-hdr h2 {
+  font-size: clamp(2rem, 3.5vw, 2.75rem);
+  line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 1rem;
+}
+.section-hdr p {
+  font-size: 1rem; color: var(--subtext0);
+  max-width: 520px; margin: 0 auto;
+}
+.feat-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem; max-width: 880px; margin: 0 auto;
+}
+.feat {
+  padding: 1.75rem 2rem;
+  border-radius: 12px; border: 1px solid var(--surface0);
+  background: var(--mantle);
+  transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
+}
+.feat:hover {
+  border-color: var(--surface2); transform: translateY(-2px);
+  box-shadow: 0 12px 40px -12px rgba(0,0,0,0.3);
+}
+.feat-bar {
+  width: 28px; height: 3px; border-radius: 2px;
+  margin-bottom: 1.25rem;
+}
+.feat h3 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1.05rem; font-weight: 700; margin-bottom: 0.45rem;
+}
+.feat p { font-size: 0.875rem; color: var(--subtext0); line-height: 1.7; }
+
+/* ───── How it works ───── */
+.steps {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 2rem; max-width: 860px; margin: 0 auto;
+}
+.step { text-align: center; }
+.step-n {
+  font-family: 'Instrument Serif', serif;
+  font-size: 2.75rem; color: var(--surface2); margin-bottom: 0.3rem;
+  line-height: 1;
+}
+.step h3 {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem;
+}
+.step-cmd {
+  display: inline-block;
+  background: var(--mantle); border: 1px solid var(--surface0);
+  border-radius: 8px; padding: 0.4rem 0.85rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+  color: var(--subtext1); margin-bottom: 0.65rem;
+}
+.step p { font-size: 0.8rem; color: var(--overlay1); }
+
+/* ───── CTA ───── */
+.cta {
+  text-align: center;
+  padding: 7rem 2rem 4rem;
+}
+.cta h2 {
+  font-size: clamp(2rem, 4vw, 3.25rem);
+  line-height: 1.12; letter-spacing: -0.02em; margin-bottom: 2rem;
+}
+.cta h2 em { font-style: italic; color: var(--blue); }
+.cta .install-wrap { margin: 0 auto 1.5rem; }
+.cta-gh {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  color: var(--subtext0); font-size: 0.85rem; transition: color 0.2s;
+}
+.cta-gh:hover { color: var(--text); }
+.cta-gh svg { width: 15px; height: 15px; fill: currentColor; }
+
+/* ───── Divider ───── */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--surface1), transparent);
+}
+
+/* ───── Footer ───── */
+footer {
+  padding: 2.5rem 2rem;
+  border-top: 1px solid var(--surface0);
+  background: var(--crust);
+}
+.foot-inner {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.foot-logo {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600; font-size: 0.85rem; color: var(--blue);
+}
+.foot-links { display: flex; gap: 1.75rem; list-style: none; }
+.foot-links a { font-size: 0.8rem; color: var(--overlay1); transition: color 0.2s; }
+.foot-links a:hover { color: var(--text); }
+.foot-copy { font-size: 0.72rem; color: var(--overlay0); }
+
+/* ───── Animations ───── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.au { animation: fade-up 0.7s cubic-bezier(0.16,1,0.3,1) both; }
+.af { animation: fade-in 0.9s ease both; }
+.d1 { animation-delay: 0.06s; }
+.d2 { animation-delay: 0.12s; }
+.d3 { animation-delay: 0.18s; }
+.d4 { animation-delay: 0.24s; }
+.d5 { animation-delay: 0.35s; }
+
+[data-reveal] {
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.16,1,0.3,1);
+}
+[data-reveal][data-visible] { opacity: 1; transform: none; }
+[data-reveal].dr1 { transition-delay: 0.05s; }
+[data-reveal].dr2 { transition-delay: 0.1s; }
+[data-reveal].dr3 { transition-delay: 0.15s; }
+[data-reveal].dr4 { transition-delay: 0.2s; }
+
+/* ───── Responsive ───── */
+@media (max-width: 960px) {
+  .hero { grid-template-columns: 1fr; min-height: auto; padding: 7rem 1.5rem 3rem; gap: 3rem; }
+  .tui-side { display: none; }
+  .nav-links { display: none; }
+  .feat-grid { grid-template-columns: 1fr; max-width: 440px; }
+  .steps { grid-template-columns: 1fr; gap: 2rem; }
+  .agents-inner { gap: 1.25rem; }
+  .foot-inner { flex-direction: column; gap: 1.25rem; text-align: center; }
+}
+@media (max-width: 480px) {
+  .install-box { padding: 0.75rem; }
+  .install-cmd code { font-size: 0.78rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════ Nav ═══════ -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-logo">o_(<span class="eye">&#x25C9;</span>) monocle</a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#how-it-works">How it works</a></li>
+      <li><a href="https://github.com/josephschmitt/monocle" target="_blank" rel="noopener">Docs</a></li>
+    </ul>
+    <a href="https://github.com/josephschmitt/monocle" target="_blank" rel="noopener" class="nav-gh">
+      <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<!-- ═══════ Hero ═══════ -->
+<section class="hero">
+  <div class="hero-text">
+    <div class="eyebrow au">Open source terminal UI</div>
+    <h1 class="au d1">Read every line<br>your agent <em>writes.</em></h1>
+    <p class="hero-body au d2">Monocle runs alongside your AI coding agent in a separate terminal. See diffs in real time, leave line-level comments, and submit structured feedback the agent acts on immediately.</p>
+    <div class="au d3">
+      <div class="install-wrap">
+        <div class="install-box" onclick="copyCmd(this)" role="button" tabindex="0" aria-label="Copy install command">
+          <div class="install-cmd">
+            <span class="prompt mono">$</span>
+            <code>brew install josephschmitt/tap/monocle</code>
+            <span class="caret" aria-hidden="true"></span>
+          </div>
+          <button class="copy-btn" aria-label="Copy to clipboard">
+            <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        </div>
+        <p class="install-hint">Also available from <a href="https://github.com/josephschmitt/monocle/releases" target="_blank" rel="noopener">GitHub Releases</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- TUI mockup -->
+  <div class="terminal-wrap af d5" style="align-self:start">
+    <div class="terminal">
+      <div class="term-bar">
+        <div class="term-dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+        <span class="term-title">monocle</span>
+        <div style="width:44px"></div>
+      </div>
+      <!-- TUI screenshot -->
+      <img src="tui-screenshot.png" alt="Monocle TUI showing diff review with inline comments" style="display:block;width:100%">
+    </div>
+  </div>
+</section>
+
+<!-- ═══════ Agents ═══════ -->
+<div class="agents" data-reveal>
+  <div class="agents-inner">
+    <span class="agents-label">Works with</span>
+    <span class="agent-name">Claude Code</span>
+    <span class="agent-name">Codex</span>
+    <span class="agent-name">Gemini CLI</span>
+    <span class="agent-name">OpenCode</span>
+  </div>
+</div>
+
+<!-- ═══════ Problem ═══════ -->
+<section class="problem" data-reveal>
+  <h2>AI agents write thousands of lines per session. Without review, bugs compound.</h2>
+  <p>Monocle gives you a dedicated terminal to watch, comment on, and guide your agent's work&nbsp;&mdash; like a pull request review, but live.</p>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════ Features ═══════ -->
+<section id="features" class="section-pad">
+  <div class="container">
+    <div class="section-hdr" data-reveal>
+      <h2>Everything you need to<br>review agent code</h2>
+      <p>Your agent writes code fast. Monocle gives you the tools to keep up.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="feat dr1" data-reveal>
+        <div class="feat-bar" style="background:var(--blue)"></div>
+        <h3>Diff review</h3>
+        <p>See every file your agent changes in unified or side-by-side diff views with syntax highlighting and intra-line diffs.</p>
+      </div>
+      <div class="feat dr2" data-reveal>
+        <div class="feat-bar" style="background:var(--green)"></div>
+        <h3>Structured feedback</h3>
+        <p>Leave line-level comments&nbsp;&mdash; issues, suggestions, notes&nbsp;&mdash; then submit a structured review the agent receives and acts on.</p>
+      </div>
+      <div class="feat dr3" data-reveal>
+        <div class="feat-bar" style="background:var(--mauve)"></div>
+        <h3>Plan review</h3>
+        <p>Review the agent's plan before it writes code. Leave feedback on the approach, then let it proceed once you're satisfied.</p>
+      </div>
+      <div class="feat dr4" data-reveal>
+        <div class="feat-bar" style="background:var(--peach)"></div>
+        <h3>Pause &amp; resume</h3>
+        <p>Pause the agent to catch up with your review. Submit feedback when you're ready and the agent picks up where it left off.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════ How it works ═══════ -->
+<section id="how-it-works" class="section-pad">
+  <div class="container">
+    <div class="section-hdr" data-reveal>
+      <h2>Three commands.<br>That's it.</h2>
+    </div>
+    <div class="steps">
+      <div class="step dr1" data-reveal>
+        <div class="step-n">1</div>
+        <h3>Install</h3>
+        <div class="step-cmd">brew install josephschmitt/tap/monocle</div>
+        <p>Single binary, no dependencies.</p>
+      </div>
+      <div class="step dr2" data-reveal>
+        <div class="step-n">2</div>
+        <h3>Register</h3>
+        <div class="step-cmd">monocle register claude</div>
+        <p>Installs skills and configures your agent.</p>
+      </div>
+      <div class="step dr3" data-reveal>
+        <div class="step-n">3</div>
+        <h3>Review</h3>
+        <div class="step-cmd">monocle</div>
+        <p>Open a terminal and start reviewing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ═══════ CTA ═══════ -->
+<section class="cta" data-reveal>
+  <h2>Start reviewing<br>agent code <em>today.</em></h2>
+  <div class="install-wrap">
+    <div class="install-box" onclick="copyCmd(this)" role="button" tabindex="0" aria-label="Copy install command">
+      <div class="install-cmd">
+        <span class="prompt mono">$</span>
+        <code>brew install josephschmitt/tap/monocle</code>
+        <span class="caret" aria-hidden="true"></span>
+      </div>
+      <button class="copy-btn" aria-label="Copy to clipboard">
+        <svg class="copy-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        <svg class="check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+    </div>
+  </div>
+  <a href="https://github.com/josephschmitt/monocle" target="_blank" rel="noopener" class="cta-gh">
+    <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    Star on GitHub
+  </a>
+</section>
+
+<!-- ═══════ Footer ═══════ -->
+<footer>
+  <div class="foot-inner">
+    <span class="foot-logo">o_(&#x25C9;) monocle</span>
+    <ul class="foot-links">
+      <li><a href="https://github.com/josephschmitt/monocle" target="_blank" rel="noopener">GitHub</a></li>
+      <li><a href="https://github.com/josephschmitt/monocle/releases" target="_blank" rel="noopener">Releases</a></li>
+      <li><a href="#">Docs</a></li>
+    </ul>
+    <span class="foot-copy">&copy; 2026 Monocle</span>
+  </div>
+</footer>
+
+<script>
+function copyCmd(box) {
+  navigator.clipboard.writeText('brew install josephschmitt/tap/monocle').then(() => {
+    const btn = box.querySelector('.copy-btn');
+    btn.classList.add('copied');
+    setTimeout(() => btn.classList.remove('copied'), 2000);
+  });
+}
+
+// Scroll reveal
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.dataset.visible = '';
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('[data-reveal]').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

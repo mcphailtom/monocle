@@ -207,98 +207,21 @@
 </a>
 </div>
 </div>
-<div class="relative group animate-fade-in delay-4">
+<div class="relative group animate-fade-in delay-4 self-start">
 <div class="absolute -inset-4 bg-primary/10 rounded-3xl blur-3xl group-hover:bg-primary/20 transition-all duration-700"></div>
 <div class="relative bg-surface-container-lowest rounded-2xl border border-outline-variant/30 overflow-hidden shadow-2xl">
 <!-- Terminal Header -->
-<div class="flex items-center justify-between px-4 py-3 bg-surface-container-low border-b border-outline-variant/10">
-<div class="flex gap-2">
-<div class="w-3 h-3 rounded-full bg-error/40"></div>
-<div class="w-3 h-3 rounded-full bg-[#f9e2af]/40"></div>
-<div class="w-3 h-3 rounded-full bg-tertiary/40"></div>
+<div class="flex items-center justify-between px-3 py-1.5 bg-surface-container-low border-b border-outline-variant/10">
+<div class="flex gap-1.5">
+<div class="w-2 h-2 rounded-full bg-error/40"></div>
+<div class="w-2 h-2 rounded-full bg-[#f9e2af]/40"></div>
+<div class="w-2 h-2 rounded-full bg-tertiary/40"></div>
 </div>
-<div class="text-xs font-mono text-on-surface-variant/50">monocle</div>
-<div class="w-8"></div>
+<div class="text-[10px] font-mono text-on-surface-variant/50">monocle</div>
+<div class="w-6"></div>
 </div>
-<!-- Terminal Content: Simulated TUI -->
-<div class="p-0 font-mono text-xs leading-relaxed overflow-hidden aspect-video flex">
-<!-- Sidebar (hidden on small screens) -->
-<div class="hidden sm:block w-[130px] shrink-0 border-r border-outline-variant/15 bg-surface-container-low/50 py-3 px-2">
-<div class="text-[10px] text-on-surface-variant/50 uppercase tracking-widest mb-2 px-1">Files &nbsp;3 / 7</div>
-<div class="space-y-0.5 text-[11px]">
-<div class="flex items-center gap-1.5 px-1 py-0.5 text-on-surface-variant/60">
-<span class="text-tertiary text-[10px]">&#x2713;</span>
-<span>main.go</span>
-</div>
-<div class="flex items-center gap-1.5 px-1 py-0.5 rounded bg-primary/10 text-primary">
-<span class="text-[#f9e2af] text-[10px]">&#x25CF;</span>
-<span>auth.ts</span>
-</div>
-<div class="flex items-center gap-1.5 px-1 py-0.5 text-on-surface-variant/60">
-<span class="text-on-surface-variant/30 text-[10px]">&nbsp;&nbsp;</span>
-<span>routes.go</span>
-</div>
-<div class="flex items-center gap-1.5 px-1 py-0.5 text-on-surface-variant/60">
-<span class="text-on-surface-variant/30 text-[10px]">&nbsp;&nbsp;</span>
-<span>config.go</span>
-</div>
-<div class="flex items-center gap-1.5 px-1 py-0.5 text-on-surface-variant/60">
-<span class="text-on-surface-variant/30 text-[10px]">&nbsp;&nbsp;</span>
-<span>handler.go</span>
-</div>
-</div>
-</div>
-<!-- Diff view -->
-<div class="flex-1 py-3 px-3 overflow-hidden">
-<div class="text-[10px] text-on-surface-variant/50 mb-2">auth.ts &middot; modified</div>
-<!-- Context line -->
-<div class="flex gap-2 py-px">
-<span class="text-on-surface-variant/25 w-6 text-right shrink-0">10</span>
-<span><span class="text-[#f9e2af]">import</span> { verify } <span class="text-[#f9e2af]">from</span> <span class="text-[#a6e3a1]">"jsonwebtoken"</span>;</span>
-</div>
-<!-- Removed line -->
-<div class="flex gap-2 py-px bg-[#f38ba8]/10 -mx-3 px-3 border-l-2 border-[#f38ba8]/60">
-<span class="text-[#f38ba8]/40 w-6 text-right shrink-0">11</span>
-<span class="text-[#f38ba8]/80"><span class="text-[#f38ba8]/40">-</span> <span class="text-[#f9e2af]">const</span> token = req.cookies[<span class="text-[#a6e3a1]">"session"</span>];</span>
-</div>
-<!-- Added lines -->
-<div class="flex gap-2 py-px bg-tertiary/10 -mx-3 px-3 border-l-2 border-tertiary/60">
-<span class="text-tertiary/40 w-6 text-right shrink-0">11</span>
-<span class="text-tertiary/90"><span class="text-tertiary/40">+</span> <span class="text-[#f9e2af]">const</span> token = getSession(req);</span>
-</div>
-<div class="flex gap-2 py-px bg-tertiary/10 -mx-3 px-3 border-l-2 border-tertiary/60">
-<span class="text-tertiary/40 w-6 text-right shrink-0">12</span>
-<span class="text-tertiary/90"><span class="text-tertiary/40">+</span> <span class="text-[#f9e2af]">if</span> (!token) <span class="text-[#f9e2af]">throw new</span> AuthError();</span>
-</div>
-<!-- Context line -->
-<div class="flex gap-2 py-px">
-<span class="text-on-surface-variant/25 w-6 text-right shrink-0">13</span>
-<span> <span class="text-[#f9e2af]">const</span> decoded = verify(token, secret);</span>
-</div>
-<!-- Inline comment -->
-<div class="mt-2 p-2.5 bg-surface-container-high rounded-lg border border-[#f9e2af]/20 ml-8">
-<div class="flex items-center gap-1.5 mb-1">
-<span class="text-[10px] font-bold text-[#f9e2af] uppercase tracking-wider">suggestion</span>
-<span class="text-[10px] text-on-surface-variant/40">line 11</span>
-</div>
-<p class="text-[11px] text-on-surface-variant leading-relaxed">Use <span class="text-primary">getSecureSession()</span> instead &mdash; it validates the token signature automatically.</p>
-</div>
-</div>
-</div>
-<!-- Status bar -->
-<div class="flex items-center justify-between px-3 py-1.5 bg-surface-container-low border-t border-outline-variant/10 text-[10px] text-on-surface-variant/40 whitespace-nowrap overflow-hidden">
-<div class="flex items-center gap-3">
-<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span> Connected</span>
-<span>ref:a3f7b2c</span>
-<span>7 files</span>
-<span>1 comment</span>
-</div>
-<div class="flex items-center gap-3">
-<span>c:comment</span>
-<span>S:submit</span>
-<span>P:pause</span>
-</div>
-</div>
+<!-- TUI screenshot -->
+<img src="tui-screenshot.png" alt="Monocle TUI showing diff review with inline comments" style="display:block;width:100%">
 </div>
 </div>
 </div>
