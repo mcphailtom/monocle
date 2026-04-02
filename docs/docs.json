@@ -5,7 +5,7 @@
   "favicon": "/images/logo-mark.svg",
   "colors": {
     "primary": "#89b4fa",
-    "light": "#b4befe",
+    "light": "#89b4fa",
     "dark": "#1e1e2e"
   },
   "navbar": {
@@ -71,7 +71,7 @@
   "background": {
     "color": {
       "light": "#cdd6f4",
-      "dark": "#11111b"
+      "dark": "#1e1e2e"
     }
   },
   "fonts": {
