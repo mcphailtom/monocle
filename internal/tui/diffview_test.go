@@ -295,7 +295,7 @@ func TestFormatExpandedCommentSuggestionDiff(t *testing.T) {
 	}
 
 	// With original code: should render diff lines
-	result := formatExpandedComment(comment, 80, "oldFunc()")
+	result := formatExpandedComment(comment, 80, "oldFunc()", true)
 	if !strings.Contains(result, "- oldFunc()") {
 		t.Errorf("expected diff to contain removed line '- oldFunc()', got:\n%s", result)
 	}
@@ -308,7 +308,7 @@ func TestFormatExpandedCommentSuggestionDiff(t *testing.T) {
 	}
 
 	// Without original code: should fall back to raw body
-	resultNoOrig := formatExpandedComment(comment, 80, "")
+	resultNoOrig := formatExpandedComment(comment, 80, "", true)
 	if !strings.Contains(resultNoOrig, "```suggestion") {
 		t.Errorf("expected raw fence when no original code, got:\n%s", resultNoOrig)
 	}
@@ -320,7 +320,7 @@ func TestFormatExpandedCommentSuggestionDiffWithSurroundingText(t *testing.T) {
 		Body: "Consider this:\n```suggestion\nnewFunc()\n```\nBetter approach.",
 	}
 
-	result := formatExpandedComment(comment, 80, "oldFunc()")
+	result := formatExpandedComment(comment, 80, "oldFunc()", true)
 	if !strings.Contains(result, "Consider this:") {
 		t.Errorf("expected text before suggestion, got:\n%s", result)
 	}
