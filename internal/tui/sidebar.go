@@ -154,7 +154,13 @@ func (m sidebarModel) View() string {
 	// Render only items within the viewport [offset, offset+viewportHeight)
 	contentItemCt := len(m.contentItems)
 	totalItems := m.totalItems()
-	availableLines := m.viewportHeight()
+	// viewportHeight() subtracts headers from m.height, but when content items
+	// exist the loop already counts headers in linesUsed — use m.height to
+	// avoid double-subtracting.
+	availableLines := m.height
+	if contentItemCt == 0 {
+		availableLines = m.viewportHeight()
+	}
 
 	linesUsed := 0
 
@@ -879,21 +885,23 @@ func (m *sidebarModel) ensureVisible() {
 	}
 }
 
+// sidebarHeaderLines returns the number of lines consumed by section headers
+// and blank separators in the sidebar, given item counts.
+func sidebarHeaderLines(contentItemCount, additionalFileCount int) int {
+	h := 1 // "Files" header is always present
+	if contentItemCount > 0 {
+		h += 2 // "Review Items" header + blank separator before "Files"
+	}
+	if additionalFileCount > 0 {
+		h += 2 // blank separator + "Additional Files" header
+	}
+	return h
+}
+
 // viewportHeight returns how many item lines fit in the sidebar viewport.
 // Accounts for section headers and dividers that consume vertical space.
 func (m sidebarModel) viewportHeight() int {
-	headerLines := 0
-	if len(m.contentItems) > 0 {
-		headerLines += 1 // "Review Items" header
-		headerLines += 1 // blank line between sections
-		headerLines += 1 // "Files" header
-	} else {
-		headerLines += 1 // "Files" header only
-	}
-	if len(m.additionalFiles) > 0 {
-		headerLines += 1 // blank line before additional section
-		headerLines += 1 // "Additional Files" header
-	}
+	headerLines := sidebarHeaderLines(len(m.contentItems), len(m.additionalFiles))
 	h := m.height - headerLines
 	if h < 0 {
 		h = 0

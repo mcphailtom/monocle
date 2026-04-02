@@ -1971,11 +1971,10 @@ func (m appModel) displayBaseRef(session *types.ReviewSession) string {
 }
 
 // stackedSidebarHeight returns the height for the sidebar in stacked mode.
-// It accounts for the header line plus one line per file/content item, with a
+// It accounts for section headers, separators, and one line per item, with a
 // minimum of 8 rows and at most 35% of totalHeight.
 func stackedSidebarHeight(totalHeight, fileCount, contentItemCount, additionalFileCount int) int {
-	// 1 header line + 1 per item
-	h := 1 + fileCount + contentItemCount + additionalFileCount
+	h := sidebarHeaderLines(contentItemCount, additionalFileCount) + fileCount + contentItemCount + additionalFileCount
 	if h < 8 {
 		h = 8
 	}
