@@ -183,7 +183,7 @@ func TestContentItems(t *testing.T) {
 		t.Errorf("unexpected: %+v", items)
 	}
 
-	got, err := d.GetContentItem("item-1")
+	got, err := d.GetContentItem("sess-1", "item-1")
 	if err != nil {
 		t.Fatalf("get item: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestContentItems(t *testing.T) {
 		t.Fatalf("upsert update: %v", err)
 	}
 
-	got2, err := d.GetContentItem("item-1")
+	got2, err := d.GetContentItem("sess-1", "item-1")
 	if err != nil {
 		t.Fatalf("get updated item: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestContentItems(t *testing.T) {
 		t.Fatalf("upsert v3: %v", err)
 	}
 
-	got3, err := d.GetContentItem("item-1")
+	got3, err := d.GetContentItem("sess-1", "item-1")
 	if err != nil {
 		t.Fatalf("get v3 item: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestContentItems(t *testing.T) {
 	}
 
 	// Verify version history
-	versions, err := d.GetContentVersions("item-1")
+	versions, err := d.GetContentVersions("sess-1", "item-1")
 	if err != nil {
 		t.Fatalf("get versions: %v", err)
 	}
@@ -270,12 +270,86 @@ func TestContentItems(t *testing.T) {
 	}
 
 	// Verify single version fetch
-	v2, err := d.GetContentVersion("item-1", 2)
+	v2, err := d.GetContentVersion("sess-1", "item-1", 2)
 	if err != nil {
 		t.Fatalf("get version 2: %v", err)
 	}
 	if v2.Content != "# Updated Plan\nNew steps..." {
 		t.Errorf("version 2 content mismatch: %q", v2.Content)
+	}
+}
+
+func TestContentItems_CrossSession(t *testing.T) {
+	d := testDB(t)
+	now := time.Now()
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+	d.CreateSession(&types.ReviewSession{ID: "sess-2", Agent: "claude", RepoRoot: "/tmp", BaseRef: "def", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+
+	// Submit plan to session 1 twice (v1 and v2)
+	item1 := &types.ContentItem{ID: "plan", Title: "Plan v1", Content: "content v1", ContentType: "markdown", CreatedAt: now, UpdatedAt: now}
+	if err := d.UpsertContentItem("sess-1", item1); err != nil {
+		t.Fatalf("upsert sess-1 v1: %v", err)
+	}
+	item1b := &types.ContentItem{ID: "plan", Title: "Plan v2", Content: "content v2", ContentType: "markdown", CreatedAt: now, UpdatedAt: now}
+	if err := d.UpsertContentItem("sess-1", item1b); err != nil {
+		t.Fatalf("upsert sess-1 v2: %v", err)
+	}
+
+	// Submit same plan ID to session 2 — should start at v1
+	item2 := &types.ContentItem{ID: "plan", Title: "Plan v1", Content: "content v1 new session", ContentType: "markdown", CreatedAt: now, UpdatedAt: now}
+	if err := d.UpsertContentItem("sess-2", item2); err != nil {
+		t.Fatalf("upsert sess-2 v1: %v", err)
+	}
+
+	// Session 1 should have 2 versions
+	v1, err := d.GetContentVersions("sess-1", "plan")
+	if err != nil {
+		t.Fatalf("get versions sess-1: %v", err)
+	}
+	if len(v1) != 2 {
+		t.Errorf("expected 2 versions for sess-1, got %d", len(v1))
+	}
+	if v1[0].Version != 1 || v1[1].Version != 2 {
+		t.Errorf("expected versions 1,2 for sess-1, got %d,%d", v1[0].Version, v1[1].Version)
+	}
+
+	// Session 2 should have 1 version starting at v1
+	v2, err := d.GetContentVersions("sess-2", "plan")
+	if err != nil {
+		t.Fatalf("get versions sess-2: %v", err)
+	}
+	if len(v2) != 1 {
+		t.Errorf("expected 1 version for sess-2, got %d", len(v2))
+	}
+	if v2[0].Version != 1 {
+		t.Errorf("expected version 1 for sess-2, got %d", v2[0].Version)
+	}
+
+	// Version counts should be independent
+	got1, err := d.GetContentItem("sess-1", "plan")
+	if err != nil {
+		t.Fatalf("get item sess-1: %v", err)
+	}
+	if got1.VersionCount != 2 {
+		t.Errorf("expected version count 2 for sess-1, got %d", got1.VersionCount)
+	}
+
+	got2, err := d.GetContentItem("sess-2", "plan")
+	if err != nil {
+		t.Fatalf("get item sess-2: %v", err)
+	}
+	if got2.VersionCount != 1 {
+		t.Errorf("expected version count 1 for sess-2, got %d", got2.VersionCount)
+	}
+
+	// GetContentItems should return independent items per session
+	items1, _ := d.GetContentItems("sess-1")
+	items2, _ := d.GetContentItems("sess-2")
+	if len(items1) != 1 || items1[0].VersionCount != 2 {
+		t.Errorf("sess-1 items unexpected: %+v", items1)
+	}
+	if len(items2) != 1 || items2[0].VersionCount != 1 {
+		t.Errorf("sess-2 items unexpected: %+v", items2)
 	}
 }
 

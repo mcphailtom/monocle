@@ -71,7 +71,13 @@ func NewEngine(cfg *types.Config, database *db.DB, repoRoot string, nonGitMode b
 	}, cfg.ReviewFormat)
 
 	e.formatter.SetContentItemProvider(func(id string) string {
-		item, err := database.GetContentItem(id)
+		e.mu.RLock()
+		session := e.current
+		e.mu.RUnlock()
+		if session == nil {
+			return ""
+		}
+		item, err := database.GetContentItem(session.ID, id)
 		if err != nil || item == nil {
 			return ""
 		}
@@ -228,13 +234,25 @@ func (e *Engine) GetFileContent(path string) (string, error) {
 }
 
 func (e *Engine) GetContentItem(id string) (*types.ContentItem, error) {
-	return e.database.GetContentItem(id)
+	e.mu.RLock()
+	session := e.current
+	e.mu.RUnlock()
+	if session == nil {
+		return nil, fmt.Errorf("no active session")
+	}
+	return e.database.GetContentItem(session.ID, id)
 }
 
 // GetContentDiff computes a diff between the previous and current version of a content item.
 // Returns nil if no previous version exists.
 func (e *Engine) GetContentDiff(id string) (*types.DiffResult, error) {
-	versions, err := e.database.GetContentVersions(id)
+	e.mu.RLock()
+	session := e.current
+	e.mu.RUnlock()
+	if session == nil {
+		return nil, fmt.Errorf("no active session")
+	}
+	versions, err := e.database.GetContentVersions(session.ID, id)
 	if err != nil {
 		return nil, err
 	}
@@ -252,16 +270,28 @@ func (e *Engine) GetContentDiff(id string) (*types.DiffResult, error) {
 
 // GetContentVersions returns all versions of a content item.
 func (e *Engine) GetContentVersions(id string) ([]types.ContentVersion, error) {
-	return e.database.GetContentVersions(id)
+	e.mu.RLock()
+	session := e.current
+	e.mu.RUnlock()
+	if session == nil {
+		return nil, fmt.Errorf("no active session")
+	}
+	return e.database.GetContentVersions(session.ID, id)
 }
 
 // GetContentDiffBetweenVersions computes a diff between two specific versions of a content item.
 func (e *Engine) GetContentDiffBetweenVersions(id string, fromVersion, toVersion int) (*types.DiffResult, error) {
-	from, err := e.database.GetContentVersion(id, fromVersion)
+	e.mu.RLock()
+	session := e.current
+	e.mu.RUnlock()
+	if session == nil {
+		return nil, fmt.Errorf("no active session")
+	}
+	from, err := e.database.GetContentVersion(session.ID, id, fromVersion)
 	if err != nil {
 		return nil, fmt.Errorf("get version %d: %w", fromVersion, err)
 	}
-	to, err := e.database.GetContentVersion(id, toVersion)
+	to, err := e.database.GetContentVersion(session.ID, id, toVersion)
 	if err != nil {
 		return nil, fmt.Errorf("get version %d: %w", toVersion, err)
 	}

@@ -152,7 +152,7 @@ func (d *DB) UpsertContentItem(sessionID string, item *types.ContentItem) error 
 	_, err := d.Exec(
 		`INSERT INTO content_items (id, session_id, title, content, content_type, is_plan, reviewed, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(id) DO UPDATE SET title = excluded.title, content = excluded.content, content_type = excluded.content_type, is_plan = excluded.is_plan, updated_at = excluded.updated_at`,
+		 ON CONFLICT(id, session_id) DO UPDATE SET title = excluded.title, content = excluded.content, content_type = excluded.content_type, is_plan = excluded.is_plan, updated_at = excluded.updated_at`,
 		item.ID, sessionID, item.Title, item.Content, item.ContentType, boolToInt(item.IsPlan), boolToInt(item.Reviewed), item.CreatedAt, item.UpdatedAt,
 	)
 	if err != nil {
@@ -162,8 +162,8 @@ func (d *DB) UpsertContentItem(sessionID string, item *types.ContentItem) error 
 	// Record a new version
 	_, err = d.Exec(
 		`INSERT INTO content_versions (content_item_id, session_id, version, title, content, created_at)
-		 VALUES (?, ?, COALESCE((SELECT MAX(version) FROM content_versions WHERE content_item_id = ?), 0) + 1, ?, ?, ?)`,
-		item.ID, sessionID, item.ID, item.Title, item.Content, item.UpdatedAt,
+		 VALUES (?, ?, COALESCE((SELECT MAX(version) FROM content_versions WHERE content_item_id = ? AND session_id = ?), 0) + 1, ?, ?, ?)`,
+		item.ID, sessionID, item.ID, sessionID, item.Title, item.Content, item.UpdatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("insert content version: %w", err)
@@ -171,7 +171,7 @@ func (d *DB) UpsertContentItem(sessionID string, item *types.ContentItem) error 
 
 	// Update the version count on the item
 	err = d.QueryRow(
-		`SELECT COUNT(*) FROM content_versions WHERE content_item_id = ?`, item.ID,
+		`SELECT COUNT(*) FROM content_versions WHERE content_item_id = ? AND session_id = ?`, item.ID, sessionID,
 	).Scan(&item.VersionCount)
 	return err
 }
@@ -180,7 +180,7 @@ func (d *DB) UpsertContentItem(sessionID string, item *types.ContentItem) error 
 func (d *DB) GetContentItems(sessionID string) ([]types.ContentItem, error) {
 	rows, err := d.Query(
 		`SELECT c.id, c.title, c.content, c.content_type, c.is_plan, c.reviewed, c.created_at, c.updated_at,
-		 (SELECT COUNT(*) FROM content_versions WHERE content_item_id = c.id) AS version_count
+		 (SELECT COUNT(*) FROM content_versions WHERE content_item_id = c.id AND session_id = c.session_id) AS version_count
 		 FROM content_items c WHERE c.session_id = ? ORDER BY c.created_at`, sessionID,
 	)
 	if err != nil {
@@ -202,14 +202,14 @@ func (d *DB) GetContentItems(sessionID string) ([]types.ContentItem, error) {
 	return items, rows.Err()
 }
 
-// GetContentItem returns a single content item by ID.
-func (d *DB) GetContentItem(id string) (*types.ContentItem, error) {
+// GetContentItem returns a single content item by ID within a session.
+func (d *DB) GetContentItem(sessionID, id string) (*types.ContentItem, error) {
 	item := &types.ContentItem{}
 	var isPlan, reviewed int
 	err := d.QueryRow(
 		`SELECT c.id, c.title, c.content, c.content_type, c.is_plan, c.reviewed, c.created_at, c.updated_at,
-		 (SELECT COUNT(*) FROM content_versions WHERE content_item_id = c.id) AS version_count
-		 FROM content_items c WHERE c.id = ?`, id,
+		 (SELECT COUNT(*) FROM content_versions WHERE content_item_id = c.id AND session_id = c.session_id) AS version_count
+		 FROM content_items c WHERE c.id = ? AND c.session_id = ?`, id, sessionID,
 	).Scan(&item.ID, &item.Title, &item.Content, &item.ContentType, &isPlan, &reviewed, &item.CreatedAt, &item.UpdatedAt, &item.VersionCount)
 	if err != nil {
 		return nil, err
@@ -219,11 +219,11 @@ func (d *DB) GetContentItem(id string) (*types.ContentItem, error) {
 	return item, nil
 }
 
-// GetContentVersions returns all versions of a content item, ordered by version ascending.
-func (d *DB) GetContentVersions(contentItemID string) ([]types.ContentVersion, error) {
+// GetContentVersions returns all versions of a content item within a session, ordered by version ascending.
+func (d *DB) GetContentVersions(sessionID, contentItemID string) ([]types.ContentVersion, error) {
 	rows, err := d.Query(
 		`SELECT content_item_id, version, title, content, created_at
-		 FROM content_versions WHERE content_item_id = ? ORDER BY version ASC`, contentItemID,
+		 FROM content_versions WHERE content_item_id = ? AND session_id = ? ORDER BY version ASC`, contentItemID, sessionID,
 	)
 	if err != nil {
 		return nil, err
@@ -241,12 +241,12 @@ func (d *DB) GetContentVersions(contentItemID string) ([]types.ContentVersion, e
 	return versions, rows.Err()
 }
 
-// GetContentVersion returns a single version of a content item.
-func (d *DB) GetContentVersion(contentItemID string, version int) (*types.ContentVersion, error) {
+// GetContentVersion returns a single version of a content item within a session.
+func (d *DB) GetContentVersion(sessionID, contentItemID string, version int) (*types.ContentVersion, error) {
 	v := &types.ContentVersion{}
 	err := d.QueryRow(
 		`SELECT content_item_id, version, title, content, created_at
-		 FROM content_versions WHERE content_item_id = ? AND version = ?`, contentItemID, version,
+		 FROM content_versions WHERE content_item_id = ? AND session_id = ? AND version = ?`, contentItemID, sessionID, version,
 	).Scan(&v.ContentItemID, &v.Version, &v.Title, &v.Content, &v.CreatedAt)
 	if err != nil {
 		return nil, err
