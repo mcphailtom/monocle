@@ -1617,6 +1617,36 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case Matches(key, km.ArtifactVersions):
+		if !m.diffView.isViewingContentItem() {
+			return m, func() tea.Msg {
+				return openInfoBannerMsg{
+					title:   "No Artifact Selected",
+					message: "Select a plan or artifact in the sidebar to browse its version history.",
+				}
+			}
+		}
+		if m.diffView.contentVersionCount < 2 {
+			return m, func() tea.Msg {
+				return openInfoBannerMsg{
+					title:   "No Version History",
+					message: "This artifact has only one version. Submit updated versions to build a history.",
+				}
+			}
+		}
+		contentID := m.diffView.contentID
+		engine := m.engine
+		return m, func() tea.Msg {
+			versions, err := engine.GetContentVersions(contentID)
+			if err != nil || len(versions) < 2 {
+				return nil
+			}
+			return openVersionPickerMsg{
+				contentID: contentID,
+				versions:  versions,
+			}
+		}
+
 	case Matches(key, km.ScrollDown):
 		m.diffView.ScrollDown()
 		m.diffView.ScrollDown()
@@ -1864,7 +1894,7 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 			return fileChangedMsg{}
 		}
 
-	case "artifact-versions":
+	case "base-artifact-version":
 		if !m.diffView.isViewingContentItem() {
 			return func() tea.Msg {
 				return openInfoBannerMsg{
@@ -1890,6 +1920,21 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 			return openVersionPickerMsg{
 				contentID: contentID,
 				versions:  versions,
+			}
+		}
+
+	case "base-ref":
+		if m.nonGitMode {
+			return nil
+		}
+		return func() tea.Msg {
+			entries, err := engine.RecentCommits(20)
+			if err != nil {
+				return nil
+			}
+			return openRefPickerMsg{
+				entries:    entries,
+				autoActive: engine.IsAutoAdvanceRef(),
 			}
 		}
 	}

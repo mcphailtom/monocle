@@ -234,6 +234,7 @@ Skills live in agent-specific directories (`.claude/skills/` for Claude Code, `.
 | `f`                    | Toggle flat/tree view                                     |
 | `z`/`e`                | Collapse/expand all (tree)                                |
 | `b`                    | Change base ref                                           |
+| `B`                    | Base artifact version to diff against                             |
 | `c`                    | Add comment at cursor (edit if on a comment)              |
 | `s`                    | Suggest edit at cursor (pre-fills suggestion block)       |
 | `C`                    | Add file-level comment                                    |
@@ -255,7 +256,8 @@ Skills live in agent-specific directories (`.claude/skills/` for Claude Code, `.
 | `:mark-all-unreviewed` | Mark all files as unreviewed                              |
 | `:discard`             | Discard all pending comments                              |
 | `:history`             | View past review submissions                              |
-| `:artifact-versions`   | Browse artifact version history                           |
+| `:base-artifact-version` | Base artifact version to diff against                           |
+| `:base-ref`              | Base ref to diff against (same as `b`)                  |
 | `I`                    | Connection info (socket path, subscriber count)           |
 | `?`                    | Show all keybindings                                      |
 
