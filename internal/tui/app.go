@@ -612,12 +612,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-		// Refresh currently displayed content item if it matches
-		if m.diffView.isViewingContentItem() && m.diffView.contentID == msg.id && msg.id != "" {
-			return m, m.handleSidebarSelect(sidebarSelectMsg{isContent: true, contentID: msg.id})
-		}
-		// Auto-select only if nothing else is available (no files, no current view)
-		if m.diffView.path == "" && len(m.sidebar.files) == 0 && msg.id != "" {
+		// Auto-select the latest content item in sidebar and viewer
+		if msg.id != "" {
 			m.sidebar.selectContentByID(msg.id)
 			return m, m.handleSidebarSelect(sidebarSelectMsg{isContent: true, contentID: msg.id})
 		}
