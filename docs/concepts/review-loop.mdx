@@ -70,6 +70,10 @@ When you add a comment, press `Tab` in the comment editor to cycle through these
   You can mark a comment as resolved with `x`. Resolved comments are excluded from submitted reviews. To delete a comment entirely, press `d` while on a comment line.
 </Note>
 
+### Comment expansion
+
+Comments expand automatically when you hover over them, showing the full comment text with syntax highlighting. Press `Space` on a comment line to manually toggle it expanded or collapsed. You can disable auto-expansion or adjust the delay in your [config file](/configuration/config-file) with the `comment_expand` and `comment_expand_delay` settings.
+
 ## The feedback queue
 
 When you submit a review, monocle doesn't send it directly — it queues it for reliable delivery. This means:
