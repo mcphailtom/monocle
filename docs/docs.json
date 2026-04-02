@@ -75,13 +75,9 @@
     }
   },
   "fonts": {
-    "family": "Plus Jakarta Sans",
-    "weight": 400,
-    "source": "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap",
-    "format": "woff2",
     "heading": {
       "family": "Instrument Serif",
-      "weight": 600
+      "weight": 400
     },
     "body": {
       "family": "Plus Jakarta Sans",
