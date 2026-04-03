@@ -1,0 +1,53 @@
+import type { ReviewSession } from "../types";
+
+interface StatusBarProps {
+  session: ReviewSession | null;
+  subscriberCount: number;
+  feedbackStatus: string;
+  selectedFile: string;
+}
+
+export function StatusBar({
+  session,
+  subscriberCount,
+  feedbackStatus,
+  selectedFile,
+}: StatusBarProps) {
+  const fileCount = session?.ChangedFiles?.length ?? 0;
+  const contentCount = session?.ContentItems?.length ?? 0;
+  const commentCount = session?.Comments?.length ?? 0;
+
+  return (
+    <footer className="flex items-center justify-between border-t border-border bg-card px-3 py-0.5 text-xs text-muted-foreground">
+      <div className="flex items-center gap-3">
+        <span className="text-foreground">
+          {selectedFile || "No file selected"}
+        </span>
+        {feedbackStatus && feedbackStatus !== "none" && (
+          <span className="text-ctp-yellow">{feedbackStatus}</span>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        {commentCount > 0 && (
+          <span>
+            {commentCount} comment{commentCount !== 1 ? "s" : ""}
+          </span>
+        )}
+        <span>
+          {fileCount} file{fileCount !== 1 ? "s" : ""}
+          {contentCount > 0 && `, ${contentCount} item${contentCount !== 1 ? "s" : ""}`}
+        </span>
+        <span
+          className={
+            subscriberCount > 0 ? "text-ctp-green" : "text-muted-foreground"
+          }
+        >
+          {subscriberCount > 0
+            ? `Agent connected`
+            : "No agent"}
+        </span>
+        <span className="text-muted-foreground">?:help</span>
+      </div>
+    </footer>
+  );
+}
