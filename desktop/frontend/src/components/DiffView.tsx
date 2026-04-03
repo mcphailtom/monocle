@@ -567,6 +567,8 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
 
       for (const hunk of file.hunks) {
         for (const change of hunk.changes) {
+          // Only attach widgets to new-side lines to avoid duplicates in split view
+          if (change.type === "delete") continue;
           const lineNum = changeLineNumber(change);
           if (lineNum && commentsByLine.has(lineNum)) {
             const key = getChangeKey(change);
