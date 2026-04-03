@@ -258,7 +258,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`flex flex-col border-r overflow-hidden ${
+      className={`flex flex-col border-r overflow-hidden transition-colors duration-150 ${
         focused ? "border-primary" : "border-border"
       }`}
       style={{ width: 260 }}
@@ -369,7 +369,7 @@ function SidebarRow({
   return (
     <div
       ref={setRef}
-      className={`flex items-center gap-1 px-3 py-0.5 cursor-pointer text-sm truncate ${
+      className={`flex items-center gap-1 px-3 py-0.5 cursor-pointer text-sm truncate transition-colors duration-150 ${
         isActive
           ? "bg-accent text-accent-foreground"
           : isCursor
@@ -384,9 +384,9 @@ function SidebarRow({
           {icon}
         </span>
       )}
-      <span className="truncate">{label}</span>
+      <span className={`truncate ${item.kind === "file" || item.kind === "tree-file" || item.kind === "additional" ? "font-mono" : ""}`}>{label}</span>
       {status && (
-        <span className={`ml-auto text-[10px] shrink-0 ${STATUS_COLORS[status]}`}>
+        <span className={`ml-auto text-[10px] font-mono shrink-0 ${STATUS_COLORS[status]}`}>
           {STATUS_LABELS[status]}
         </span>
       )}

@@ -20,7 +20,7 @@ export function StatusBar({
   return (
     <footer className="flex items-center justify-between border-t border-border bg-card px-3 py-0.5 text-xs text-muted-foreground">
       <div className="flex items-center gap-3">
-        <span className="text-foreground">
+        <span className="text-foreground font-mono">
           {selectedFile || "No file selected"}
         </span>
         {feedbackStatus && feedbackStatus !== "none" && (
@@ -46,7 +46,7 @@ export function StatusBar({
             ? `Agent connected`
             : "No agent"}
         </span>
-        <span className="text-muted-foreground">?:help</span>
+        <span className="text-muted-foreground font-mono">?:help</span>
       </div>
     </footer>
   );
