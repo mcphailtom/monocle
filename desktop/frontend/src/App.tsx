@@ -8,6 +8,9 @@ import { CommentEditor } from "./components/CommentEditor";
 import { ReviewSubmitDialog } from "./components/ReviewSubmitDialog";
 import { HelpDialog } from "./components/HelpDialog";
 import { CommandPalette } from "./components/CommandPalette";
+import { ConnectionInfoDialog } from "./components/ConnectionInfoDialog";
+import { HistoryDialog } from "./components/HistoryDialog";
+import { BaseRefPicker } from "./components/BaseRefPicker";
 import { ProjectPicker } from "./components/ProjectPicker";
 import { useKeyboard } from "./hooks/useKeyboard";
 import type {
@@ -101,9 +104,12 @@ function ReviewUI() {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
 
-  // Help and command palette
+  // Help, command palette, and modal dialogs
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [connectionInfoOpen, setConnectionInfoOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [baseRefPickerOpen, setBaseRefPickerOpen] = useState(false);
 
   // Diff view ref for keyboard navigation
   const diffViewRef = useRef<DiffViewHandle>(null);
@@ -366,6 +372,22 @@ function ReviewUI() {
     }
   }, [loadSession, loadFiles]);
 
+  const handleBaseRefSelect = useCallback(
+    async (ref: string) => {
+      try {
+        await api.setBaseRef(ref);
+        // Reload everything with new base
+        loadFiles();
+        loadSession();
+        if (selectedPath) loadDiff(selectedPath);
+        else if (selectedContentId) loadContentItem(selectedContentId);
+      } catch (err) {
+        console.error("Failed to set base ref:", err);
+      }
+    },
+    [loadFiles, loadSession, loadDiff, loadContentItem, selectedPath, selectedContentId],
+  );
+
   const toggleFocusMode = useCallback(() => {
     setFocusMode((prev) => {
       const next = !prev;
@@ -408,7 +430,7 @@ function ReviewUI() {
           loadFiles();
           break;
         case "history":
-          // TODO: implement history view
+          setHistoryOpen(true);
           break;
       }
     },
@@ -810,6 +832,20 @@ function ReviewUI() {
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
+    // Base ref picker (b key)
+    {
+      key: "b",
+      handler: () => setBaseRefPickerOpen(true),
+      when: () => !commentEditorOpen && !reviewDialogOpen && !helpOpen && !commandPaletteOpen && !baseRefPickerOpen,
+    },
+
+    // Connection info (Shift+I)
+    {
+      key: "shift+i",
+      handler: () => setConnectionInfoOpen(true),
+      when: () => !commentEditorOpen && !reviewDialogOpen && !helpOpen && !commandPaletteOpen,
+    },
+
     // Help and command palette
     {
       key: "?",
@@ -939,6 +975,25 @@ function ReviewUI() {
         open={commandPaletteOpen}
         onClose={() => setCommandPaletteOpen(false)}
         onCommand={handleCommand}
+      />
+
+      {/* Connection info dialog */}
+      <ConnectionInfoDialog
+        open={connectionInfoOpen}
+        onClose={() => setConnectionInfoOpen(false)}
+      />
+
+      {/* Submission history dialog */}
+      <HistoryDialog
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+      />
+
+      {/* Base ref picker */}
+      <BaseRefPicker
+        open={baseRefPickerOpen}
+        onClose={() => setBaseRefPickerOpen(false)}
+        onSelect={handleBaseRefSelect}
       />
     </div>
   );
