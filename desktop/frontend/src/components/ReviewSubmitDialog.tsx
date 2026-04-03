@@ -14,6 +14,7 @@ interface ReviewSubmitDialogProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (action: SubmitAction, body: string) => void;
+  onCopyToClipboard?: (action: SubmitAction, body: string) => void;
   summary: ReviewSummary | null;
 }
 
@@ -34,6 +35,7 @@ export function ReviewSubmitDialog({
   open,
   onClose,
   onSubmit,
+  onCopyToClipboard,
   summary,
 }: ReviewSubmitDialogProps) {
   const [action, setAction] = useState<SubmitAction>("request_changes");
@@ -53,18 +55,27 @@ export function ReviewSubmitDialog({
     onClose();
   }, [action, body, onSubmit, onClose]);
 
+  const handleCopy = useCallback(() => {
+    onCopyToClipboard?.(action, body.trim());
+    onClose();
+  }, [action, body, onCopyToClipboard, onClose]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         handleSubmit();
       }
+      if (e.key === "y" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleCopy();
+      }
       if (e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
         setAction((a) => (a === "approve" ? "request_changes" : "approve"));
       }
     },
-    [handleSubmit],
+    [handleSubmit, handleCopy],
   );
 
   const totalComments =
@@ -138,7 +149,7 @@ export function ReviewSubmitDialog({
         <DialogFooter>
           <div className="flex items-center justify-between w-full">
             <span className="text-[10px] text-muted-foreground">
-              Tab to toggle action &middot; Ctrl+Enter to submit
+              Tab to toggle &middot; Ctrl+Enter to submit &middot; Ctrl+Y to copy
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={onClose}>

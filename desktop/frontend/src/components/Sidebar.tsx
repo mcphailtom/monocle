@@ -35,9 +35,13 @@ interface SidebarProps {
   cursor: number;
   reviewFilter: string;
   treeMode: boolean;
+  collapseAllSignal?: number;
+  expandAllSignal?: number;
+  toggleDirPath?: string;
   onSelect: (item: SidebarItem) => void;
   onCursorChange: (cursor: number) => void;
   onItemsChange?: (items: SidebarItem[]) => void;
+  onToggleDir?: (path: string) => void;
 }
 
 // --- Helpers ---
@@ -134,6 +138,10 @@ export function Sidebar({
   onSelect,
   onCursorChange,
   onItemsChange,
+  onToggleDir,
+  collapseAllSignal,
+  expandAllSignal,
+  toggleDirPath,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -158,6 +166,35 @@ export function Sidebar({
     () => (treeMode ? buildTree(filteredFiles) : []),
     [filteredFiles, treeMode],
   );
+
+  // Collect all directory paths from the tree for collapse/expand all
+  const allDirPaths = useMemo(() => {
+    const paths: string[] = [];
+    function walk(nodes: FileTreeNode[]) {
+      for (const node of nodes) {
+        if (node.isDir) {
+          paths.push(node.path);
+          walk(node.children);
+        }
+      }
+    }
+    walk(tree);
+    return paths;
+  }, [tree]);
+
+  // Collapse all directories when signal changes
+  useEffect(() => {
+    if (collapseAllSignal && collapseAllSignal > 0) {
+      setCollapsed(new Set(allDirPaths));
+    }
+  }, [collapseAllSignal, allDirPaths]);
+
+  // Expand all directories when signal changes
+  useEffect(() => {
+    if (expandAllSignal && expandAllSignal > 0) {
+      setCollapsed(new Set());
+    }
+  }, [expandAllSignal]);
 
   const items = useMemo((): SidebarItem[] => {
     const result: SidebarItem[] = [];
@@ -229,9 +266,17 @@ export function Sidebar({
         }
         return next;
       });
+      onToggleDir?.(path);
     },
-    [],
+    [onToggleDir],
   );
+
+  // Toggle a specific dir from parent (for Enter key)
+  useEffect(() => {
+    if (toggleDirPath) {
+      toggleDir(toggleDirPath);
+    }
+  }, [toggleDirPath, toggleDir]);
 
   const handleClick = useCallback(
     (index: number) => {
