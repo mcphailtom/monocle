@@ -309,12 +309,15 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
     >
       <ScrollArea className="flex-1" ref={scrollRef}>
         <div className="py-1">
-          {items.map((item, index) => (
+          {items.map((item, index) => {
+            const cursorItem = items[cursor];
+            const cursorOnNonFile = focused && (cursorItem?.kind === "dir" || cursorItem?.kind === "section");
+            return (
             <SidebarRow
               key={`${item.kind}-${index}`}
               item={item}
               index={index}
-              isActive={isSidebarItemSelected(item, selectedPath, selectedContentId)}
+              isActive={!cursorOnNonFile && isSidebarItemSelected(item, selectedPath, selectedContentId)}
               isCursor={focused && index === cursor}
               onClick={handleClick}
               setRef={(el) => {
@@ -322,7 +325,8 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
                 else itemRefs.current.delete(index);
               }}
             />
-          ))}
+            );
+          })}
           {selectableCount === 0 && (
             <div className="px-3 py-4 text-sm text-muted-foreground text-center">
               No files to show
