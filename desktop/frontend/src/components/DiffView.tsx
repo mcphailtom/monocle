@@ -130,10 +130,14 @@ function toUnifiedDiff(diff: DiffResult): string {
 
 // --- Build highlighted line map using Shiki ---
 
-function useShikiHighlight(diff: DiffResult) {
+function useShikiHighlight(diff: DiffResult | null) {
   const [lineHtml, setLineHtml] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
+    if (!diff || !diff.Hunks) {
+      setLineHtml(new Map());
+      return;
+    }
     let cancelled = false;
     const lang = detectLanguage(diff.Path);
     if (lang === "text") return;
@@ -185,7 +189,7 @@ function useShikiHighlight(diff: DiffResult) {
     });
 
     return () => { cancelled = true; };
-  }, [diff.Path, diff.Hunks]);
+  }, [diff?.Path, diff?.Hunks?.length]);
 
   return lineHtml;
 }
@@ -307,9 +311,16 @@ function changeLineNumber(change: ChangeData): number {
 
 export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
   function DiffView(
-    { diff, comments, viewType, focused, wrap, onFocus, onLineClick, onCommentClick },
+    { diff: rawDiff, comments, viewType, focused, wrap, onFocus, onLineClick, onCommentClick },
     ref,
   ) {
+    // Normalize: Go nil slices serialize as JSON null
+    const diff = useMemo(() => {
+      if (!rawDiff) return rawDiff;
+      if (!rawDiff.Hunks) return { ...rawDiff, Hunks: [] };
+      return rawDiff;
+    }, [rawDiff]);
+
     const containerRef = useRef<HTMLDivElement>(null);
     const lineHtml = useShikiHighlight(diff);
     const [cursorIndex, setCursorIndex] = useState(0);

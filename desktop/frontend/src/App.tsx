@@ -154,13 +154,22 @@ function ReviewUI() {
   }, []);
 
   const loadContentItem = useCallback(async (id: string) => {
+    // Clear stale state before async load
+    setDiff(null);
+    setFileContent(null);
     try {
       const item = await api.getContentItem(id);
       setContentTitle(item?.Title ?? "");
       if (item?.PreviousContent) {
         const d = await api.getContentDiff(id);
-        setDiff(d);
-        setFileContent(null);
+        if (d?.Hunks?.length) {
+          setDiff(d);
+          setFileContent(null);
+        } else {
+          // No meaningful diff — show content directly
+          setDiff(null);
+          setFileContent(item?.Content ?? null);
+        }
       } else {
         setDiff(null);
         setFileContent(item?.Content ?? null);
@@ -481,6 +490,21 @@ function ReviewUI() {
     },
     [loadDiff, loadContentItem, loadAdditionalFile],
   );
+
+  // --- Auto-select plans when they arrive ---
+
+  const prevPlanIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const currentPlans = contentItems.filter((c) => c.IsPlan);
+    const prevIds = prevPlanIdsRef.current;
+    const newPlan = currentPlans.find((p) => !prevIds.has(p.ID));
+    prevPlanIdsRef.current = new Set(currentPlans.map((p) => p.ID));
+
+    if (newPlan) {
+      handleSidebarSelect({ kind: "content", item: newPlan });
+    }
+  }, [contentItems, handleSidebarSelect]);
 
   // --- Sidebar cursor movement with auto-select ---
 
