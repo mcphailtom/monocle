@@ -436,7 +436,7 @@ function SidebarRow({
     >
       {icon && (
         <span
-          className="text-[13px] w-4 shrink-0 text-center"
+          className="text-[13px] w-4 shrink-0 text-center font-[family-name:var(--font-icon)]"
           style={iconColor ? { color: iconColor } : undefined}
         >
           {icon}
