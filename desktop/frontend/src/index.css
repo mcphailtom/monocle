@@ -205,3 +205,10 @@ html, body, #root {
 .diff-code-selected {
   outline: 1px solid #89b4fa40;
 }
+
+/* Line wrapping for diff view */
+.diff-wrap .diff-code-cell,
+.diff-wrap .diff-code {
+  white-space: pre-wrap;
+  word-break: break-all;
+}

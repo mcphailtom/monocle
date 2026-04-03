@@ -74,7 +74,11 @@ function getHighlighter(): Promise<Highlighter> {
 export interface DiffViewHandle {
   moveCursor: (delta: number) => void;
   scroll: (delta: number) => void;
+  scrollHalfPage: (direction: 1 | -1) => void;
+  scrollHorizontal: (delta: number) => void;
+  scrollToColumn: (target: "start" | "first-char" | "end") => void;
   getCursorLine: () => number;
+  getCommentAtCursor: () => ReviewComment | null;
   toggleVisualMode: () => void;
   isVisualMode: () => boolean;
   getSelectionRange: () => { start: number; end: number } | null;
@@ -86,6 +90,7 @@ interface DiffViewProps {
   comments: ReviewComment[];
   viewType: ViewType;
   focused: boolean;
+  wrap?: boolean;
   onFocus?: () => void;
   onLineClick?: (lineNumber: number, side: "old" | "new") => void;
   onCommentClick?: (comment: ReviewComment) => void;
@@ -239,7 +244,7 @@ function changeLineNumber(change: ChangeData): number {
 
 export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
   function DiffView(
-    { diff, comments, viewType, focused, onFocus, onLineClick, onCommentClick },
+    { diff, comments, viewType, focused, wrap, onFocus, onLineClick, onCommentClick },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -363,10 +368,49 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       containerRef.current?.scrollBy({ top: delta * 80 });
     }, []);
 
+    const scrollHalfPage = useCallback((direction: 1 | -1) => {
+      const container = containerRef.current;
+      if (!container) return;
+      container.scrollBy({ top: direction * (container.clientHeight / 2) });
+    }, []);
+
+    const scrollHorizontal = useCallback((delta: number) => {
+      containerRef.current?.scrollBy({ left: delta * 40 });
+    }, []);
+
+    const scrollToColumn = useCallback((target: "start" | "first-char" | "end") => {
+      const container = containerRef.current;
+      if (!container) return;
+      switch (target) {
+        case "start":
+          container.scrollLeft = 0;
+          break;
+        case "first-char":
+          container.scrollLeft = 0;
+          break;
+        case "end":
+          container.scrollLeft = container.scrollWidth - container.clientWidth;
+          break;
+      }
+    }, []);
+
     const getCursorLine = useCallback(() => {
       const change = allChanges[cursorIndex];
       return change ? changeLineNumber(change) : 0;
     }, [allChanges, cursorIndex]);
+
+    const getCommentAtCursor = useCallback(() => {
+      const change = allChanges[cursorIndex];
+      if (!change) return null;
+      const lineNum = changeLineNumber(change);
+      // Find any comment whose line range includes the cursor line
+      for (const comment of comments) {
+        const lo = comment.LineStart;
+        const hi = comment.LineEnd || comment.LineStart;
+        if (lineNum >= lo && lineNum <= hi) return comment;
+      }
+      return null;
+    }, [allChanges, cursorIndex, comments]);
 
     const toggleVisualMode = useCallback(() => {
       if (visualMode) {
@@ -450,13 +494,17 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       () => ({
         moveCursor,
         scroll,
+        scrollHalfPage,
+        scrollHorizontal,
+        scrollToColumn,
         getCursorLine,
+        getCommentAtCursor,
         toggleVisualMode,
         isVisualMode,
         getSelectionRange,
         exitVisualMode,
       }),
-      [moveCursor, scroll, getCursorLine, toggleVisualMode, isVisualMode, getSelectionRange, exitVisualMode],
+      [moveCursor, scroll, scrollHalfPage, scrollHorizontal, scrollToColumn, getCursorLine, getCommentAtCursor, toggleVisualMode, isVisualMode, getSelectionRange, exitVisualMode],
     );
 
     // Selected change keys for highlight (single line or visual range)
@@ -584,7 +632,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     return (
       <div
         ref={containerRef}
-        className={`h-full overflow-auto selectable font-mono ${focused ? "" : "opacity-90"}`}
+        className={`h-full overflow-auto selectable font-mono ${focused ? "" : "opacity-90"} ${wrap ? "diff-wrap" : ""}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
