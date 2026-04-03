@@ -41,11 +41,27 @@ function App() {
     }
   }, []);
 
+  // Listen for File > Open Project menu action (Go dispatches DOM event via WindowExecJS)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { path?: string; error?: string };
+      if (detail.error) {
+        setProjectError(detail.error);
+        setProjectPath(null);
+      } else if (detail.path) {
+        setProjectError(null);
+        setProjectPath(detail.path);
+      }
+    };
+    window.addEventListener("monocle:project-changed", handler);
+    return () => window.removeEventListener("monocle:project-changed", handler);
+  }, []);
+
   if (!projectPath) {
     return <ProjectPicker onSelect={handleSelectProject} error={projectError} />;
   }
 
-  return <ReviewUI />;
+  return <ReviewUI key={projectPath} />;
 }
 
 function ReviewUI() {

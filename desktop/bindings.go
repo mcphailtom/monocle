@@ -99,6 +99,43 @@ func (a *App) OpenDirectoryDialog() (string, error) {
 	})
 }
 
+// openProjectFromMenu is called from the native File > Open Project menu item.
+// Opens the OS directory picker, initializes the engine, and notifies the
+// frontend via WindowExecJS (Wails EventsEmit is unreliable from menu goroutines).
+func (a *App) openProjectFromMenu() {
+	if a.ctx == nil {
+		return
+	}
+
+	dir, err := a.OpenDirectoryDialog()
+	if err != nil || dir == "" {
+		return
+	}
+
+	root, err := a.SelectProject(dir)
+	if err != nil {
+		a.emitProjectChanged("", err)
+		return
+	}
+	a.emitProjectChanged(root, nil)
+}
+
+func (a *App) emitProjectChanged(path string, err error) {
+	var js string
+	if err != nil {
+		js = fmt.Sprintf(
+			`window.dispatchEvent(new CustomEvent("monocle:project-changed", {detail: {error: %q}}))`,
+			err.Error(),
+		)
+	} else {
+		js = fmt.Sprintf(
+			`window.dispatchEvent(new CustomEvent("monocle:project-changed", {detail: {path: %q}}))`,
+			path,
+		)
+	}
+	wailsRuntime.WindowExecJS(a.ctx, js)
+}
+
 // SelectProject initializes the engine for the given project directory.
 // Returns the resolved repo root path on success.
 func (a *App) SelectProject(projectPath string) (string, error) {
