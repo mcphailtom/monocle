@@ -1,2 +1,5 @@
 node_modules
 dist
+wailsjs
+tsconfig.tsbuildinfo
+package.json.md5
