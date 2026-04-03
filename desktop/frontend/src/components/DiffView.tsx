@@ -14,7 +14,7 @@ import type {
   DiffType,
   HunkTokens,
 } from "react-diff-view";
-import "react-diff-view/style/index.css";
+// CSS imported in index.css to control load order
 import type { DiffResult, ReviewComment, CommentType } from "../types";
 
 // --- Props ---
