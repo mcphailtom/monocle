@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { ScrollArea } from "./ui/scroll-area";
+import { fileIcon } from "../devicons";
 import type {
   ChangedFile,
   ContentItem,
@@ -386,6 +387,8 @@ function SidebarRow({
   let status: FileChangeStatus | null = null;
   let reviewed = false;
   let icon = "";
+  let iconColor = "";
+  let filePath = "";
 
   switch (item.kind) {
     case "file":
@@ -393,6 +396,7 @@ function SidebarRow({
       label = item.kind === "tree-file" ? item.file.Path.split("/").pop()! : item.file.Path;
       status = item.file.Status;
       reviewed = item.file.Reviewed;
+      filePath = item.file.Path;
       break;
     case "content":
       label = item.item.Title;
@@ -402,11 +406,19 @@ function SidebarRow({
     case "additional":
       label = item.file.Name;
       reviewed = item.file.Reviewed;
+      filePath = item.file.Path;
       break;
     case "dir":
       label = item.path.split("/").pop()!;
       icon = item.collapsed ? "\u25B6" : "\u25BC"; // ▶ or ▼
       break;
+  }
+
+  // Resolve file icon from devicons
+  if (filePath) {
+    const fi = fileIcon(filePath);
+    icon = fi.glyph;
+    iconColor = fi.color;
   }
 
   return (
@@ -423,7 +435,10 @@ function SidebarRow({
       onClick={() => onClick(index)}
     >
       {icon && (
-        <span className="text-[10px] text-muted-foreground w-3 shrink-0">
+        <span
+          className="text-[13px] w-4 shrink-0 text-center"
+          style={iconColor ? { color: iconColor } : undefined}
+        >
           {icon}
         </span>
       )}
