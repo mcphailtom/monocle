@@ -1,24 +1,20 @@
-import { useMemo, useRef, useEffect } from "react";
+import { useMemo, useRef, useEffect, useState } from "react";
 import {
   Diff,
   Hunk,
   parseDiff,
   Decoration,
   getChangeKey,
-  markEdits,
-  tokenize,
 } from "react-diff-view";
 import type {
   HunkData,
   ViewType,
   DiffType,
-  HunkTokens,
 } from "react-diff-view";
-// CSS imported in index.css to control load order
-import { refractor } from "refractor";
+import { createHighlighter, type Highlighter } from "shiki";
 import type { DiffResult, ReviewComment, CommentType } from "../types";
 
-// --- Language detection from file extension ---
+// --- Language detection ---
 
 const EXT_TO_LANG: Record<string, string> = {
   ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx",
@@ -26,26 +22,40 @@ const EXT_TO_LANG: Record<string, string> = {
   java: "java", kt: "kotlin", swift: "swift",
   c: "c", h: "c", cpp: "cpp", hpp: "cpp", cc: "cpp",
   cs: "csharp", css: "css", scss: "scss", less: "less",
-  html: "markup", htm: "markup", xml: "markup", svg: "markup",
+  html: "html", htm: "html", xml: "xml", svg: "xml",
   json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
   md: "markdown", mdx: "markdown",
   sh: "bash", bash: "bash", zsh: "bash", fish: "bash",
   sql: "sql", graphql: "graphql",
-  dockerfile: "docker", makefile: "makefile",
-  proto: "protobuf", lua: "lua", zig: "zig",
+  dockerfile: "dockerfile", makefile: "makefile",
+  lua: "lua", zig: "zig", lock: "json",
 };
 
-function detectLanguage(path: string): string | undefined {
-  const ext = path.split(".").pop()?.toLowerCase() ?? "";
-  const lang = EXT_TO_LANG[ext];
-  if (!lang) return undefined;
-  // Check if refractor has this language registered
-  try {
-    if (refractor.registered(lang)) return lang;
-  } catch {
-    // not registered
+function detectLanguage(path: string): string {
+  const name = path.split("/").pop()?.toLowerCase() ?? "";
+  if (name === "makefile" || name === "dockerfile") return name;
+  const ext = name.split(".").pop() ?? "";
+  return EXT_TO_LANG[ext] ?? "text";
+}
+
+// --- Shiki singleton ---
+
+let highlighterPromise: Promise<Highlighter> | null = null;
+
+function getHighlighter(): Promise<Highlighter> {
+  if (!highlighterPromise) {
+    highlighterPromise = createHighlighter({
+      themes: ["catppuccin-mocha"],
+      langs: [
+        "typescript", "tsx", "javascript", "jsx", "go", "rust", "python",
+        "ruby", "java", "kotlin", "swift", "c", "cpp", "csharp",
+        "css", "scss", "less", "html", "xml", "json", "yaml", "toml",
+        "markdown", "bash", "sql", "graphql", "dockerfile", "makefile",
+        "lua", "zig",
+      ],
+    });
   }
-  return undefined;
+  return highlighterPromise;
 }
 
 // --- Props ---
@@ -53,13 +63,13 @@ function detectLanguage(path: string): string | undefined {
 interface DiffViewProps {
   diff: DiffResult;
   comments: ReviewComment[];
-  viewType: ViewType; // "unified" | "split"
+  viewType: ViewType;
   focused: boolean;
   onLineClick?: (lineNumber: number, side: "old" | "new") => void;
   onCommentClick?: (comment: ReviewComment) => void;
 }
 
-// --- Convert our DiffResult to unified diff string for parseDiff ---
+// --- Convert DiffResult to unified diff string ---
 
 function toUnifiedDiff(diff: DiffResult): string {
   const lines: string[] = [];
@@ -86,6 +96,68 @@ function toUnifiedDiff(diff: DiffResult): string {
   }
 
   return lines.join("\n") + "\n";
+}
+
+// --- Build highlighted line map using Shiki ---
+
+function useShikiHighlight(diff: DiffResult) {
+  const [lineHtml, setLineHtml] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+    const lang = detectLanguage(diff.Path);
+    if (lang === "text") return;
+
+    // Collect all unique source lines from hunks
+    const allLines: string[] = [];
+    for (const hunk of diff.Hunks) {
+      for (const line of hunk.Lines) {
+        allLines.push(line.Content);
+      }
+    }
+    if (allLines.length === 0) return;
+
+    // Join into one block so Shiki gets syntax context across lines
+    const code = allLines.join("\n");
+
+    getHighlighter().then((highlighter) => {
+      if (cancelled) return;
+
+      let tokens;
+      try {
+        tokens = highlighter.codeToTokens(code, {
+          lang,
+          theme: "catppuccin-mocha",
+        });
+      } catch {
+        return; // language not supported
+      }
+
+      const map = new Map<string, string>();
+      for (let i = 0; i < tokens.tokens.length && i < allLines.length; i++) {
+        const lineTokens = tokens.tokens[i];
+        const html = lineTokens
+          .map((t) => {
+            const escaped = t.content
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;");
+            if (t.color) {
+              return `<span style="color:${t.color}">${escaped}</span>`;
+            }
+            return escaped;
+          })
+          .join("");
+        map.set(allLines[i], html);
+      }
+
+      if (!cancelled) setLineHtml(map);
+    });
+
+    return () => { cancelled = true; };
+  }, [diff]);
+
+  return lineHtml;
 }
 
 // --- Comment widget ---
@@ -146,8 +218,9 @@ export function DiffView({
   onCommentClick,
 }: DiffViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const lineHtml = useShikiHighlight(diff);
 
-  // Parse diff using react-diff-view's parser
+  // Parse diff
   const [file] = useMemo(() => {
     if (!diff || diff.Hunks.length === 0) return [null];
     const unified = toUnifiedDiff(diff);
@@ -155,37 +228,11 @@ export function DiffView({
     return [files[0] ?? null];
   }, [diff]);
 
-  // Syntax highlighting + word-level edits
-  const language = useMemo(() => detectLanguage(diff.Path), [diff.Path]);
-
-  const tokens = useMemo((): HunkTokens | null => {
-    if (!file) return null;
-    try {
-      const enhancers = [markEdits(file.hunks, { type: "block" })];
-      if (language) {
-        return tokenize(file.hunks, {
-          highlight: true,
-          refractor,
-          language,
-          enhancers,
-        } as Parameters<typeof tokenize>[1]);
-      }
-      return tokenize(file.hunks, {
-        highlight: false,
-        enhancers,
-      } as Parameters<typeof tokenize>[1]);
-    } catch {
-      return null;
-    }
-  }, [file, language]);
-
-  // Build widgets map: changeKey → ReactNode
+  // Build widgets map
   const widgets = useMemo(() => {
     if (!file || comments.length === 0) return {};
 
     const widgetMap: Record<string, React.ReactNode> = {};
-
-    // Group comments by their target line
     const commentsByLine = new Map<number, ReviewComment[]>();
     for (const comment of comments) {
       const line = comment.LineEnd || comment.LineStart;
@@ -195,17 +242,12 @@ export function DiffView({
       commentsByLine.set(line, existing);
     }
 
-    // Map line numbers to change keys
     for (const hunk of file.hunks) {
       for (const change of hunk.changes) {
         let lineNum: number | undefined;
-        if (change.type === "insert") {
-          lineNum = change.lineNumber;
-        } else if (change.type === "delete") {
-          lineNum = change.lineNumber;
-        } else {
-          lineNum = change.newLineNumber;
-        }
+        if (change.type === "insert") lineNum = change.lineNumber;
+        else if (change.type === "delete") lineNum = change.lineNumber;
+        else lineNum = change.newLineNumber;
 
         if (lineNum && commentsByLine.has(lineNum)) {
           const key = getChangeKey(change);
@@ -218,11 +260,10 @@ export function DiffView({
         }
       }
     }
-
     return widgetMap;
   }, [file, comments, onCommentClick]);
 
-  // Gutter click handler — react-diff-view passes (change) not a DOM event
+  // Gutter click handler
   const gutterEvents = useMemo(
     () => ({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -230,19 +271,38 @@ export function DiffView({
         if (!onLineClick) return;
         const change = args[0]?.change;
         if (!change) return;
-        if (change.type === "insert") {
-          onLineClick(change.lineNumber, "new");
-        } else if (change.type === "delete") {
-          onLineClick(change.lineNumber, "old");
-        } else if (change.type === "normal") {
-          onLineClick(change.newLineNumber, "new");
-        }
+        if (change.type === "insert") onLineClick(change.lineNumber, "new");
+        else if (change.type === "delete") onLineClick(change.lineNumber, "old");
+        else if (change.type === "normal") onLineClick(change.newLineNumber, "new");
       },
     }),
     [onLineClick],
   );
 
-  // Scroll to top when diff changes
+  // Custom token renderer that injects Shiki-highlighted HTML
+  const renderToken = useMemo(() => {
+    if (lineHtml.size === 0) return undefined;
+
+    return (
+      token: { value: string; className: string; children?: React.ReactNode },
+      defaultRender: (token: { value: string; className: string }) => React.ReactNode,
+      i: number,
+    ) => {
+      // Only apply to the code content tokens (not gutter, not edit markers)
+      const highlighted = lineHtml.get(token.value);
+      if (highlighted && !token.className?.includes("diff-code-edit")) {
+        return (
+          <span
+            key={i}
+            className={token.className}
+            dangerouslySetInnerHTML={{ __html: highlighted }}
+          />
+        );
+      }
+      return defaultRender(token);
+    };
+  }, [lineHtml]);
+
   useEffect(() => {
     containerRef.current?.scrollTo(0, 0);
   }, [diff.Path]);
@@ -259,9 +319,7 @@ export function DiffView({
     h.Lines.every((l) => l.Kind === "added"),
   )
     ? "add"
-    : diff.Hunks.every((h) =>
-          h.Lines.every((l) => l.Kind === "removed"),
-        )
+    : diff.Hunks.every((h) => h.Lines.every((l) => l.Kind === "removed"))
       ? "delete"
       : "modify";
 
@@ -270,7 +328,6 @@ export function DiffView({
       ref={containerRef}
       className={`h-full overflow-auto selectable ${focused ? "" : "opacity-90"}`}
     >
-      {/* File header */}
       <div className="sticky top-0 z-10 bg-card border-b border-border px-4 py-1.5 text-xs text-muted-foreground flex items-center gap-2">
         <span className="text-foreground font-medium">{diff.Path}</span>
         <span>
@@ -288,7 +345,7 @@ export function DiffView({
         diffType={diffType}
         hunks={file.hunks}
         widgets={widgets}
-        tokens={tokens ?? undefined}
+        renderToken={renderToken as any}
         gutterEvents={gutterEvents as any}
       >
         {(hunks) =>
