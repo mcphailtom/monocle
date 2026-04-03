@@ -6,12 +6,18 @@ import type { RecentProject } from "../types";
 
 interface ProjectPickerProps {
   onSelect: (path: string) => void;
+  error: string | null;
 }
 
-export function ProjectPicker({ onSelect }: ProjectPickerProps) {
+export function ProjectPicker({ onSelect, error }: ProjectPickerProps) {
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [selecting, setSelecting] = useState(false);
+
+  // Reset selecting state when an error comes back
+  useEffect(() => {
+    if (error) setSelecting(false);
+  }, [error]);
 
   useEffect(() => {
     async function load() {
@@ -81,6 +87,13 @@ export function ProjectPicker({ onSelect }: ProjectPickerProps) {
             Select a project to review
           </p>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mb-4 px-3 py-2 rounded border border-destructive/50 bg-destructive/10 text-destructive text-xs">
+            {error}
+          </div>
+        )}
 
         {/* Open folder button */}
         <Button
