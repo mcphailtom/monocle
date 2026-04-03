@@ -201,7 +201,7 @@ const COMMENT_TYPE_STYLES: Record<CommentType, { label: string; base: string; fo
 
 // --- Suggestion diff parsing ---
 
-const SUGGESTION_RE = /^```suggestion\n([\s\S]*?)\n```$/;
+const SUGGESTION_RE = /^```suggestion\n([\s\S]*?)\n?```$/;
 
 function parseSuggestion(body: string): string | null {
   const match = body.match(SUGGESTION_RE);
@@ -711,10 +711,10 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     );
 
     // Selected change keys for highlight (single line or visual range)
+    const isCommentFocused = focusedCommentId !== null;
     const selectedChanges = useMemo(() => {
       if (allChanges.length === 0) return [];
-      // Don't highlight a code line when a comment is focused
-      if (focusedCommentId) return [];
+      if (isCommentFocused) return [];
       if (visualMode) {
         const lo = Math.min(visualAnchor, cursorIndex);
         const hi = Math.max(visualAnchor, cursorIndex);
@@ -727,7 +727,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       const change = allChanges[cursorIndex];
       if (!change) return [];
       return [getChangeKey(change)];
-    }, [allChanges, cursorIndex, visualMode, visualAnchor, focusedCommentId]);
+    }, [allChanges, cursorIndex, visualMode, visualAnchor, isCommentFocused]);
 
     // Structural tokens (no syntax highlight — just gives renderToken something to work with)
     const tokens = useMemo((): HunkTokens | null => {
@@ -873,9 +873,9 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
         </div>
 
         {/* File-level comments (LineStart === 0) */}
-        {comments.some((c) => c.LineStart === 0) && (
+        {commentsByChangeIdx.get(-1) && (
           <CommentWidget
-            comments={comments.filter((c) => c.LineStart === 0)}
+            comments={commentsByChangeIdx.get(-1)!}
             focusedId={focusedCommentId}
             lineContentMap={lineContentMap}
             onClick={onCommentClick}
