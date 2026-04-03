@@ -8,6 +8,7 @@ import { CommentEditor } from "./components/CommentEditor";
 import { ReviewSubmitDialog } from "./components/ReviewSubmitDialog";
 import { HelpDialog } from "./components/HelpDialog";
 import { CommandPalette } from "./components/CommandPalette";
+import { ProjectPicker } from "./components/ProjectPicker";
 import { useKeyboard } from "./hooks/useKeyboard";
 import type {
   ReviewSession,
@@ -25,6 +26,25 @@ import type { ViewType } from "react-diff-view";
 type FocusTarget = "sidebar" | "main";
 
 function App() {
+  const [projectPath, setProjectPath] = useState<string | null>(null);
+
+  const handleSelectProject = useCallback(async (path: string) => {
+    try {
+      await api.selectProject(path);
+      setProjectPath(path);
+    } catch (err) {
+      console.error("Failed to select project:", err);
+    }
+  }, []);
+
+  if (!projectPath) {
+    return <ProjectPicker onSelect={handleSelectProject} />;
+  }
+
+  return <ReviewUI />;
+}
+
+function ReviewUI() {
   // --- State ---
   const [session, setSession] = useState<ReviewSession | null>(null);
   const [files, setFiles] = useState<ChangedFile[]>([]);

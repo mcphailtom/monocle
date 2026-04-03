@@ -14,6 +14,7 @@ import type {
   LogEntry,
   SubmitResult,
   Config,
+  RecentProject,
   FileChangedEvent,
   FeedbackStatusChangedEvent,
   ContentItemAddedEvent,
@@ -29,6 +30,11 @@ declare global {
     go: {
       desktop: {
         App: {
+          // Project selection
+          GetRecentProjects(): Promise<RecentProject[]>;
+          OpenDirectoryDialog(): Promise<string>;
+          SelectProject(projectPath: string): Promise<void>;
+
           // Session
           GetSession(): Promise<ReviewSession | null>;
           ListSessions(repoRoot: string, limit: number): Promise<SessionSummary[]>;
@@ -116,6 +122,11 @@ const app = () => window.go.desktop.App;
 // --- API ---
 
 export const api = {
+  // Project selection
+  getRecentProjects: () => app().GetRecentProjects(),
+  openDirectoryDialog: () => app().OpenDirectoryDialog(),
+  selectProject: (path: string) => app().SelectProject(path),
+
   // Session
   getSession: () => app().GetSession(),
   listSessions: (repoRoot: string, limit: number) =>

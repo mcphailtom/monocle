@@ -164,6 +164,15 @@ export interface SubmitResult {
   AgentConnected: boolean;
 }
 
+// --- Project picker ---
+
+export interface RecentProject {
+  path: string;
+  name: string;
+  session_count: number;
+  last_opened: string;
+}
+
 // --- Event payloads ---
 
 export interface FileChangedEvent {
