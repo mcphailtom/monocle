@@ -198,13 +198,49 @@ const COMMENT_TYPE_STYLES: Record<CommentType, { label: string; base: string; fo
   praise: { label: "Praise", base: "bg-comment-praise/20 border-comment-praise/40 text-comment-praise", focused: "bg-comment-praise/50 border-comment-praise text-comment-praise" },
 };
 
+// --- Suggestion diff parsing ---
+
+const SUGGESTION_RE = /^```suggestion\n([\s\S]*?)\n```$/;
+
+function parseSuggestion(body: string): string | null {
+  const match = body.match(SUGGESTION_RE);
+  return match ? match[1] : null;
+}
+
+function SuggestionDiff({
+  original,
+  suggested,
+}: {
+  original: string[];
+  suggested: string[];
+}) {
+  return (
+    <div className="font-mono text-[11px] rounded overflow-hidden border border-border/50 mt-1">
+      {original.map((line, i) => (
+        <div key={`old-${i}`} className="bg-diff-removed-bg text-diff-removed px-2 py-0 whitespace-pre">
+          <span className="text-diff-removed/60 select-none mr-2">-</span>{line}
+        </div>
+      ))}
+      {suggested.map((line, i) => (
+        <div key={`new-${i}`} className="bg-diff-added-bg text-diff-added px-2 py-0 whitespace-pre">
+          <span className="text-diff-added/60 select-none mr-2">+</span>{line}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// --- Comment widget ---
+
 function CommentWidget({
   comments,
   focusedId,
+  lineContentMap,
   onClick,
 }: {
   comments: ReviewComment[];
   focusedId?: string | null;
+  lineContentMap?: Map<number, string>;
   onClick?: (c: ReviewComment) => void;
 }) {
   return (
@@ -212,6 +248,19 @@ function CommentWidget({
       {comments.map((comment) => {
         const style = COMMENT_TYPE_STYLES[comment.Type] ?? COMMENT_TYPE_STYLES.note;
         const isFocused = focusedId === comment.ID;
+        const suggestedText = comment.Type === "suggestion" ? parseSuggestion(comment.Body) : null;
+
+        // Build original lines from the line range
+        let originalLines: string[] = [];
+        if (suggestedText !== null && lineContentMap) {
+          const lo = comment.LineStart;
+          const hi = comment.LineEnd || comment.LineStart;
+          for (let line = lo; line <= hi; line++) {
+            const content = lineContentMap.get(line);
+            if (content !== undefined) originalLines.push(content);
+          }
+        }
+
         return (
           <div
             key={comment.ID}
@@ -220,7 +269,14 @@ function CommentWidget({
             onClick={() => onClick?.(comment)}
           >
             <span className="font-bold mr-2">{style.label}</span>
-            <span className="text-foreground font-sans">{comment.Body}</span>
+            {suggestedText !== null ? (
+              <SuggestionDiff
+                original={originalLines}
+                suggested={suggestedText.split("\n")}
+              />
+            ) : (
+              <span className="text-foreground font-sans">{comment.Body}</span>
+            )}
           </div>
         );
       })}
@@ -678,6 +734,17 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       }
     }, [file]);
 
+    // Map new-side line numbers to their content (for suggestion diffs)
+    const lineContentMap = useMemo(() => {
+      const map = new Map<number, string>();
+      for (const change of allChanges) {
+        if (change.type !== "delete") {
+          map.set(changeLineNumber(change), change.content);
+        }
+      }
+      return map;
+    }, [allChanges]);
+
     // Build widgets map
     const widgets = useMemo(() => {
       if (!file || comments.length === 0) return {};
@@ -703,6 +770,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
               <CommentWidget
                 comments={commentsByLine.get(lineNum)!}
                 focusedId={focusedCommentId}
+                lineContentMap={lineContentMap}
                 onClick={onCommentClick}
               />
             );
@@ -710,7 +778,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
         }
       }
       return widgetMap;
-    }, [file, comments, focusedCommentId, onCommentClick]);
+    }, [file, comments, focusedCommentId, lineContentMap, onCommentClick]);
 
     // Gutter click handler
     const gutterEvents = useMemo(
@@ -802,6 +870,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
           <CommentWidget
             comments={comments.filter((c) => c.LineStart === 0)}
             focusedId={focusedCommentId}
+            lineContentMap={lineContentMap}
             onClick={onCommentClick}
           />
         )}
