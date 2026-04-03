@@ -4,15 +4,17 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/josephschmitt/monocle/internal/adapters"
 	"github.com/josephschmitt/monocle/internal/core"
 	"github.com/josephschmitt/monocle/internal/db"
 	"github.com/josephschmitt/monocle/internal/types"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App exposes EngineAPI methods to the Wails frontend via auto-generated bindings.
-// Engine initialization happens in startup(), called by Wails OnStartup.
+// Engine init is deferred until the user picks a project via SelectProject().
 type App struct {
 	ctx      context.Context
 	engine   core.EngineAPI
@@ -20,50 +22,109 @@ type App struct {
 }
 
 // startup is called by Wails when the application starts.
-// All engine initialization happens here, not in main(), because
-// Wails runs the binary during binding generation.
+// Only opens the database — engine init waits for SelectProject().
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
-	// Load config
-	cfg, err := core.LoadConfig()
-	if err != nil {
-		cfg = core.DefaultConfig()
-	}
-
-	// Open database
 	database, err := db.Open(db.DBPath())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
 		return
 	}
 	a.database = database
+}
 
-	// Get repo root
-	repoRoot, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting cwd: %v\n", err)
-		return
+// shutdown is called by Wails when the application is closing.
+func (a *App) shutdown(_ context.Context) {
+	if a.engine != nil {
+		a.engine.Shutdown()
 	}
-	repoRoot = adapters.FindRepoRoot(repoRoot)
+	if a.database != nil {
+		a.database.Close()
+	}
+}
+
+// --- Project selection (before engine is initialized) ---
+
+// RecentProject represents a project the user has previously reviewed.
+type RecentProject struct {
+	Path         string `json:"path"`
+	Name         string `json:"name"`
+	SessionCount int    `json:"session_count"`
+	LastOpened   string `json:"last_opened"`
+}
+
+// GetRecentProjects returns distinct repo roots from past sessions, most recent first.
+func (a *App) GetRecentProjects() ([]RecentProject, error) {
+	if a.database == nil {
+		return nil, nil
+	}
+
+	sessions, err := a.database.ListSessions("", 100)
+	if err != nil {
+		return nil, err
+	}
+
+	// Deduplicate by repo root, keeping the most recent and counting sessions
+	seen := map[string]*RecentProject{}
+	var order []string
+	for _, s := range sessions {
+		if p, ok := seen[s.RepoRoot]; ok {
+			p.SessionCount++
+		} else {
+			seen[s.RepoRoot] = &RecentProject{
+				Path:         s.RepoRoot,
+				Name:         filepath.Base(s.RepoRoot),
+				SessionCount: 1,
+				LastOpened:   s.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			}
+			order = append(order, s.RepoRoot)
+		}
+	}
+
+	result := make([]RecentProject, 0, len(order))
+	for _, path := range order {
+		result = append(result, *seen[path])
+	}
+	return result, nil
+}
+
+// OpenDirectoryDialog opens a native OS directory picker and returns the selected path.
+func (a *App) OpenDirectoryDialog() (string, error) {
+	return wailsRuntime.OpenDirectoryDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Select Project Directory",
+	})
+}
+
+// SelectProject initializes the engine for the given project directory.
+// Call this after the user picks a project from the picker or directory dialog.
+func (a *App) SelectProject(projectPath string) error {
+	// Shut down existing engine if switching projects
+	if a.engine != nil {
+		a.engine.Shutdown()
+		a.engine = nil
+	}
+
+	repoRoot := adapters.FindRepoRoot(projectPath)
 	nonGitMode := !adapters.IsGitRepo(repoRoot)
 
-	// Create engine
-	engine, err := core.NewEngine(cfg, database, repoRoot, nonGitMode)
+	cfg, err := core.LoadConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating engine: %v\n", err)
-		return
+		cfg = core.DefaultConfig()
+	}
+
+	engine, err := core.NewEngine(cfg, a.database, repoRoot, nonGitMode)
+	if err != nil {
+		return fmt.Errorf("create engine: %w", err)
 	}
 	a.engine = engine
 
 	// Start a new session
-	opts := core.SessionOptions{
+	if _, err := engine.StartSession(core.SessionOptions{
 		Agent:    "claude",
 		RepoRoot: repoRoot,
-	}
-	if _, err := engine.StartSession(opts); err != nil {
-		fmt.Fprintf(os.Stderr, "Error starting session: %v\n", err)
-		return
+	}); err != nil {
+		return fmt.Errorf("start session: %w", err)
 	}
 
 	// Start socket server for agent communication
@@ -76,17 +137,9 @@ func (a *App) startup(ctx context.Context) {
 	}
 
 	// Bridge engine events to Wails
-	bridgeEngineEvents(engine, ctx)
-}
+	bridgeEngineEvents(engine, a.ctx)
 
-// shutdown is called by Wails when the application is closing.
-func (a *App) shutdown(_ context.Context) {
-	if a.engine != nil {
-		a.engine.Shutdown()
-	}
-	if a.database != nil {
-		a.database.Close()
-	}
+	return nil
 }
 
 // --- Session lifecycle ---
