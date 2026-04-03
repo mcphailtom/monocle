@@ -25,7 +25,7 @@ const SECTIONS = [
       ["^", "Scroll to column 0"],
       ["$", "Scroll to line end"],
       ["[ / ]", "Previous / next file"],
-      ["{ / }", "Previous / next sidebar section"],
+      ["{ / }", "Previous / next comment (diff) or section (sidebar)"],
       ["Enter", "Focus diff pane / toggle directory"],
       ["Tab", "Switch focus between sidebar and main pane"],
       ["\\", "Toggle sidebar"],
