@@ -446,14 +446,18 @@ function SidebarRow({
         </span>
       )}
       <span className={`truncate ${item.kind === "file" || item.kind === "tree-file" || item.kind === "additional" ? "font-mono" : ""}`}>{label}</span>
-      {status && (
-        <span className={`ml-auto text-[10px] font-mono shrink-0 ${STATUS_COLORS[status]}`}>
-          {STATUS_LABELS[status]}
-        </span>
-      )}
-      {reviewed && (
-        <span className="ml-auto text-[10px] text-ctp-green shrink-0">
-          ✓
+      {(status || reviewed) && (
+        <span className="ml-auto flex items-center gap-2 shrink-0">
+          {status && (
+            <span className={`text-[10px] font-mono ${STATUS_COLORS[status]}`}>
+              {STATUS_LABELS[status]}
+            </span>
+          )}
+          {reviewed && (
+            <span className="text-[10px] text-ctp-green">
+              ✓
+            </span>
+          )}
         </span>
       )}
     </div>
