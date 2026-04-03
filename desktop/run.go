@@ -4,6 +4,8 @@ import (
 	"embed"
 
 	wails "github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 )
@@ -18,12 +20,24 @@ var assets embed.FS
 func Run() error {
 	app := &App{}
 
+	// Native menu bar
+	appMenu := menu.NewMenu()
+	appMenu.Append(menu.AppMenu()) // macOS standard app menu (About, Preferences, Quit, etc.)
+
+	fileMenu := appMenu.AddSubmenu("File")
+	fileMenu.AddText("Open Project...", keys.CmdOrCtrl("o"), func(_ *menu.CallbackData) {
+		go app.openProjectFromMenu()
+	})
+
+	appMenu.Append(menu.EditMenu()) // Standard Edit menu (Undo, Cut, Copy, Paste, etc.)
+
 	return wails.Run(&options.App{
 		Title:    "Monocle",
 		Width:    1280,
 		Height:   800,
 		MinWidth: 800,
 		MinHeight: 600,
+		Menu:     appMenu,
 		BackgroundColour: &options.RGBA{R: 30, G: 30, B: 46, A: 1},
 		AssetServer: &assetserver.Options{
 			Assets: assets,
