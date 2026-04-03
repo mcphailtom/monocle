@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "react-diff-view/style/index.css";
+@import "@azurity/pure-nerd-font/pure-nerd-font.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -65,7 +66,7 @@
 @theme inline {
   --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  --font-icon: "Symbols Nerd Font Mono", "Symbols Nerd Font", "MesloLGS Nerd Font Mono", "MesloLGS NF", "Monaco Nerd Font Mono", "Monaco Nerd Font", "Hack Nerd Font Mono", "FiraCode Nerd Font Mono", "JetBrainsMono Nerd Font", ui-monospace, monospace;
+  --font-icon: "PureNerdFont", monospace;
   --font-heading: "Instrument Serif", Georgia, serif;
   --font-serif: "Instrument Serif", Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
