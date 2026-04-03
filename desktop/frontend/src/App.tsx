@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from "react";
 import { api, onEvent } from "./api";
 import { Sidebar, type SidebarItem } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
+import { DiffView } from "./components/DiffView";
+import { ContentView } from "./components/ContentView";
 import { useKeyboard } from "./hooks/useKeyboard";
 import type {
   ReviewSession,
@@ -10,6 +12,7 @@ import type {
   AdditionalFile,
   DiffResult,
 } from "./types";
+import type { ViewType } from "react-diff-view";
 
 type FocusTarget = "sidebar" | "main";
 
@@ -30,6 +33,8 @@ function App() {
   const [treeMode, setTreeMode] = useState(false);
   const [subscriberCount, setSubscriberCount] = useState(0);
   const [feedbackStatus, setFeedbackStatus] = useState("");
+  const [viewType, setViewType] = useState<ViewType>("unified");
+  const [contentTitle, setContentTitle] = useState("");
 
   // --- Data loading ---
 
@@ -70,6 +75,7 @@ function App() {
   const loadContentItem = useCallback(async (id: string) => {
     try {
       const item = await api.getContentItem(id);
+      setContentTitle(item?.Title ?? "");
       if (item?.PreviousContent) {
         const d = await api.getContentDiff(id);
         setDiff(d);
@@ -81,6 +87,7 @@ function App() {
     } catch {
       setDiff(null);
       setFileContent(null);
+      setContentTitle("");
     }
   }, []);
 
@@ -240,6 +247,14 @@ function App() {
       handler: () =>
         setSidebarCursor((c) => Math.min(c + 1, getTotalItems() - 1)),
     },
+
+    // Diff view controls (when main pane focused)
+    {
+      key: "t",
+      handler: () =>
+        setViewType((v) => (v === "unified" ? "split" : "unified")),
+      when: () => focus === "main",
+    },
   ]);
 
   function getTotalItems(): number {
@@ -282,9 +297,21 @@ function App() {
           }`}
         >
           {diff ? (
-            <DiffPlaceholder diff={diff} />
+            <DiffView
+              diff={diff}
+              comments={
+                session?.Comments?.filter(
+                  (c) => c.TargetRef === (selectedPath || selectedContentId),
+                ) ?? []
+              }
+              viewType={viewType}
+              focused={focus === "main"}
+            />
           ) : fileContent !== null ? (
-            <ContentPlaceholder content={fileContent} />
+            <ContentView
+              content={fileContent}
+              title={contentTitle || undefined}
+            />
           ) : (
             <div className="flex h-full items-center justify-center text-muted-foreground">
               <div className="text-center">
@@ -308,58 +335,6 @@ function App() {
         feedbackStatus={feedbackStatus}
         selectedFile={selectedPath || selectedContentId}
       />
-    </div>
-  );
-}
-
-// Temporary placeholders — replaced in Phase 3
-function DiffPlaceholder({ diff }: { diff: DiffResult }) {
-  const totalLines = diff.Hunks.reduce((sum, h) => sum + h.Lines.length, 0);
-  return (
-    <div className="p-4">
-      <div className="text-sm text-muted-foreground mb-2">
-        {diff.Path} &middot; {diff.Hunks.length} hunk
-        {diff.Hunks.length !== 1 ? "s" : ""} &middot; {totalLines} lines
-      </div>
-      <div className="font-mono text-xs selectable">
-        {diff.Hunks.map((hunk, hi) => (
-          <div key={hi} className="mb-4">
-            <div className="text-diff-hunk opacity-60">{hunk.Header}</div>
-            {hunk.Lines.map((line, li) => (
-              <div
-                key={li}
-                className={
-                  line.Kind === "added"
-                    ? "text-diff-added bg-diff-added-bg"
-                    : line.Kind === "removed"
-                      ? "text-diff-removed bg-diff-removed-bg"
-                      : "text-foreground"
-                }
-              >
-                <span className="inline-block w-16 text-right text-muted-foreground/40 select-none pr-2">
-                  {line.OldLineNum > 0 ? line.OldLineNum : " "}
-                  {" "}
-                  {line.NewLineNum > 0 ? line.NewLineNum : " "}
-                </span>
-                <span className="select-none">
-                  {line.Kind === "added" ? "+" : line.Kind === "removed" ? "-" : " "}
-                </span>
-                {line.Content}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ContentPlaceholder({ content }: { content: string }) {
-  return (
-    <div className="p-4">
-      <pre className="font-mono text-xs text-foreground whitespace-pre-wrap selectable">
-        {content}
-      </pre>
     </div>
   );
 }
