@@ -514,22 +514,35 @@ function ReviewUI() {
       handler: () => diffViewRef.current?.moveCursor(-1),
       when: () => focus === "main",
     },
-    // Diff scrolling (Shift+J/K)
+    // Diff scrolling (Shift+J/K — works from any pane)
     {
       key: "shift+j",
       handler: () => diffViewRef.current?.scroll(1),
-      when: () => focus === "main",
     },
     {
       key: "shift+k",
       handler: () => diffViewRef.current?.scroll(-1),
-      when: () => focus === "main",
+    },
+
+    // Visual selection mode
+    {
+      key: "v",
+      handler: () => diffViewRef.current?.toggleVisualMode(),
+      when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
     },
 
     // Commenting (when main pane focused, no dialog open)
     {
       key: "c",
-      handler: () => openCommentEditor(diffViewRef.current?.getCursorLine() ?? 1),
+      handler: () => {
+        const range = diffViewRef.current?.getSelectionRange();
+        if (range) {
+          openCommentEditor(range.start, range.end);
+          diffViewRef.current?.exitVisualMode();
+        } else {
+          openCommentEditor(diffViewRef.current?.getCursorLine() ?? 1);
+        }
+      },
       when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
     },
 
@@ -566,8 +579,9 @@ function ReviewUI() {
       handler: () => {
         if (helpOpen) setHelpOpen(false);
         else if (commandPaletteOpen) setCommandPaletteOpen(false);
+        else if (diffViewRef.current?.isVisualMode()) diffViewRef.current.exitVisualMode();
       },
-      when: () => helpOpen || commandPaletteOpen,
+      when: () => helpOpen || commandPaletteOpen || (diffViewRef.current?.isVisualMode() ?? false),
     },
   ]);
 
@@ -579,20 +593,22 @@ function ReviewUI() {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         {!sidebarHidden && (
-          <Sidebar
-            files={files}
-            contentItems={contentItems}
-            additionalFiles={additionalFiles}
-            selectedPath={selectedPath}
-            selectedContentId={selectedContentId}
-            focused={focus === "sidebar"}
-            cursor={sidebarCursor}
-            reviewFilter={reviewFilter}
-            treeMode={treeMode}
-            onSelect={handleSidebarSelect}
-            onCursorChange={setSidebarCursor}
-            onItemsChange={handleSidebarItems}
-          />
+          <div className="flex" onClick={() => setFocus("sidebar")}>
+            <Sidebar
+              files={files}
+              contentItems={contentItems}
+              additionalFiles={additionalFiles}
+              selectedPath={selectedPath}
+              selectedContentId={selectedContentId}
+              focused={focus === "sidebar"}
+              cursor={sidebarCursor}
+              reviewFilter={reviewFilter}
+              treeMode={treeMode}
+              onSelect={handleSidebarSelect}
+              onCursorChange={setSidebarCursor}
+              onItemsChange={handleSidebarItems}
+            />
+          </div>
         )}
 
         {/* Main pane */}
@@ -600,6 +616,7 @@ function ReviewUI() {
           className={`flex-1 overflow-auto border-r ${
             focus === "main" ? "border-primary" : "border-transparent"
           }`}
+          onClick={() => setFocus("main")}
         >
           {diff ? (
             <DiffView
@@ -612,6 +629,7 @@ function ReviewUI() {
               }
               viewType={viewType}
               focused={focus === "main"}
+              onFocus={() => setFocus("main")}
               onLineClick={(lineNum) => openCommentEditor(lineNum)}
               onCommentClick={handleEditComment}
             />
