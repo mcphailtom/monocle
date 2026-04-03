@@ -429,11 +429,9 @@ function SidebarRow({
     <div
       ref={setRef}
       className={`flex items-center gap-1 px-3 py-0.5 cursor-pointer text-[13px] truncate transition-colors duration-150 ${
-        isActive
+        isActive || isCursor
           ? "bg-accent text-accent-foreground"
-          : isCursor
-            ? "bg-secondary text-secondary-foreground"
-            : "text-foreground hover:bg-secondary/50"
+          : "text-foreground hover:bg-secondary/50"
       } ${reviewed ? "opacity-50" : ""}`}
       style={{ paddingLeft: `${12 + indent}px` }}
       onClick={() => onClick(index)}
