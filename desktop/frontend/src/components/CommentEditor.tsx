@@ -155,7 +155,7 @@ export function CommentEditor({
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Write your comment..."
-          className="min-h-[120px] text-sm"
+          className="min-h-[120px] text-sm font-mono"
         />
 
         <DialogFooter>
