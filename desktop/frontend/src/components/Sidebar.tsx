@@ -37,6 +37,7 @@ interface SidebarProps {
   treeMode: boolean;
   onSelect: (item: SidebarItem) => void;
   onCursorChange: (cursor: number) => void;
+  onItemsChange?: (items: SidebarItem[]) => void;
 }
 
 // --- Helpers ---
@@ -132,6 +133,7 @@ export function Sidebar({
   treeMode,
   onSelect,
   onCursorChange,
+  onItemsChange,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -202,6 +204,11 @@ export function Sidebar({
 
     return result;
   }, [filteredContent, filteredFiles, filteredAdditional, treeMode, tree, collapsed]);
+
+  // Notify parent when items change so keyboard nav can resolve cursor → item
+  useEffect(() => {
+    onItemsChange?.(items);
+  }, [items, onItemsChange]);
 
   // Scroll active item into view
   useEffect(() => {
