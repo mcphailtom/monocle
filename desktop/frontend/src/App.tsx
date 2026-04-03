@@ -101,7 +101,7 @@ function ReviewUI() {
     lineEnd: number;
   } | null>(null);
   const [editingComment, setEditingComment] = useState<ReviewComment | null>(null);
-  const [suggestionMode, setSuggestionMode] = useState(false);
+  const [suggestionBody, setSuggestionBody] = useState("");
 
   // Review submit state
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
@@ -206,7 +206,7 @@ function ReviewUI() {
 
       setCommentTarget({ targetType, targetRef, lineStart, lineEnd: lineEnd || lineStart });
       setEditingComment(null);
-      setSuggestionMode(false);
+      setSuggestionBody("");
       setCommentEditorOpen(true);
     },
     [selectedPath, selectedContentId],
@@ -305,15 +305,15 @@ function ReviewUI() {
   }, [refreshStatus]);
 
   const openSuggestionEditor = useCallback(
-    (lineStart: number, lineEnd: number = 0) => {
+    (lineStart: number, lineEnd: number = 0, content: string = "") => {
       const targetType: TargetType = selectedContentId ? "content" : "file";
       const targetRef = selectedContentId || selectedPath;
       if (!targetRef) return;
 
       setCommentTarget({ targetType, targetRef, lineStart, lineEnd: lineEnd || lineStart });
       setEditingComment(null);
+      setSuggestionBody("```suggestion\n" + content + "\n```");
       setCommentEditorOpen(true);
-      setSuggestionMode(true);
     },
     [selectedPath, selectedContentId],
   );
@@ -711,16 +711,17 @@ function ReviewUI() {
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Suggestion editing (s key — like c but pre-sets suggestion type)
+    // Suggestion editing (s key — like c but pre-sets suggestion type with line content)
     {
       key: "s",
       handler: () => {
+        const content = diffViewRef.current?.getSelectedContent() ?? "";
         const range = diffViewRef.current?.getSelectionRange();
         if (range) {
-          openSuggestionEditor(range.start, range.end);
+          openSuggestionEditor(range.start, range.end, content);
           diffViewRef.current?.exitVisualMode();
         } else {
-          openSuggestionEditor(diffViewRef.current?.getCursorLine() ?? 1);
+          openSuggestionEditor(diffViewRef.current?.getCursorLine() ?? 1, 0, content);
         }
       },
       when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
@@ -985,11 +986,11 @@ function ReviewUI() {
       {/* Comment editor dialog */}
       <CommentEditor
         open={commentEditorOpen}
-        onClose={() => { setCommentEditorOpen(false); setSuggestionMode(false); }}
+        onClose={() => { setCommentEditorOpen(false); setSuggestionBody(""); }}
         onSave={handleSaveComment}
         editingComment={editingComment}
-        initialType={suggestionMode ? "suggestion" : undefined}
-        initialBody={suggestionMode ? "```suggestion\n\n```" : undefined}
+        initialType={suggestionBody ? "suggestion" : undefined}
+        initialBody={suggestionBody || undefined}
         targetLabel={commentTarget?.targetRef ?? ""}
         lineStart={commentTarget?.lineStart ?? 0}
         lineEnd={commentTarget?.lineEnd ?? 0}
