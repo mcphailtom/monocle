@@ -451,9 +451,9 @@ function SidebarRow({
         </span>
       )}
       <span className={`truncate ${item.kind === "file" || item.kind === "tree-file" || item.kind === "additional" ? "font-mono" : ""}`}>{label}</span>
-      {reviewed && (
-        <span className="ml-auto text-[10px] text-ctp-green shrink-0">
-          ✓
+      {item.kind !== "dir" && (
+        <span className={`ml-auto text-[10px] shrink-0 ${reviewed ? "text-ctp-green" : "text-muted-foreground/40"}`}>
+          {reviewed ? "✓" : "○"}
         </span>
       )}
     </div>
