@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,8 @@ import (
 	"github.com/josephschmitt/monocle/internal/types"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+var errNoEngine = errors.New("no project selected")
 
 // App exposes EngineAPI methods to the Wails frontend via auto-generated bindings.
 // Engine init is deferred until the user picks a project via SelectProject().
@@ -232,7 +235,7 @@ func (a *App) GetAdditionalFileContent(absPath string) (string, error) {
 
 func (a *App) AddComment(targetType string, targetRef string, lineStart int, lineEnd int, commentType string, body string) (*types.ReviewComment, error) {
 	if a.engine == nil {
-		return nil, fmt.Errorf("engine not initialized")
+		return nil, errNoEngine
 	}
 	return a.engine.AddComment(
 		core.CommentTarget{
@@ -248,35 +251,35 @@ func (a *App) AddComment(targetType string, targetRef string, lineStart int, lin
 
 func (a *App) EditComment(commentID string, commentType string, body string) (*types.ReviewComment, error) {
 	if a.engine == nil {
-		return nil, fmt.Errorf("engine not initialized")
+		return nil, errNoEngine
 	}
 	return a.engine.EditComment(commentID, types.CommentType(commentType), body)
 }
 
 func (a *App) DeleteComment(commentID string) error {
 	if a.engine == nil {
-		return nil
+		return errNoEngine
 	}
 	return a.engine.DeleteComment(commentID)
 }
 
 func (a *App) ResolveComment(commentID string) error {
 	if a.engine == nil {
-		return nil
+		return errNoEngine
 	}
 	return a.engine.ResolveComment(commentID)
 }
 
 func (a *App) ClearComments() error {
 	if a.engine == nil {
-		return nil
+		return errNoEngine
 	}
 	return a.engine.ClearComments()
 }
 
 func (a *App) ClearReview() error {
 	if a.engine == nil {
-		return nil
+		return errNoEngine
 	}
 	return a.engine.ClearReview()
 }
@@ -285,42 +288,42 @@ func (a *App) ClearReview() error {
 
 func (a *App) MarkReviewed(path string) error {
 	if a.engine == nil {
-		return nil
+		return errNoEngine
 	}
 	return a.engine.MarkReviewed(path)
 }
 
 func (a *App) UnmarkReviewed(path string) error {
 	if a.engine == nil {
-		return nil
+		return errNoEngine
 	}
 	return a.engine.UnmarkReviewed(path)
 }
 
 func (a *App) MarkContentReviewed(id string) error {
 	if a.engine == nil {
-		return nil
+		return errNoEngine
 	}
 	return a.engine.MarkContentReviewed(id)
 }
 
 func (a *App) UnmarkContentReviewed(id string) error {
 	if a.engine == nil {
-		return nil
+		return errNoEngine
 	}
 	return a.engine.UnmarkContentReviewed(id)
 }
 
 func (a *App) ResetAllReviewed() error {
 	if a.engine == nil {
-		return nil
+		return errNoEngine
 	}
 	return a.engine.ResetAllReviewed()
 }
 
 func (a *App) MarkAllReviewed() error {
 	if a.engine == nil {
-		return nil
+		return errNoEngine
 	}
 	return a.engine.MarkAllReviewed()
 }
@@ -336,7 +339,7 @@ func (a *App) GetReviewSummary() (*types.ReviewSummary, error) {
 
 func (a *App) Submit(action string, body string) (*core.SubmitResult, error) {
 	if a.engine == nil {
-		return nil, fmt.Errorf("engine not initialized")
+		return nil, errNoEngine
 	}
 	return a.engine.Submit(types.SubmitAction(action), body)
 }
@@ -359,7 +362,7 @@ func (a *App) GetSubmissions() ([]types.ReviewSubmission, error) {
 
 func (a *App) SetBaseRef(ref string) error {
 	if a.engine == nil {
-		return nil
+		return errNoEngine
 	}
 	return a.engine.SetBaseRef(ref)
 }

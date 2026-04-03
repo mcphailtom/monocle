@@ -157,7 +157,7 @@ function useShikiHighlight(diff: DiffResult) {
     });
 
     return () => { cancelled = true; };
-  }, [diff]);
+  }, [diff.Path, diff.Hunks]);
 
   return lineHtml;
 }
