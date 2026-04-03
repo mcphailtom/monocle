@@ -166,6 +166,37 @@ html, body, #root {
   user-select: text;
 }
 
+/* Syntax highlighting tokens (Catppuccin Mocha) — used by refractor/Prism via react-diff-view */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata { color: #6c7086; font-style: italic; }
+.token.punctuation { color: #bac2de; }
+.token.property,
+.token.tag,
+.token.constant,
+.token.symbol,
+.token.deleted { color: #f38ba8; }
+.token.boolean,
+.token.number { color: #fab387; }
+.token.selector,
+.token.attr-name,
+.token.string,
+.token.char,
+.token.builtin,
+.token.inserted { color: #a6e3a1; }
+.token.operator,
+.token.entity,
+.token.url { color: #94e2d5; }
+.token.atrule,
+.token.attr-value,
+.token.function,
+.token.class-name { color: #89b4fa; }
+.token.keyword { color: #cba6f7; }
+.token.regex,
+.token.important,
+.token.variable { color: #f9e2af; }
+
 /* react-diff-view Catppuccin Mocha dark theme overrides */
 :root {
   --diff-background-color: var(--background);

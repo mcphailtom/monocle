@@ -15,7 +15,38 @@ import type {
   HunkTokens,
 } from "react-diff-view";
 // CSS imported in index.css to control load order
+import { refractor } from "refractor";
 import type { DiffResult, ReviewComment, CommentType } from "../types";
+
+// --- Language detection from file extension ---
+
+const EXT_TO_LANG: Record<string, string> = {
+  ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx",
+  go: "go", rs: "rust", py: "python", rb: "ruby",
+  java: "java", kt: "kotlin", swift: "swift",
+  c: "c", h: "c", cpp: "cpp", hpp: "cpp", cc: "cpp",
+  cs: "csharp", css: "css", scss: "scss", less: "less",
+  html: "markup", htm: "markup", xml: "markup", svg: "markup",
+  json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
+  md: "markdown", mdx: "markdown",
+  sh: "bash", bash: "bash", zsh: "bash", fish: "bash",
+  sql: "sql", graphql: "graphql",
+  dockerfile: "docker", makefile: "makefile",
+  proto: "protobuf", lua: "lua", zig: "zig",
+};
+
+function detectLanguage(path: string): string | undefined {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const lang = EXT_TO_LANG[ext];
+  if (!lang) return undefined;
+  // Check if refractor has this language registered
+  try {
+    if (refractor.registered(lang)) return lang;
+  } catch {
+    // not registered
+  }
+  return undefined;
+}
 
 // --- Props ---
 
@@ -124,18 +155,29 @@ export function DiffView({
     return [files[0] ?? null];
   }, [diff]);
 
-  // Compute word-level edits
+  // Syntax highlighting + word-level edits
+  const language = useMemo(() => detectLanguage(diff.Path), [diff.Path]);
+
   const tokens = useMemo((): HunkTokens | null => {
     if (!file) return null;
     try {
+      const enhancers = [markEdits(file.hunks, { type: "block" })];
+      if (language) {
+        return tokenize(file.hunks, {
+          highlight: true,
+          refractor,
+          language,
+          enhancers,
+        } as Parameters<typeof tokenize>[1]);
+      }
       return tokenize(file.hunks, {
         highlight: false,
-        enhancers: [markEdits(file.hunks, { type: "block" })],
+        enhancers,
       } as Parameters<typeof tokenize>[1]);
     } catch {
       return null;
     }
-  }, [file]);
+  }, [file, language]);
 
   // Build widgets map: changeKey → ReactNode
   const widgets = useMemo(() => {
