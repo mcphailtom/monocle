@@ -97,8 +97,8 @@ func (a *App) OpenDirectoryDialog() (string, error) {
 }
 
 // SelectProject initializes the engine for the given project directory.
-// Call this after the user picks a project from the picker or directory dialog.
-func (a *App) SelectProject(projectPath string) error {
+// Returns the resolved repo root path on success.
+func (a *App) SelectProject(projectPath string) (string, error) {
 	// Shut down existing engine if switching projects
 	if a.engine != nil {
 		a.engine.Shutdown()
@@ -115,7 +115,7 @@ func (a *App) SelectProject(projectPath string) error {
 
 	engine, err := core.NewEngine(cfg, a.database, repoRoot, nonGitMode)
 	if err != nil {
-		return fmt.Errorf("create engine: %w", err)
+		return "", fmt.Errorf("create engine: %w", err)
 	}
 	a.engine = engine
 
@@ -124,7 +124,7 @@ func (a *App) SelectProject(projectPath string) error {
 		Agent:    "claude",
 		RepoRoot: repoRoot,
 	}); err != nil {
-		return fmt.Errorf("start session: %w", err)
+		return "", fmt.Errorf("start session: %w", err)
 	}
 
 	// Start socket server for agent communication
@@ -133,13 +133,13 @@ func (a *App) SelectProject(projectPath string) error {
 		socketPath = override
 	}
 	if err := engine.StartServer(socketPath); err != nil {
-		return fmt.Errorf("start server: %w", err)
+		return "", fmt.Errorf("start server: %w", err)
 	}
 
 	// Bridge engine events to Wails
 	bridgeEngineEvents(engine, a.ctx)
 
-	return nil
+	return repoRoot, nil
 }
 
 // --- Session lifecycle ---

@@ -33,7 +33,7 @@ declare global {
           // Project selection
           GetRecentProjects(): Promise<RecentProject[]>;
           OpenDirectoryDialog(): Promise<string>;
-          SelectProject(projectPath: string): Promise<void>;
+          SelectProject(projectPath: string): Promise<string>;
 
           // Session
           GetSession(): Promise<ReviewSession | null>;
