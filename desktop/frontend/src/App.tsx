@@ -683,6 +683,12 @@ function ReviewUI() {
     {
       key: "c",
       handler: () => {
+        // If a comment is focused (cursor is on the comment widget), edit it
+        const focusedComment = diffViewRef.current?.getFocusedComment();
+        if (focusedComment) {
+          handleEditComment(focusedComment);
+          return;
+        }
         const range = diffViewRef.current?.getSelectionRange();
         if (range) {
           openCommentEditor(range.start, range.end);
