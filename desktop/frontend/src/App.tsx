@@ -83,6 +83,8 @@ function ReviewUI() {
   const [feedbackStatus, setFeedbackStatus] = useState("");
   const [viewType, setViewType] = useState<ViewType>("unified");
   const [contentTitle, setContentTitle] = useState("");
+  const [wrap, setWrap] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
 
   // Comment editor state
   const [commentEditorOpen, setCommentEditorOpen] = useState(false);
@@ -93,6 +95,7 @@ function ReviewUI() {
     lineEnd: number;
   } | null>(null);
   const [editingComment, setEditingComment] = useState<ReviewComment | null>(null);
+  const [suggestionMode, setSuggestionMode] = useState(false);
 
   // Review submit state
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
@@ -194,6 +197,7 @@ function ReviewUI() {
 
       setCommentTarget({ targetType, targetRef, lineStart, lineEnd: lineEnd || lineStart });
       setEditingComment(null);
+      setSuggestionMode(false);
       setCommentEditorOpen(true);
     },
     [selectedPath, selectedContentId],
@@ -291,6 +295,90 @@ function ReviewUI() {
     }
   }, [refreshStatus]);
 
+  const openSuggestionEditor = useCallback(
+    (lineStart: number, lineEnd: number = 0) => {
+      const targetType: TargetType = selectedContentId ? "content" : "file";
+      const targetRef = selectedContentId || selectedPath;
+      if (!targetRef) return;
+
+      setCommentTarget({ targetType, targetRef, lineStart, lineEnd: lineEnd || lineStart });
+      setEditingComment(null);
+      setCommentEditorOpen(true);
+      setSuggestionMode(true);
+    },
+    [selectedPath, selectedContentId],
+  );
+
+  const openFileComment = useCallback(() => {
+    const targetType: TargetType = selectedContentId ? "content" : "file";
+    const targetRef = selectedContentId || selectedPath;
+    if (!targetRef) return;
+
+    setCommentTarget({ targetType, targetRef, lineStart: 0, lineEnd: 0 });
+    setEditingComment(null);
+    setCommentEditorOpen(true);
+  }, [selectedPath, selectedContentId]);
+
+  const handleDeleteComment = useCallback(
+    async (comment: ReviewComment) => {
+      try {
+        await api.deleteComment(comment.ID);
+        loadSession();
+      } catch (err) {
+        console.error("Failed to delete comment:", err);
+      }
+    },
+    [loadSession],
+  );
+
+  const handleResolveComment = useCallback(
+    async (comment: ReviewComment) => {
+      try {
+        await api.resolveComment(comment.ID);
+        loadSession();
+      } catch (err) {
+        console.error("Failed to resolve comment:", err);
+      }
+    },
+    [loadSession],
+  );
+
+  const handleForceReload = useCallback(async () => {
+    try {
+      await api.refreshChangedFiles();
+      loadFiles();
+      loadSession();
+      // Reload current selection
+      if (selectedPath) loadDiff(selectedPath);
+      else if (selectedContentId) loadContentItem(selectedContentId);
+    } catch (err) {
+      console.error("Failed to reload:", err);
+    }
+  }, [loadFiles, loadSession, loadDiff, loadContentItem, selectedPath, selectedContentId]);
+
+  const handleClearReview = useCallback(async () => {
+    try {
+      await api.clearReview();
+      loadSession();
+      loadFiles();
+    } catch (err) {
+      console.error("Failed to clear review:", err);
+    }
+  }, [loadSession, loadFiles]);
+
+  const toggleFocusMode = useCallback(() => {
+    setFocusMode((prev) => {
+      const next = !prev;
+      if (next) {
+        setSidebarHidden(true);
+        setWrap(true);
+      } else {
+        setSidebarHidden(false);
+      }
+      return next;
+    });
+  }, []);
+
   const handleCommand = useCallback(
     async (command: string) => {
       switch (command) {
@@ -311,6 +399,11 @@ function ReviewUI() {
           break;
         case "discard":
           await api.clearReview();
+          loadSession();
+          loadFiles();
+          break;
+        case "mark-all-unreviewed":
+          await api.resetAllReviewed();
           loadSession();
           loadFiles();
           break;
@@ -563,6 +656,160 @@ function ReviewUI() {
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
+    // Suggestion editing (s key — like c but pre-sets suggestion type)
+    {
+      key: "s",
+      handler: () => {
+        const range = diffViewRef.current?.getSelectionRange();
+        if (range) {
+          openSuggestionEditor(range.start, range.end);
+          diffViewRef.current?.exitVisualMode();
+        } else {
+          openSuggestionEditor(diffViewRef.current?.getCursorLine() ?? 1);
+        }
+      },
+      when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // File-level comment (Shift+C)
+    {
+      key: "shift+c",
+      handler: openFileComment,
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // Delete comment at cursor (d key)
+    {
+      key: "d",
+      handler: () => {
+        const comment = diffViewRef.current?.getCommentAtCursor();
+        if (comment) handleDeleteComment(comment);
+      },
+      when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // Toggle comment resolved (x key)
+    {
+      key: "x",
+      handler: () => {
+        const comment = diffViewRef.current?.getCommentAtCursor();
+        if (comment) handleResolveComment(comment);
+      },
+      when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // Force reload (Shift+R)
+    {
+      key: "shift+r",
+      handler: handleForceReload,
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // Clear review (Shift+D)
+    {
+      key: "shift+d",
+      handler: handleClearReview,
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // Line wrap toggle (w key — works from any pane)
+    {
+      key: "w",
+      handler: () => setWrap((w) => !w),
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // Focus mode (Shift+F)
+    {
+      key: "shift+f",
+      handler: toggleFocusMode,
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // Half-page scroll (Ctrl+D / Ctrl+U — works from any pane)
+    {
+      key: "ctrl+d",
+      handler: () => diffViewRef.current?.scrollHalfPage(1),
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+    {
+      key: "ctrl+u",
+      handler: () => diffViewRef.current?.scrollHalfPage(-1),
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // Horizontal scroll (h/l when main focused, H/L from any pane)
+    {
+      key: "h",
+      handler: () => diffViewRef.current?.scrollHorizontal(-1),
+      when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
+    },
+    {
+      key: "l",
+      handler: () => diffViewRef.current?.scrollHorizontal(1),
+      when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
+    },
+    {
+      key: "shift+h",
+      handler: () => diffViewRef.current?.scrollHorizontal(-1),
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+    {
+      key: "shift+l",
+      handler: () => diffViewRef.current?.scrollHorizontal(1),
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // Scroll position keys (0, ^, $ — works from any pane)
+    {
+      key: "0",
+      handler: () => diffViewRef.current?.scrollToColumn("start"),
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+    {
+      key: "^",
+      handler: () => diffViewRef.current?.scrollToColumn("first-char"),
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+    {
+      key: "$",
+      handler: () => diffViewRef.current?.scrollToColumn("end"),
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // Section navigation ({/} — jump between sidebar sections)
+    {
+      key: "{",
+      handler: () => {
+        const items = sidebarItemsRef.current;
+        for (let i = sidebarCursor - 1; i >= 0; i--) {
+          if (items[i]?.kind === "section") {
+            // Move to first item after section header
+            const target = Math.min(i + 1, items.length - 1);
+            moveSidebarCursorTo(target);
+            return;
+          }
+        }
+        moveSidebarCursorTo(0);
+      },
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+    {
+      key: "}",
+      handler: () => {
+        const items = sidebarItemsRef.current;
+        for (let i = sidebarCursor + 1; i < items.length; i++) {
+          if (items[i]?.kind === "section") {
+            const target = Math.min(i + 1, items.length - 1);
+            moveSidebarCursorTo(target);
+            return;
+          }
+        }
+        moveSidebarCursorTo(items.length - 1);
+      },
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+
     // Help and command palette
     {
       key: "?",
@@ -629,6 +876,7 @@ function ReviewUI() {
               }
               viewType={viewType}
               focused={focus === "main"}
+              wrap={wrap}
               onFocus={() => setFocus("main")}
               onLineClick={(lineNum) => openCommentEditor(lineNum)}
               onCommentClick={handleEditComment}
@@ -665,9 +913,11 @@ function ReviewUI() {
       {/* Comment editor dialog */}
       <CommentEditor
         open={commentEditorOpen}
-        onClose={() => setCommentEditorOpen(false)}
+        onClose={() => { setCommentEditorOpen(false); setSuggestionMode(false); }}
         onSave={handleSaveComment}
         editingComment={editingComment}
+        initialType={suggestionMode ? "suggestion" : undefined}
+        initialBody={suggestionMode ? "```suggestion\n\n```" : undefined}
         targetLabel={commentTarget?.targetRef ?? ""}
         lineStart={commentTarget?.lineStart ?? 0}
         lineEnd={commentTarget?.lineEnd ?? 0}

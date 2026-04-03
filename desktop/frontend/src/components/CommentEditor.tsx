@@ -27,6 +27,10 @@ interface CommentEditorProps {
   onSave: (type: CommentType, body: string) => void;
   /** If editing an existing comment */
   editingComment?: ReviewComment | null;
+  /** Pre-set comment type (e.g. for suggestion mode) */
+  initialType?: CommentType;
+  /** Pre-fill body text (e.g. suggestion block template) */
+  initialBody?: string;
   /** Target info for display */
   targetLabel: string;
   lineStart: number;
@@ -38,6 +42,8 @@ export function CommentEditor({
   onClose,
   onSave,
   editingComment,
+  initialType,
+  initialBody,
   targetLabel,
   lineStart,
   lineEnd,
@@ -51,12 +57,24 @@ export function CommentEditor({
   // Reset state when opening
   useEffect(() => {
     if (open) {
-      setCommentType(editingComment?.Type ?? "issue");
-      setBody(editingComment?.Body ?? "");
+      setCommentType(editingComment?.Type ?? initialType ?? "issue");
+      setBody(editingComment?.Body ?? initialBody ?? "");
       // Focus textarea after dialog animation
-      setTimeout(() => textareaRef.current?.focus(), 100);
+      setTimeout(() => {
+        const ta = textareaRef.current;
+        if (ta) {
+          ta.focus();
+          // For suggestion template, place cursor inside the code block
+          if (initialBody && !editingComment) {
+            const cursorPos = initialBody.indexOf("\n\n```");
+            if (cursorPos >= 0) {
+              ta.setSelectionRange(cursorPos + 1, cursorPos + 1);
+            }
+          }
+        }
+      }, 100);
     }
-  }, [open, editingComment]);
+  }, [open, editingComment, initialType, initialBody]);
 
   const handleSave = useCallback(() => {
     if (!body.trim()) return;
