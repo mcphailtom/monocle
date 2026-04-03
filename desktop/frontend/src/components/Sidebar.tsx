@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { ScrollArea } from "./ui/scroll-area";
 import type {
   ChangedFile,
@@ -25,6 +25,10 @@ type SidebarItem =
   | { kind: "tree-file"; file: ChangedFile; depth: number }
   | { kind: "section"; label: string; count: number };
 
+export interface SidebarHandle {
+  toggleDir: (path: string) => void;
+}
+
 interface SidebarProps {
   files: ChangedFile[];
   contentItems: ContentItem[];
@@ -37,11 +41,9 @@ interface SidebarProps {
   treeMode: boolean;
   collapseAllSignal?: number;
   expandAllSignal?: number;
-  toggleDirPath?: string;
   onSelect: (item: SidebarItem) => void;
   onCursorChange: (cursor: number) => void;
   onItemsChange?: (items: SidebarItem[]) => void;
-  onToggleDir?: (path: string) => void;
 }
 
 // --- Helpers ---
@@ -125,7 +127,7 @@ function filterByReview<T extends { Reviewed: boolean }>(
 
 // --- Component ---
 
-export function Sidebar({
+export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar({
   files,
   contentItems,
   additionalFiles,
@@ -138,11 +140,9 @@ export function Sidebar({
   onSelect,
   onCursorChange,
   onItemsChange,
-  onToggleDir,
   collapseAllSignal,
   expandAllSignal,
-  toggleDirPath,
-}: SidebarProps) {
+}, ref) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -182,16 +182,20 @@ export function Sidebar({
     return paths;
   }, [tree]);
 
-  // Collapse all directories when signal changes
+  // Collapse all directories when signal fires (not on allDirPaths changes)
+  const lastCollapseSignal = useRef(0);
   useEffect(() => {
-    if (collapseAllSignal && collapseAllSignal > 0) {
+    if (collapseAllSignal && collapseAllSignal > lastCollapseSignal.current) {
+      lastCollapseSignal.current = collapseAllSignal;
       setCollapsed(new Set(allDirPaths));
     }
   }, [collapseAllSignal, allDirPaths]);
 
-  // Expand all directories when signal changes
+  // Expand all directories when signal fires
+  const lastExpandSignal = useRef(0);
   useEffect(() => {
-    if (expandAllSignal && expandAllSignal > 0) {
+    if (expandAllSignal && expandAllSignal > lastExpandSignal.current) {
+      lastExpandSignal.current = expandAllSignal;
       setCollapsed(new Set());
     }
   }, [expandAllSignal]);
@@ -266,17 +270,11 @@ export function Sidebar({
         }
         return next;
       });
-      onToggleDir?.(path);
     },
-    [onToggleDir],
+    [],
   );
 
-  // Toggle a specific dir from parent (for Enter key)
-  useEffect(() => {
-    if (toggleDirPath) {
-      toggleDir(toggleDirPath);
-    }
-  }, [toggleDirPath, toggleDir]);
+  useImperativeHandle(ref, () => ({ toggleDir }), [toggleDir]);
 
   const handleClick = useCallback(
     (index: number) => {
@@ -333,7 +331,7 @@ export function Sidebar({
       </ScrollArea>
     </aside>
   );
-}
+});
 
 function isSidebarItemSelected(
   item: SidebarItem,
