@@ -563,21 +563,15 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
           : cursorIndex;
 
         if (direction > 0) {
-          // Find next change index with comments after current position
-          const next = indices.find((i) => i > currentIdx);
-          if (next !== undefined) {
-            const coms = commentsByChangeIdx.get(next)!;
-            setFocusedCommentId(coms[0].ID);
-            if (next >= 0) setCursorIndex(next);
-          }
+          const next = indices.find((i) => i > currentIdx) ?? indices[0];
+          const coms = commentsByChangeIdx.get(next)!;
+          setFocusedCommentId(coms[0].ID);
+          if (next >= 0) setCursorIndex(next);
         } else {
-          // Find previous change index with comments before current position
-          const prev = [...indices].reverse().find((i) => i < currentIdx);
-          if (prev !== undefined) {
-            const coms = commentsByChangeIdx.get(prev)!;
-            setFocusedCommentId(coms[0].ID);
-            if (prev >= 0) setCursorIndex(prev);
-          }
+          const prev = [...indices].reverse().find((i) => i < currentIdx) ?? indices[indices.length - 1];
+          const coms = commentsByChangeIdx.get(prev)!;
+          setFocusedCommentId(coms[0].ID);
+          if (prev >= 0) setCursorIndex(prev);
         }
       },
       [commentsByChangeIdx, cursorIndex, focusedCommentId],
