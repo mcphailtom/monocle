@@ -2,35 +2,106 @@ package desktop
 
 import (
 	"context"
+	"fmt"
+	"os"
 
+	"github.com/josephschmitt/monocle/internal/adapters"
 	"github.com/josephschmitt/monocle/internal/core"
+	"github.com/josephschmitt/monocle/internal/db"
 	"github.com/josephschmitt/monocle/internal/types"
 )
 
 // App exposes EngineAPI methods to the Wails frontend via auto-generated bindings.
+// Engine initialization happens in startup(), called by Wails OnStartup.
 type App struct {
-	ctx    context.Context
-	engine core.EngineAPI
-}
-
-// NewApp creates a new Wails app binding layer.
-func NewApp(engine core.EngineAPI) *App {
-	return &App{engine: engine}
+	ctx      context.Context
+	engine   core.EngineAPI
+	database *db.DB
 }
 
 // startup is called by Wails when the application starts.
+// All engine initialization happens here, not in main(), because
+// Wails runs the binary during binding generation.
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	bridgeEngineEvents(a.engine, ctx)
+
+	// Load config
+	cfg, err := core.LoadConfig()
+	if err != nil {
+		cfg = core.DefaultConfig()
+	}
+
+	// Open database
+	database, err := db.Open(db.DBPath())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error opening database: %v\n", err)
+		return
+	}
+	a.database = database
+
+	// Get repo root
+	repoRoot, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting cwd: %v\n", err)
+		return
+	}
+	repoRoot = adapters.FindRepoRoot(repoRoot)
+	nonGitMode := !adapters.IsGitRepo(repoRoot)
+
+	// Create engine
+	engine, err := core.NewEngine(cfg, database, repoRoot, nonGitMode)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating engine: %v\n", err)
+		return
+	}
+	a.engine = engine
+
+	// Start a new session
+	opts := core.SessionOptions{
+		Agent:    "claude",
+		RepoRoot: repoRoot,
+	}
+	if _, err := engine.StartSession(opts); err != nil {
+		fmt.Fprintf(os.Stderr, "Error starting session: %v\n", err)
+		return
+	}
+
+	// Start socket server for agent communication
+	socketPath := adapters.DefaultSocketPath(repoRoot)
+	if override := os.Getenv("MONOCLE_SOCKET"); override != "" {
+		socketPath = override
+	}
+	if err := engine.StartServer(socketPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not start server: %v\n", err)
+	}
+
+	// Bridge engine events to Wails
+	bridgeEngineEvents(engine, ctx)
+}
+
+// shutdown is called by Wails when the application is closing.
+func (a *App) shutdown(_ context.Context) {
+	if a.engine != nil {
+		a.engine.Shutdown()
+	}
+	if a.database != nil {
+		a.database.Close()
+	}
 }
 
 // --- Session lifecycle ---
 
 func (a *App) GetSession() *types.ReviewSession {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.GetSession()
 }
 
 func (a *App) ListSessions(repoRoot string, limit int) ([]types.SessionSummary, error) {
+	if a.engine == nil {
+		return nil, nil
+	}
 	return a.engine.ListSessions(core.ListSessionsOptions{
 		RepoRoot: repoRoot,
 		Limit:    limit,
@@ -40,46 +111,76 @@ func (a *App) ListSessions(repoRoot string, limit int) ([]types.SessionSummary, 
 // --- Browsing ---
 
 func (a *App) RefreshChangedFiles() ([]types.ChangedFile, error) {
+	if a.engine == nil {
+		return nil, nil
+	}
 	return a.engine.RefreshChangedFiles()
 }
 
 func (a *App) GetChangedFiles() []types.ChangedFile {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.GetChangedFiles()
 }
 
 func (a *App) GetContentItems() []types.ContentItem {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.GetContentItems()
 }
 
 func (a *App) GetFileDiff(path string) (*types.DiffResult, error) {
+	if a.engine == nil {
+		return nil, nil
+	}
 	return a.engine.GetFileDiff(path)
 }
 
 func (a *App) GetFileContent(path string) (string, error) {
+	if a.engine == nil {
+		return "", nil
+	}
 	return a.engine.GetFileContent(path)
 }
 
 func (a *App) GetContentItem(id string) (*types.ContentItem, error) {
+	if a.engine == nil {
+		return nil, nil
+	}
 	return a.engine.GetContentItem(id)
 }
 
 func (a *App) GetContentDiff(id string) (*types.DiffResult, error) {
+	if a.engine == nil {
+		return nil, nil
+	}
 	return a.engine.GetContentDiff(id)
 }
 
 // --- Additional files ---
 
 func (a *App) GetAdditionalFiles() []types.AdditionalFile {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.GetAdditionalFiles()
 }
 
 func (a *App) GetAdditionalFileContent(absPath string) (string, error) {
+	if a.engine == nil {
+		return "", nil
+	}
 	return a.engine.GetAdditionalFileContent(absPath)
 }
 
 // --- Commenting ---
 
 func (a *App) AddComment(targetType string, targetRef string, lineStart int, lineEnd int, commentType string, body string) (*types.ReviewComment, error) {
+	if a.engine == nil {
+		return nil, fmt.Errorf("engine not initialized")
+	}
 	return a.engine.AddComment(
 		core.CommentTarget{
 			TargetType: types.TargetType(targetType),
@@ -93,84 +194,141 @@ func (a *App) AddComment(targetType string, targetRef string, lineStart int, lin
 }
 
 func (a *App) EditComment(commentID string, commentType string, body string) (*types.ReviewComment, error) {
+	if a.engine == nil {
+		return nil, fmt.Errorf("engine not initialized")
+	}
 	return a.engine.EditComment(commentID, types.CommentType(commentType), body)
 }
 
 func (a *App) DeleteComment(commentID string) error {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.DeleteComment(commentID)
 }
 
 func (a *App) ResolveComment(commentID string) error {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.ResolveComment(commentID)
 }
 
 func (a *App) ClearComments() error {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.ClearComments()
 }
 
 func (a *App) ClearReview() error {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.ClearReview()
 }
 
 // --- Review status ---
 
 func (a *App) MarkReviewed(path string) error {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.MarkReviewed(path)
 }
 
 func (a *App) UnmarkReviewed(path string) error {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.UnmarkReviewed(path)
 }
 
 func (a *App) MarkContentReviewed(id string) error {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.MarkContentReviewed(id)
 }
 
 func (a *App) UnmarkContentReviewed(id string) error {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.UnmarkContentReviewed(id)
 }
 
 func (a *App) ResetAllReviewed() error {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.ResetAllReviewed()
 }
 
 func (a *App) MarkAllReviewed() error {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.MarkAllReviewed()
 }
 
 // --- Submission ---
 
 func (a *App) GetReviewSummary() (*types.ReviewSummary, error) {
+	if a.engine == nil {
+		return nil, nil
+	}
 	return a.engine.GetReviewSummary()
 }
 
 func (a *App) Submit(action string, body string) (*core.SubmitResult, error) {
+	if a.engine == nil {
+		return nil, fmt.Errorf("engine not initialized")
+	}
 	return a.engine.Submit(types.SubmitAction(action), body)
 }
 
 func (a *App) FormatReview(action string, body string) (string, error) {
+	if a.engine == nil {
+		return "", nil
+	}
 	return a.engine.FormatReview(types.SubmitAction(action), body)
 }
 
 func (a *App) GetSubmissions() ([]types.ReviewSubmission, error) {
+	if a.engine == nil {
+		return nil, nil
+	}
 	return a.engine.GetSubmissions()
 }
 
 // --- Base ref ---
 
 func (a *App) SetBaseRef(ref string) error {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.SetBaseRef(ref)
 }
 
 func (a *App) SetAutoAdvanceRef(enabled bool) {
+	if a.engine == nil {
+		return
+	}
 	a.engine.SetAutoAdvanceRef(enabled)
 }
 
 func (a *App) IsAutoAdvanceRef() bool {
+	if a.engine == nil {
+		return false
+	}
 	return a.engine.IsAutoAdvanceRef()
 }
 
 func (a *App) SelectedBaseRef() string {
+	if a.engine == nil {
+		return ""
+	}
 	return a.engine.SelectedBaseRef()
 }
 
@@ -181,6 +339,9 @@ type LogEntry struct {
 }
 
 func (a *App) RecentCommits(n int) ([]LogEntry, error) {
+	if a.engine == nil {
+		return nil, nil
+	}
 	commits, err := a.engine.RecentCommits(n)
 	if err != nil {
 		return nil, err
@@ -195,33 +356,54 @@ func (a *App) RecentCommits(n int) ([]LogEntry, error) {
 // --- Feedback ---
 
 func (a *App) GetFeedbackStatus() string {
+	if a.engine == nil {
+		return ""
+	}
 	return a.engine.GetFeedbackStatus()
 }
 
 func (a *App) GetQueuedCount() int {
+	if a.engine == nil {
+		return 0
+	}
 	return a.engine.GetQueuedCount()
 }
 
 func (a *App) RequestPause() {
+	if a.engine == nil {
+		return
+	}
 	a.engine.RequestPause()
 }
 
 func (a *App) CancelPause() {
+	if a.engine == nil {
+		return
+	}
 	a.engine.CancelPause()
 }
 
 // --- Connection ---
 
 func (a *App) GetSubscriberCount() int {
+	if a.engine == nil {
+		return 0
+	}
 	return a.engine.GetSubscriberCount()
 }
 
 func (a *App) GetSocketPath() string {
+	if a.engine == nil {
+		return ""
+	}
 	return a.engine.GetSocketPath()
 }
 
 // --- Config ---
 
 func (a *App) GetConfig() *types.Config {
+	if a.engine == nil {
+		return nil
+	}
 	return a.engine.GetConfig()
 }
