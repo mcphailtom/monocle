@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+/*
+ * Catppuccin Mocha theme mapped to Monocle's semantic color system.
+ * Based on the TUI's 16-color ANSI palette (theme.go) with Catppuccin hex values.
+ */
+@theme {
+  /* Catppuccin Mocha base palette */
+  --color-ctp-rosewater: #f5e0dc;
+  --color-ctp-flamingo: #f2cdcd;
+  --color-ctp-pink: #f5c2e7;
+  --color-ctp-mauve: #cba6f7;
+  --color-ctp-red: #f38ba8;
+  --color-ctp-maroon: #eba0ac;
+  --color-ctp-peach: #fab387;
+  --color-ctp-yellow: #f9e2af;
+  --color-ctp-green: #a6e3a1;
+  --color-ctp-teal: #94e2d5;
+  --color-ctp-sky: #89dceb;
+  --color-ctp-sapphire: #74c7ec;
+  --color-ctp-blue: #89b4fa;
+  --color-ctp-lavender: #b4befe;
+  --color-ctp-text: #cdd6f4;
+  --color-ctp-subtext1: #bac2de;
+  --color-ctp-subtext0: #a6adc8;
+  --color-ctp-overlay2: #9399b2;
+  --color-ctp-overlay1: #7f849c;
+  --color-ctp-overlay0: #6c7086;
+  --color-ctp-surface2: #585b70;
+  --color-ctp-surface1: #45475a;
+  --color-ctp-surface0: #313244;
+  --color-ctp-base: #1e1e2e;
+  --color-ctp-mantle: #181825;
+  --color-ctp-crust: #11111b;
+
+  /* Semantic colors (mapped from TUI ANSI → Catppuccin) */
+  --color-accent: var(--color-ctp-blue);
+  --color-title: var(--color-ctp-sapphire);
+  --color-muted: var(--color-ctp-overlay0);
+  --color-text: var(--color-ctp-text);
+  --color-subtext: var(--color-ctp-subtext0);
+  --color-border: var(--color-ctp-surface1);
+  --color-border-focus: var(--color-ctp-blue);
+  --color-surface: var(--color-ctp-surface0);
+  --color-base: var(--color-ctp-base);
+  --color-mantle: var(--color-ctp-mantle);
+
+  /* Diff (ANSI 2=green, 1=red, 3=yellow) */
+  --color-diff-added: var(--color-ctp-green);
+  --color-diff-removed: var(--color-ctp-red);
+  --color-diff-hunk: var(--color-ctp-sapphire);
+  --color-diff-context: var(--color-ctp-overlay0);
+  --color-diff-added-bg: #132a13;
+  --color-diff-removed-bg: #2a1313;
+  --color-diff-added-change-bg: #1f4a1f;
+  --color-diff-removed-change-bg: #4a1f1f;
+
+  /* File status */
+  --color-status-added: var(--color-ctp-green);
+  --color-status-modified: var(--color-ctp-yellow);
+  --color-status-deleted: var(--color-ctp-red);
+  --color-status-renamed: var(--color-ctp-mauve);
+
+  /* Comment types (matching TUI: issue=red, suggest=yellow, note=blue, praise=green) */
+  --color-comment-issue: var(--color-ctp-red);
+  --color-comment-suggest: var(--color-ctp-yellow);
+  --color-comment-note: var(--color-ctp-blue);
+  --color-comment-praise: var(--color-ctp-green);
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--color-ctp-base);
+  color: var(--color-ctp-text);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  /* Prevent text selection on drag for split panes */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection in content areas */
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}

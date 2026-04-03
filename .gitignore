@@ -6,7 +6,8 @@ dist/
 .DS_Store
 node_modules
 .devbox/
-src/
+/src/
+!desktop/frontend/src/
 test/
 scripts/
 .claude/worktrees/
