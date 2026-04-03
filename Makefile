@@ -1,9 +1,14 @@
-.PHONY: build run install uninstall test vet lint sync-skills skills-tarball
+.PHONY: build run install uninstall test vet lint bundle-desktop build-desktop sync-skills skills-tarball
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o bin/monocle ./cmd/monocle
+
+bundle-desktop: build
+	cd desktop/frontend && bun install && bun run build
+
+build-desktop: bundle-desktop
 
 run: build
 	./bin/monocle
