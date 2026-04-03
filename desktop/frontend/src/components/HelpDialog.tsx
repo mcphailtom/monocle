@@ -69,7 +69,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle className="text-sm">Keyboard Shortcuts</DialogTitle>
+          <DialogTitle>Keyboard Shortcuts</DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh]">
           <div className="space-y-4 pr-4">

@@ -82,7 +82,7 @@ export function ProjectPicker({ onSelect, error }: ProjectPickerProps) {
     <div className="flex h-full items-center justify-center">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <h1 className="text-xl font-bold text-foreground mb-1">Monocle</h1>
+          <h1 className="text-2xl font-serif text-foreground mb-1">Monocle</h1>
           <p className="text-sm text-muted-foreground">
             Select a project to review
           </p>
@@ -115,14 +115,14 @@ export function ProjectPicker({ onSelect, error }: ProjectPickerProps) {
                 {recentProjects.map((project) => (
                   <button
                     key={project.path}
-                    className="w-full text-left px-3 py-2 rounded hover:bg-secondary/50 transition-colors"
+                    className="w-full text-left px-3 py-2 rounded hover:bg-secondary/50 transition-all duration-200"
                     onClick={() => handleSelectRecent(project.path)}
                   >
                     <div className="text-sm text-foreground font-medium">
                       {project.name}
                     </div>
                     <div className="text-xs text-muted-foreground flex items-center gap-2">
-                      <span className="truncate">{project.path}</span>
+                      <span className="truncate font-mono">{project.path}</span>
                       <span className="shrink-0">&middot;</span>
                       <span className="shrink-0">
                         {formatDate(project.last_opened)}

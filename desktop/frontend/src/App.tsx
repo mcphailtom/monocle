@@ -613,7 +613,7 @@ function ReviewUI() {
 
         {/* Main pane */}
         <main
-          className={`flex-1 overflow-auto border-r ${
+          className={`flex-1 overflow-auto border-r transition-colors duration-150 ${
             focus === "main" ? "border-primary" : "border-transparent"
           }`}
           onClick={() => setFocus("main")}
@@ -641,7 +641,7 @@ function ReviewUI() {
           ) : (
             <div className="flex h-full items-center justify-center text-muted-foreground">
               <div className="text-center">
-                <p className="text-lg">Monocle</p>
+                <p className="text-lg font-serif">Monocle</p>
                 <p className="text-sm mt-2">
                   Select a file to view its diff
                 </p>

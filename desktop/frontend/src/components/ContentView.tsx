@@ -19,13 +19,13 @@ const markdownComponents = {
   code: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
     if (className?.includes("language-")) {
       return (
-        <pre className="bg-ctp-mantle rounded p-3 text-xs overflow-x-auto">
+        <pre className="bg-ctp-mantle rounded p-3 text-xs overflow-x-auto font-mono">
           <code className="text-ctp-text">{children}</code>
         </pre>
       );
     }
     return (
-      <code className="bg-ctp-surface0 text-ctp-yellow px-1 rounded text-xs">
+      <code className="bg-ctp-surface0 text-ctp-yellow px-1 rounded text-xs font-mono">
         {children}
       </code>
     );
