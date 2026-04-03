@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { api, onEvent } from "./api";
 import { Sidebar, type SidebarItem } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
-import { DiffView } from "./components/DiffView";
+import { DiffView, type DiffViewHandle } from "./components/DiffView";
 import { ContentView } from "./components/ContentView";
 import { CommentEditor } from "./components/CommentEditor";
 import { ReviewSubmitDialog } from "./components/ReviewSubmitDialog";
@@ -101,6 +101,9 @@ function ReviewUI() {
   // Help and command palette
   const [helpOpen, setHelpOpen] = useState(false);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // Diff view ref for keyboard navigation
+  const diffViewRef = useRef<DiffViewHandle>(null);
 
   // --- Data loading ---
 
@@ -500,10 +503,33 @@ function ReviewUI() {
       when: () => focus === "main",
     },
 
+    // Diff line navigation (when main pane focused)
+    {
+      key: "j",
+      handler: () => diffViewRef.current?.moveCursor(1),
+      when: () => focus === "main",
+    },
+    {
+      key: "k",
+      handler: () => diffViewRef.current?.moveCursor(-1),
+      when: () => focus === "main",
+    },
+    // Diff scrolling (Shift+J/K)
+    {
+      key: "shift+j",
+      handler: () => diffViewRef.current?.scroll(1),
+      when: () => focus === "main",
+    },
+    {
+      key: "shift+k",
+      handler: () => diffViewRef.current?.scroll(-1),
+      when: () => focus === "main",
+    },
+
     // Commenting (when main pane focused, no dialog open)
     {
       key: "c",
-      handler: () => openCommentEditor(1),
+      handler: () => openCommentEditor(diffViewRef.current?.getCursorLine() ?? 1),
       when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
     },
 
@@ -577,6 +603,7 @@ function ReviewUI() {
         >
           {diff ? (
             <DiffView
+              ref={diffViewRef}
               diff={diff}
               comments={
                 session?.Comments?.filter(
