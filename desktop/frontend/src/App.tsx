@@ -617,14 +617,30 @@ function ReviewUI() {
       when: () => focus === "sidebar",
     },
 
-    // File navigation (global)
+    // File navigation (global — skips sections and dirs)
     {
       key: "[",
-      handler: () => moveSidebarCursor(-1),
+      handler: () => {
+        const items = sidebarItemsRef.current;
+        for (let i = sidebarCursor - 1; i >= 0; i--) {
+          if (items[i]?.kind !== "section" && items[i]?.kind !== "dir") {
+            moveSidebarCursorTo(i);
+            return;
+          }
+        }
+      },
     },
     {
       key: "]",
-      handler: () => moveSidebarCursor(1),
+      handler: () => {
+        const items = sidebarItemsRef.current;
+        for (let i = sidebarCursor + 1; i < items.length; i++) {
+          if (items[i]?.kind !== "section" && items[i]?.kind !== "dir") {
+            moveSidebarCursorTo(i);
+            return;
+          }
+        }
+      },
     },
 
     // Diff view controls (when main pane focused)
