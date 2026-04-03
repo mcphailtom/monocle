@@ -280,9 +280,13 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     }, [file]);
 
     // Map change index → comments on that line (for nav interleaving)
+    // Index -1 is used for file-level comments (LineStart === 0)
     const commentsByChangeIdx = useMemo(() => {
       const map = new Map<number, ReviewComment[]>();
       if (allChanges.length === 0 || comments.length === 0) return map;
+      // File-level comments at sentinel index -1
+      const fileLevelComments = comments.filter((c) => c.LineStart === 0);
+      if (fileLevelComments.length > 0) map.set(-1, fileLevelComments);
       const lineToComments = new Map<number, ReviewComment[]>();
       for (const c of comments) {
         const line = c.LineEnd || c.LineStart;
@@ -339,27 +343,33 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       (delta: number) => {
         // When on a focused comment, navigate within or out of comments
         if (focusedCommentId) {
-          const coms = commentsByChangeIdx.get(cursorIndex);
+          // Check if this is a file-level comment (sentinel -1) or a line comment
+          const fileLevelComs = commentsByChangeIdx.get(-1);
+          const isFileLevel = fileLevelComs?.some((c) => c.ID === focusedCommentId);
+          const coms = isFileLevel ? fileLevelComs! : commentsByChangeIdx.get(cursorIndex);
           if (coms) {
             const comIdx = coms.findIndex((c) => c.ID === focusedCommentId);
             if (delta > 0) {
-              // Moving down: next comment on same line, or advance to next change
               if (comIdx < coms.length - 1) {
                 setFocusedCommentId(coms[comIdx + 1].ID);
                 return;
               }
               // No more comments — move to next change
               setFocusedCommentId(null);
-              setCursorIndex((prev) => Math.min(prev + 1, allChanges.length - 1));
+              if (isFileLevel) {
+                setCursorIndex(0); // go to first change
+              } else {
+                setCursorIndex((prev) => Math.min(prev + 1, allChanges.length - 1));
+              }
               return;
             } else {
-              // Moving up: prev comment, or back to the code line
               if (comIdx > 0) {
                 setFocusedCommentId(coms[comIdx - 1].ID);
                 return;
               }
-              // Back to the code line itself
+              // Back to the code line (or nowhere if file-level)
               setFocusedCommentId(null);
+              if (isFileLevel) return; // already at top
               return;
             }
           }
@@ -374,6 +384,12 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
               const coms = commentsByChangeIdx.get(prev)!;
               setFocusedCommentId(coms[0].ID);
               return prev; // stay on same change index
+            }
+            // When moving up from first change, stop on file-level comments
+            if (delta < 0 && prev === 0 && next === 0 && commentsByChangeIdx.has(-1)) {
+              const coms = commentsByChangeIdx.get(-1)!;
+              setFocusedCommentId(coms[coms.length - 1].ID);
+              return 0;
             }
             // When moving up into a line with comments, stop on last comment
             if (delta < 0 && commentsByChangeIdx.has(next) && next !== prev) {
@@ -750,6 +766,15 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
             <span className="text-ctp-mauve font-medium">VISUAL</span>
           )}
         </div>
+
+        {/* File-level comments (LineStart === 0) */}
+        {comments.some((c) => c.LineStart === 0) && (
+          <CommentWidget
+            comments={comments.filter((c) => c.LineStart === 0)}
+            focusedId={focusedCommentId}
+            onClick={onCommentClick}
+          />
+        )}
 
         <Diff
           viewType={viewType}
