@@ -414,7 +414,8 @@ function SidebarRow({
       break;
     case "dir":
       label = item.path.split("/").pop()!;
-      icon = item.collapsed ? "\u25B6" : "\u25BC"; // ▶ or ▼
+      icon = (item.collapsed ? "\u25B6 " : "\u25BC ") + "\uf07b"; // arrow + nf-fa-folder
+      iconColor = "#e8a838";
       break;
   }
 
