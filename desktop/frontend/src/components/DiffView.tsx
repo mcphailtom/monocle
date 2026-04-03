@@ -83,6 +83,7 @@ export interface DiffViewHandle {
   isVisualMode: () => boolean;
   getSelectionRange: () => { start: number; end: number } | null;
   getSelectedContent: () => string;
+  jumpToComment: (direction: 1 | -1) => void;
   exitVisualMode: () => void;
 }
 
@@ -548,6 +549,40 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       return change.content;
     }, [visualMode, visualAnchor, cursorIndex, allChanges]);
 
+    // Jump to next/previous comment in the diff
+    const jumpToComment = useCallback(
+      (direction: 1 | -1) => {
+        // Build sorted list of change indices that have comments
+        const indices = Array.from(commentsByChangeIdx.keys()).sort((a, b) => a - b);
+        if (indices.length === 0) return;
+
+        // Determine current effective position
+        // If focused on a comment, use its change index; otherwise use cursorIndex
+        const currentIdx = focusedCommentId
+          ? (commentsByChangeIdx.get(-1)?.some((c) => c.ID === focusedCommentId) ? -1 : cursorIndex)
+          : cursorIndex;
+
+        if (direction > 0) {
+          // Find next change index with comments after current position
+          const next = indices.find((i) => i > currentIdx);
+          if (next !== undefined) {
+            const coms = commentsByChangeIdx.get(next)!;
+            setFocusedCommentId(coms[0].ID);
+            if (next >= 0) setCursorIndex(next);
+          }
+        } else {
+          // Find previous change index with comments before current position
+          const prev = [...indices].reverse().find((i) => i < currentIdx);
+          if (prev !== undefined) {
+            const coms = commentsByChangeIdx.get(prev)!;
+            setFocusedCommentId(coms[0].ID);
+            if (prev >= 0) setCursorIndex(prev);
+          }
+        }
+      },
+      [commentsByChangeIdx, cursorIndex, focusedCommentId],
+    );
+
     // Mouse-driven selection: click moves cursor, drag enters visual mode
     const isDragging = useRef(false);
     const dragAnchor = useRef(0);
@@ -612,9 +647,10 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
         isVisualMode,
         getSelectionRange,
         getSelectedContent,
+        jumpToComment,
         exitVisualMode,
       }),
-      [moveCursor, scroll, scrollHalfPage, scrollHorizontal, scrollToColumn, getCursorLine, getCommentAtCursor, toggleVisualMode, isVisualMode, getSelectionRange, getSelectedContent, exitVisualMode],
+      [moveCursor, scroll, scrollHalfPage, scrollHorizontal, scrollToColumn, getCursorLine, getCommentAtCursor, toggleVisualMode, isVisualMode, getSelectionRange, getSelectedContent, jumpToComment, exitVisualMode],
     );
 
     // Selected change keys for highlight (single line or visual range)
