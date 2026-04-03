@@ -87,7 +87,6 @@ function ReviewUI() {
   const [viewType, setViewType] = useState<ViewType>("unified");
   const [contentTitle, setContentTitle] = useState("");
   const [wrap, setWrap] = useState(false);
-  const [focusMode, setFocusMode] = useState(false);
   const preFocusWrap = useRef(false);
   const [collapseAllSignal, setCollapseAllSignal] = useState(0);
   const [expandAllSignal, setExpandAllSignal] = useState(0);
@@ -376,19 +375,15 @@ function ReviewUI() {
   );
 
   const toggleFocusMode = useCallback(() => {
-    setFocusMode((prev) => {
-      const next = !prev;
-      if (next) {
-        preFocusWrap.current = wrap;
-        setSidebarHidden(true);
-        setWrap(true);
-      } else {
-        setSidebarHidden(false);
-        setWrap(preFocusWrap.current);
-      }
-      return next;
-    });
-  }, [wrap]);
+    if (!sidebarHidden) {
+      preFocusWrap.current = wrap;
+      setSidebarHidden(true);
+      setWrap(true);
+    } else {
+      setSidebarHidden(false);
+      setWrap(preFocusWrap.current);
+    }
+  }, [sidebarHidden, wrap]);
 
   const handleCommand = useCallback(
     async (command: string) => {
@@ -409,9 +404,7 @@ function ReviewUI() {
           loadFiles();
           break;
         case "discard":
-          await api.clearReview();
-          loadSession();
-          loadFiles();
+          await handleClearReview();
           break;
         case "mark-all-unreviewed":
           await api.resetAllReviewed();
