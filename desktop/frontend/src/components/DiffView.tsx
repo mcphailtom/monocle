@@ -82,6 +82,7 @@ export interface DiffViewHandle {
   toggleVisualMode: () => void;
   isVisualMode: () => boolean;
   getSelectionRange: () => { start: number; end: number } | null;
+  getSelectedContent: () => string;
   exitVisualMode: () => void;
 }
 
@@ -440,6 +441,25 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       };
     }, [visualMode, visualAnchor, cursorIndex, allChanges]);
 
+    const getSelectedContent = useCallback(() => {
+      if (visualMode) {
+        const lo = Math.min(visualAnchor, cursorIndex);
+        const hi = Math.max(visualAnchor, cursorIndex);
+        const lines: string[] = [];
+        for (let i = lo; i <= hi && i < allChanges.length; i++) {
+          const change = allChanges[i];
+          // Only include "new" side content (normal + insert, skip deletes)
+          if (change.type !== "delete") {
+            lines.push(change.content);
+          }
+        }
+        return lines.join("\n");
+      }
+      const change = allChanges[cursorIndex];
+      if (!change) return "";
+      return change.content;
+    }, [visualMode, visualAnchor, cursorIndex, allChanges]);
+
     // Mouse-driven selection: click moves cursor, drag enters visual mode
     const isDragging = useRef(false);
     const dragAnchor = useRef(0);
@@ -502,9 +522,10 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
         toggleVisualMode,
         isVisualMode,
         getSelectionRange,
+        getSelectedContent,
         exitVisualMode,
       }),
-      [moveCursor, scroll, scrollHalfPage, scrollHorizontal, scrollToColumn, getCursorLine, getCommentAtCursor, toggleVisualMode, isVisualMode, getSelectionRange, exitVisualMode],
+      [moveCursor, scroll, scrollHalfPage, scrollHorizontal, scrollToColumn, getCursorLine, getCommentAtCursor, toggleVisualMode, isVisualMode, getSelectionRange, getSelectedContent, exitVisualMode],
     );
 
     // Selected change keys for highlight (single line or visual range)

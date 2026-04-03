@@ -64,11 +64,13 @@ export function CommentEditor({
         const ta = textareaRef.current;
         if (ta) {
           ta.focus();
-          // For suggestion template, place cursor inside the code block
+          // For suggestion template, select the content inside the code block
+          // so the user can immediately type a replacement
           if (initialBody && !editingComment) {
-            const cursorPos = initialBody.indexOf("\n\n```");
-            if (cursorPos >= 0) {
-              ta.setSelectionRange(cursorPos + 1, cursorPos + 1);
+            const contentStart = initialBody.indexOf("\n") + 1;
+            const contentEnd = initialBody.lastIndexOf("\n```");
+            if (contentStart > 0 && contentEnd > contentStart) {
+              ta.setSelectionRange(contentStart, contentEnd);
             }
           }
         }
