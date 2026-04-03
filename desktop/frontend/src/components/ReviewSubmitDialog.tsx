@@ -143,7 +143,7 @@ export function ReviewSubmitDialog({
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Additional comments (optional)..."
-          className="min-h-[80px] text-sm"
+          className="min-h-[80px] text-sm font-mono"
         />
 
         <DialogFooter>

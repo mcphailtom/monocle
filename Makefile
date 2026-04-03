@@ -12,8 +12,14 @@ run: build
 build-desktop:
 	wails build -ldflags "-X main.version=$(VERSION)"
 
-dev-desktop:
+dev-desktop: frontend-dist
 	wails dev
+
+frontend-dist:
+	@if [ ! -d desktop/frontend/dist ] || [ -z "$$(ls -A desktop/frontend/dist 2>/dev/null)" ]; then \
+		echo "Building frontend dist..."; \
+		cd desktop/frontend && bun install && bun run build; \
+	fi
 
 install:
 	go install -ldflags "-X main.version=$(VERSION)" ./cmd/monocle
