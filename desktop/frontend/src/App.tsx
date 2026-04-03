@@ -88,6 +88,9 @@ function ReviewUI() {
   const [contentTitle, setContentTitle] = useState("");
   const [wrap, setWrap] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [collapseAllSignal, setCollapseAllSignal] = useState(0);
+  const [expandAllSignal, setExpandAllSignal] = useState(0);
+  const [toggleDirPath, setToggleDirPath] = useState("");
 
   // Comment editor state
   const [commentEditorOpen, setCommentEditorOpen] = useState(false);
@@ -585,11 +588,41 @@ function ReviewUI() {
       when: () => focus === "sidebar",
     },
 
+    // Enter: focus diff pane (on file/content), toggle dir (on tree dir)
+    {
+      key: "enter",
+      handler: () => {
+        const item = sidebarItemsRef.current[sidebarCursor];
+        if (!item) return;
+        if (item.kind === "dir") {
+          setToggleDirPath(item.path);
+          // Reset so re-pressing Enter on the same dir works
+          setTimeout(() => setToggleDirPath(""), 0);
+        } else if (item.kind !== "section") {
+          setFocus("main");
+        }
+      },
+      when: () => focus === "sidebar",
+    },
+
     // Sidebar toggles
     {
       key: "f",
       handler: () => setTreeMode((t) => !t),
       when: () => focus === "sidebar",
+    },
+
+    // Collapse all tree dirs (z key)
+    {
+      key: "z",
+      handler: () => setCollapseAllSignal((n) => n + 1),
+      when: () => focus === "sidebar" && treeMode,
+    },
+    // Expand all tree dirs (e key)
+    {
+      key: "e",
+      handler: () => setExpandAllSignal((n) => n + 1),
+      when: () => focus === "sidebar" && treeMode,
     },
     {
       key: "/",
@@ -887,6 +920,9 @@ function ReviewUI() {
               cursor={sidebarCursor}
               reviewFilter={reviewFilter}
               treeMode={treeMode}
+              collapseAllSignal={collapseAllSignal}
+              expandAllSignal={expandAllSignal}
+              toggleDirPath={toggleDirPath}
               onSelect={handleSidebarSelect}
               onCursorChange={setSidebarCursor}
               onItemsChange={handleSidebarItems}
@@ -964,6 +1000,14 @@ function ReviewUI() {
         open={reviewDialogOpen}
         onClose={() => setReviewDialogOpen(false)}
         onSubmit={handleSubmitReview}
+        onCopyToClipboard={async (action, body) => {
+          try {
+            const formatted = await api.formatReview(action, body);
+            await navigator.clipboard.writeText(formatted);
+          } catch (err) {
+            console.error("Failed to copy review:", err);
+          }
+        }}
         summary={reviewSummary}
       />
 
