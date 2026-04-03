@@ -6,6 +6,8 @@ import { DiffView } from "./components/DiffView";
 import { ContentView } from "./components/ContentView";
 import { CommentEditor } from "./components/CommentEditor";
 import { ReviewSubmitDialog } from "./components/ReviewSubmitDialog";
+import { HelpDialog } from "./components/HelpDialog";
+import { CommandPalette } from "./components/CommandPalette";
 import { useKeyboard } from "./hooks/useKeyboard";
 import type {
   ReviewSession,
@@ -55,6 +57,10 @@ function App() {
   // Review submit state
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
+
+  // Help and command palette
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   // --- Data loading ---
 
@@ -242,6 +248,37 @@ function App() {
     }
   }, [refreshStatus]);
 
+  const handleCommand = useCallback(
+    async (command: string) => {
+      switch (command) {
+        case "submit":
+          openReviewDialog();
+          break;
+        case "pause":
+          handleRequestPause();
+          break;
+        case "clear":
+          await api.clearComments();
+          loadSession();
+          break;
+        case "mark-all-reviewed":
+          await api.markAllReviewed();
+          loadSession();
+          loadFiles();
+          break;
+        case "discard":
+          await api.clearReview();
+          loadSession();
+          loadFiles();
+          break;
+        case "history":
+          // TODO: implement history view
+          break;
+      }
+    },
+    [openReviewDialog, handleRequestPause, loadSession, loadFiles],
+  );
+
   // --- Initial load ---
 
   useEffect(() => {
@@ -406,6 +443,26 @@ function App() {
       handler: handleRequestPause,
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
+
+    // Help and command palette
+    {
+      key: "?",
+      handler: () => setHelpOpen(true),
+      when: () => !commentEditorOpen && !reviewDialogOpen && !helpOpen && !commandPaletteOpen,
+    },
+    {
+      key: ":",
+      handler: () => setCommandPaletteOpen(true),
+      when: () => !commentEditorOpen && !reviewDialogOpen && !helpOpen && !commandPaletteOpen,
+    },
+    {
+      key: "escape",
+      handler: () => {
+        if (helpOpen) setHelpOpen(false);
+        else if (commandPaletteOpen) setCommandPaletteOpen(false);
+      },
+      when: () => helpOpen || commandPaletteOpen,
+    },
   ]);
 
   function getTotalItems(): number {
@@ -506,6 +563,16 @@ function App() {
         onClose={() => setReviewDialogOpen(false)}
         onSubmit={handleSubmitReview}
         summary={reviewSummary}
+      />
+
+      {/* Help dialog */}
+      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      {/* Command palette */}
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onCommand={handleCommand}
       />
     </div>
   );
