@@ -148,6 +148,54 @@
           "store_path": "/nix/store/g3zyhsqvkfdhz0dfg1bfk5baf49rvdxi-lefthook-2.1.1"
         }
       }
+    },
+    "wails@latest": {
+      "last_modified": "2026-03-21T07:29:51Z",
+      "resolved": "github:NixOS/nixpkgs/09061f748ee21f68a089cd5d91ec1859cd93d0be#wails",
+      "source": "devbox-search",
+      "version": "2.11.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/gq0slkj6fls6yq0x7ymyc4vcwvs0sn5k-wails-2.11.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/gq0slkj6fls6yq0x7ymyc4vcwvs0sn5k-wails-2.11.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/1zxp590n2m9fjiwmgihlla9ksp8q1hi5-wails-2.11.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/1zxp590n2m9fjiwmgihlla9ksp8q1hi5-wails-2.11.0"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/3fwi3x2add9gvisk4pb6gldws1yvdyvy-wails-2.11.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/3fwi3x2add9gvisk4pb6gldws1yvdyvy-wails-2.11.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/m6r3yrjm32k9f53k95sgbw0aw071x7b7-wails-2.11.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/m6r3yrjm32k9f53k95sgbw0aw071x7b7-wails-2.11.0"
+        }
+      }
     }
   }
 }
