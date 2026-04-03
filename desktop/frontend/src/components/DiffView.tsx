@@ -209,7 +209,7 @@ function CommentWidget({
             onClick={() => onClick?.(comment)}
           >
             <span className="font-bold mr-2">{style.label}</span>
-            <span className="text-foreground">{comment.Body}</span>
+            <span className="text-foreground font-sans">{comment.Body}</span>
           </div>
         );
       })}
@@ -584,7 +584,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     return (
       <div
         ref={containerRef}
-        className={`h-full overflow-auto ${focused ? "" : "opacity-90"}`}
+        className={`h-full overflow-auto selectable font-mono ${focused ? "" : "opacity-90"}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

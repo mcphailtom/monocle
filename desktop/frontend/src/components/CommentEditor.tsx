@@ -101,10 +101,10 @@ export function CommentEditor({
         onKeyDown={handleKeyDown}
       >
         <DialogHeader>
-          <DialogTitle className="text-sm">
+          <DialogTitle>
             {editingComment ? "Edit Comment" : "Add Comment"}
           </DialogTitle>
-          <div className="text-xs text-muted-foreground">
+          <div className="text-xs text-muted-foreground font-mono">
             {targetLabel} &middot; {lineLabel}
           </div>
         </DialogHeader>
