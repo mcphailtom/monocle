@@ -22,7 +22,7 @@ const SECTIONS = [
       ["h / l", "Scroll diff left/right"],
       ["H / L", "Scroll diff left/right (any pane)"],
       ["0", "Scroll to column 0"],
-      ["^", "Scroll to first non-space"],
+      ["^", "Scroll to column 0"],
       ["$", "Scroll to line end"],
       ["[ / ]", "Previous / next file"],
       ["{ / }", "Previous / next sidebar section"],

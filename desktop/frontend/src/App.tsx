@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { api, onEvent } from "./api";
-import { Sidebar, type SidebarItem } from "./components/Sidebar";
+import { Sidebar, type SidebarItem, type SidebarHandle } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { DiffView, type DiffViewHandle } from "./components/DiffView";
 import { ContentView } from "./components/ContentView";
@@ -88,9 +88,9 @@ function ReviewUI() {
   const [contentTitle, setContentTitle] = useState("");
   const [wrap, setWrap] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const preFocusWrap = useRef(false);
   const [collapseAllSignal, setCollapseAllSignal] = useState(0);
   const [expandAllSignal, setExpandAllSignal] = useState(0);
-  const [toggleDirPath, setToggleDirPath] = useState("");
 
   // Comment editor state
   const [commentEditorOpen, setCommentEditorOpen] = useState(false);
@@ -114,8 +114,9 @@ function ReviewUI() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [baseRefPickerOpen, setBaseRefPickerOpen] = useState(false);
 
-  // Diff view ref for keyboard navigation
+  // Component refs for keyboard navigation
   const diffViewRef = useRef<DiffViewHandle>(null);
+  const sidebarRef = useRef<SidebarHandle>(null);
 
   // --- Data loading ---
 
@@ -199,14 +200,14 @@ function ReviewUI() {
   // --- Comment actions ---
 
   const openCommentEditor = useCallback(
-    (lineStart: number, lineEnd: number = 0) => {
+    (lineStart: number, lineEnd: number = 0, suggestion: string = "") => {
       const targetType: TargetType = selectedContentId ? "content" : "file";
       const targetRef = selectedContentId || selectedPath;
       if (!targetRef) return;
 
       setCommentTarget({ targetType, targetRef, lineStart, lineEnd: lineEnd || lineStart });
       setEditingComment(null);
-      setSuggestionBody("");
+      setSuggestionBody(suggestion);
       setCommentEditorOpen(true);
     },
     [selectedPath, selectedContentId],
@@ -306,27 +307,10 @@ function ReviewUI() {
 
   const openSuggestionEditor = useCallback(
     (lineStart: number, lineEnd: number = 0, content: string = "") => {
-      const targetType: TargetType = selectedContentId ? "content" : "file";
-      const targetRef = selectedContentId || selectedPath;
-      if (!targetRef) return;
-
-      setCommentTarget({ targetType, targetRef, lineStart, lineEnd: lineEnd || lineStart });
-      setEditingComment(null);
-      setSuggestionBody("```suggestion\n" + content + "\n```");
-      setCommentEditorOpen(true);
+      openCommentEditor(lineStart, lineEnd, "```suggestion\n" + content + "\n```");
     },
-    [selectedPath, selectedContentId],
+    [openCommentEditor],
   );
-
-  const openFileComment = useCallback(() => {
-    const targetType: TargetType = selectedContentId ? "content" : "file";
-    const targetRef = selectedContentId || selectedPath;
-    if (!targetRef) return;
-
-    setCommentTarget({ targetType, targetRef, lineStart: 0, lineEnd: 0 });
-    setEditingComment(null);
-    setCommentEditorOpen(true);
-  }, [selectedPath, selectedContentId]);
 
   const handleDeleteComment = useCallback(
     async (comment: ReviewComment) => {
@@ -395,14 +379,16 @@ function ReviewUI() {
     setFocusMode((prev) => {
       const next = !prev;
       if (next) {
+        preFocusWrap.current = wrap;
         setSidebarHidden(true);
         setWrap(true);
       } else {
         setSidebarHidden(false);
+        setWrap(preFocusWrap.current);
       }
       return next;
     });
-  }, []);
+  }, [wrap]);
 
   const handleCommand = useCallback(
     async (command: string) => {
@@ -595,9 +581,7 @@ function ReviewUI() {
         const item = sidebarItemsRef.current[sidebarCursor];
         if (!item) return;
         if (item.kind === "dir") {
-          setToggleDirPath(item.path);
-          // Reset so re-pressing Enter on the same dir works
-          setTimeout(() => setToggleDirPath(""), 0);
+          sidebarRef.current?.toggleDir(item.path);
         } else if (item.kind !== "section") {
           setFocus("main");
         }
@@ -730,7 +714,7 @@ function ReviewUI() {
     // File-level comment (Shift+C)
     {
       key: "shift+c",
-      handler: openFileComment,
+      handler: () => openCommentEditor(0, 0),
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
@@ -824,7 +808,7 @@ function ReviewUI() {
     },
     {
       key: "^",
-      handler: () => diffViewRef.current?.scrollToColumn("first-char"),
+      handler: () => diffViewRef.current?.scrollToColumn("start"),
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
     {
@@ -912,6 +896,7 @@ function ReviewUI() {
         {!sidebarHidden && (
           <div className="flex" onClick={() => setFocus("sidebar")}>
             <Sidebar
+              ref={sidebarRef}
               files={files}
               contentItems={contentItems}
               additionalFiles={additionalFiles}
@@ -923,7 +908,6 @@ function ReviewUI() {
               treeMode={treeMode}
               collapseAllSignal={collapseAllSignal}
               expandAllSignal={expandAllSignal}
-              toggleDirPath={toggleDirPath}
               onSelect={handleSidebarSelect}
               onCursorChange={setSidebarCursor}
               onItemsChange={handleSidebarItems}

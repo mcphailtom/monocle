@@ -76,7 +76,7 @@ export interface DiffViewHandle {
   scroll: (delta: number) => void;
   scrollHalfPage: (direction: 1 | -1) => void;
   scrollHorizontal: (delta: number) => void;
-  scrollToColumn: (target: "start" | "first-char" | "end") => void;
+  scrollToColumn: (target: "start" | "end") => void;
   getCursorLine: () => number;
   getCommentAtCursor: () => ReviewComment | null;
   toggleVisualMode: () => void;
@@ -379,19 +379,13 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       containerRef.current?.scrollBy({ left: delta * 40 });
     }, []);
 
-    const scrollToColumn = useCallback((target: "start" | "first-char" | "end") => {
+    const scrollToColumn = useCallback((target: "start" | "end") => {
       const container = containerRef.current;
       if (!container) return;
-      switch (target) {
-        case "start":
-          container.scrollLeft = 0;
-          break;
-        case "first-char":
-          container.scrollLeft = 0;
-          break;
-        case "end":
-          container.scrollLeft = container.scrollWidth - container.clientWidth;
-          break;
+      if (target === "start") {
+        container.scrollLeft = 0;
+      } else {
+        container.scrollLeft = container.scrollWidth - container.clientWidth;
       }
     }, []);
 
