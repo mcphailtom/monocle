@@ -26,6 +26,7 @@ const SECTIONS = [
       ["$", "Scroll to line end"],
       ["[ / ]", "Previous / next file"],
       ["{ / }", "Previous / next sidebar section"],
+      ["Enter", "Focus diff pane / toggle directory"],
       ["Tab", "Switch focus between sidebar and main pane"],
       ["\\", "Toggle sidebar"],
       ["1 / 2", "Focus sidebar / main pane"],
@@ -35,6 +36,7 @@ const SECTIONS = [
     title: "Sidebar",
     bindings: [
       ["f", "Toggle tree/flat view"],
+      ["z / e", "Collapse / expand all (tree mode)"],
       ["/", "Cycle review filter (all / reviewed / unreviewed)"],
     ],
   },
@@ -63,6 +65,15 @@ const SECTIONS = [
       ["D", "Clear review (all comments, reviewed states)"],
       ["I", "Connection info"],
       [":", "Open command palette"],
+    ],
+  },
+  {
+    title: "Submit Dialog",
+    bindings: [
+      ["Tab", "Toggle action (approve / request changes)"],
+      ["Ctrl+Enter", "Submit review"],
+      ["Ctrl+Y", "Copy review to clipboard"],
+      ["Escape", "Cancel"],
     ],
   },
   {
