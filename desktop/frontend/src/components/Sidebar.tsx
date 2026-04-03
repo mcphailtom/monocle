@@ -412,7 +412,7 @@ function SidebarRow({
   return (
     <div
       ref={setRef}
-      className={`flex items-center gap-1 px-3 py-0.5 cursor-pointer text-sm truncate transition-colors duration-150 ${
+      className={`flex items-center gap-1 px-3 py-0.5 cursor-pointer text-[13px] truncate transition-colors duration-150 ${
         isActive
           ? "bg-accent text-accent-foreground"
           : isCursor
