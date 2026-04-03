@@ -164,3 +164,29 @@ html, body, #root {
   -webkit-user-select: text;
   user-select: text;
 }
+
+/* react-diff-view Catppuccin Mocha dark theme overrides */
+:root {
+  --diff-background-color: var(--background);
+  --diff-text-color: var(--foreground);
+  --diff-font-family: inherit;
+  --diff-selection-background-color: #45475a;
+  --diff-selection-text-color: #cdd6f4;
+  --diff-gutter-insert-background-color: #132a13;
+  --diff-gutter-insert-text-color: #a6adc8;
+  --diff-gutter-delete-background-color: #2a1313;
+  --diff-gutter-delete-text-color: #a6adc8;
+  --diff-gutter-selected-background-color: #45475a;
+  --diff-gutter-selected-text-color: #cdd6f4;
+  --diff-code-insert-background-color: #132a13;
+  --diff-code-insert-text-color: #cdd6f4;
+  --diff-code-delete-background-color: #2a1313;
+  --diff-code-delete-text-color: #cdd6f4;
+  --diff-code-insert-edit-background-color: #1f4a1f;
+  --diff-code-insert-edit-text-color: #cdd6f4;
+  --diff-code-delete-edit-background-color: #4a1f1f;
+  --diff-code-delete-edit-text-color: #cdd6f4;
+  --diff-code-selected-background-color: #45475a;
+  --diff-code-selected-text-color: #cdd6f4;
+  --diff-omit-gutter-line-color: #6c7086;
+}
