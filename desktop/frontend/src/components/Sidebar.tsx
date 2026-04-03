@@ -300,6 +300,9 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
     [items],
   );
 
+  const cursorItem = items[cursor];
+  const cursorOnNonFile = focused && (cursorItem?.kind === "dir" || cursorItem?.kind === "section");
+
   return (
     <aside
       className={`flex flex-col border-r overflow-hidden transition-colors duration-150 ${
@@ -309,10 +312,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
     >
       <ScrollArea className="flex-1" ref={scrollRef}>
         <div className="py-1">
-          {items.map((item, index) => {
-            const cursorItem = items[cursor];
-            const cursorOnNonFile = focused && (cursorItem?.kind === "dir" || cursorItem?.kind === "section");
-            return (
+          {items.map((item, index) => (
             <SidebarRow
               key={`${item.kind}-${index}`}
               item={item}
@@ -325,8 +325,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
                 else itemRefs.current.delete(index);
               }}
             />
-            );
-          })}
+          ))}
           {selectableCount === 0 && (
             <div className="px-3 py-4 text-sm text-muted-foreground text-center">
               No files to show
