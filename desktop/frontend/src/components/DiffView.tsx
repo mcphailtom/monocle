@@ -190,11 +190,11 @@ function useShikiHighlight(diff: DiffResult) {
 
 // --- Comment widget ---
 
-const COMMENT_TYPE_STYLES: Record<CommentType, { label: string; className: string }> = {
-  issue: { label: "Issue", className: "bg-comment-issue/20 border-comment-issue/40 text-comment-issue" },
-  suggestion: { label: "Suggestion", className: "bg-comment-suggest/20 border-comment-suggest/40 text-comment-suggest" },
-  note: { label: "Note", className: "bg-comment-note/20 border-comment-note/40 text-comment-note" },
-  praise: { label: "Praise", className: "bg-comment-praise/20 border-comment-praise/40 text-comment-praise" },
+const COMMENT_TYPE_STYLES: Record<CommentType, { label: string; base: string; focused: string }> = {
+  issue: { label: "Issue", base: "bg-comment-issue/20 border-comment-issue/40 text-comment-issue", focused: "bg-comment-issue/35 border-comment-issue text-comment-issue" },
+  suggestion: { label: "Suggestion", base: "bg-comment-suggest/20 border-comment-suggest/40 text-comment-suggest", focused: "bg-comment-suggest/35 border-comment-suggest text-comment-suggest" },
+  note: { label: "Note", base: "bg-comment-note/20 border-comment-note/40 text-comment-note", focused: "bg-comment-note/35 border-comment-note text-comment-note" },
+  praise: { label: "Praise", base: "bg-comment-praise/20 border-comment-praise/40 text-comment-praise", focused: "bg-comment-praise/35 border-comment-praise text-comment-praise" },
 };
 
 function CommentWidget({
@@ -215,7 +215,7 @@ function CommentWidget({
           <div
             key={comment.ID}
             data-comment-id={comment.ID}
-            className={`border rounded px-3 py-2 mb-1 text-xs cursor-pointer ${style.className} ${isFocused ? "ring-1 ring-primary" : ""}`}
+            className={`border rounded px-3 py-2 mb-1 text-xs cursor-pointer ${isFocused ? style.focused : style.base}`}
             onClick={() => onClick?.(comment)}
           >
             <span className="font-bold mr-2">{style.label}</span>
