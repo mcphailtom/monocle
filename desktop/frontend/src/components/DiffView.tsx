@@ -5,11 +5,13 @@ import {
   parseDiff,
   Decoration,
   getChangeKey,
+  tokenize,
 } from "react-diff-view";
 import type {
   HunkData,
   ViewType,
   DiffType,
+  HunkTokens,
 } from "react-diff-view";
 import { createHighlighter, type Highlighter } from "shiki";
 import type { DiffResult, ReviewComment, CommentType } from "../types";
@@ -228,6 +230,18 @@ export function DiffView({
     return [files[0] ?? null];
   }, [diff]);
 
+  // Structural tokens (no syntax highlight — just gives renderToken something to work with)
+  const tokens = useMemo((): HunkTokens | null => {
+    if (!file) return null;
+    try {
+      return tokenize(file.hunks, {
+        highlight: false,
+      } as Parameters<typeof tokenize>[1]);
+    } catch {
+      return null;
+    }
+  }, [file]);
+
   // Build widgets map
   const widgets = useMemo(() => {
     if (!file || comments.length === 0) return {};
@@ -345,6 +359,7 @@ export function DiffView({
         diffType={diffType}
         hunks={file.hunks}
         widgets={widgets}
+        tokens={tokens ?? undefined}
         renderToken={renderToken as any}
         gutterEvents={gutterEvents as any}
       >
