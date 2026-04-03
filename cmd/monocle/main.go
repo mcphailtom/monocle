@@ -11,7 +11,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/alecthomas/kong"
 
-	"github.com/josephschmitt/monocle/desktop"
 	"github.com/josephschmitt/monocle/internal/adapters"
 	"github.com/josephschmitt/monocle/internal/client"
 	"github.com/josephschmitt/monocle/internal/core"
@@ -25,14 +24,7 @@ import (
 var version = "dev"
 
 type CLI struct {
-<<<<<<< HEAD
 	Run             RunCmd             `cmd:"" default:"withargs" help:"Start a review session" hidden:""`
-||||||| parent of c8e604b (feat: scaffold Wails desktop app with React frontend)
-	Run             RunCmd             `cmd:"" default:"withargs" help:"Start a review session"`
-=======
-	Run             RunCmd             `cmd:"" default:"withargs" help:"Start a review session"`
-	App             AppCmd             `cmd:"" help:"Start Monocle as a desktop app"`
->>>>>>> c8e604b (feat: scaffold Wails desktop app with React frontend)
 	Review          ReviewCmd          `cmd:"review" help:"Commands for interacting with a Monocle review session"`
 	Register        RegisterCmd        `cmd:"" help:"Register Monocle for an agent"`
 	Unregister      UnregisterCmd      `cmd:"" help:"Remove Monocle registration"`
@@ -97,13 +89,6 @@ type RunCmd struct {
 	Session        string   `help:"Resume a specific session by ID" name:"session" short:"s" default:""`
 }
 
-type AppCmd struct {
-	Socket         string   `help:"Override socket path for agent connection" env:"MONOCLE_SOCKET" default:""`
-	AdditionalPath []string `help:"Additional file or directory paths to include for review (repeatable)" name:"additional-path" short:"a" type:"path"`
-	Continue       bool     `help:"Resume the most recent session for this repo" name:"continue" short:"c" xor:"session-mode"`
-	Session        string   `help:"Resume a specific session by ID" name:"session" short:"s" default:""`
-}
-
 type RegisterCmd struct {
 	Agent           string `arg:"" optional:"" help:"Agent to register (claude, opencode, codex, gemini, all)"`
 	Global          bool   `help:"Register in user-level config instead of project" default:"false"`
@@ -157,10 +142,6 @@ func main() {
 
 func (cmd *RunCmd) Run() error {
 	return runTUI(cmd.Socket, cmd.WorkDir, cmd.AdditionalPath, cmd.Continue, cmd.Resume, cmd.Session)
-}
-
-func (cmd *AppCmd) Run() error {
-	return runDesktopApp(cmd.Socket, cmd.AdditionalPath, cmd.Continue, cmd.Session)
 }
 
 func (cmd *RegisterCmd) Run() error {
@@ -809,74 +790,6 @@ func runTUI(socketOverride string, workdir string, additionalPaths []string, con
 	// Run program
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("run tui: %w", err)
-	}
-
-	// Cleanup
-	engine.Shutdown()
-	return nil
-}
-
-func runDesktopApp(socketOverride string, additionalPaths []string, continueSession bool, sessionID string) error {
-	// Load config
-	cfg, err := core.LoadConfig()
-	if err != nil {
-		cfg = core.DefaultConfig()
-	}
-
-	// Open database
-	database, err := db.Open(db.DBPath())
-	if err != nil {
-		return fmt.Errorf("open db: %w", err)
-	}
-	defer database.Close()
-
-	// Get repo root
-	repoRoot, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("get cwd: %w", err)
-	}
-	repoRoot = adapters.FindRepoRoot(repoRoot)
-	nonGitMode := !adapters.IsGitRepo(repoRoot)
-
-	// Create engine
-	engine, err := core.NewEngine(cfg, database, repoRoot, nonGitMode)
-	if err != nil {
-		return fmt.Errorf("create engine: %w", err)
-	}
-
-	// Resolve session
-	if nonGitMode {
-		if err := startNewSession(engine, repoRoot); err != nil {
-			return err
-		}
-	} else if err := resolveSession(engine, repoRoot, continueSession, false, sessionID); err != nil {
-		return err
-	}
-
-	// Reload pending feedback for continued sessions
-	if continueSession || sessionID != "" {
-		engine.ReloadPendingFeedback()
-	}
-
-	// Add additional file paths
-	if len(additionalPaths) > 0 && !continueSession && sessionID == "" {
-		if _, err := engine.AddAdditionalPaths(additionalPaths); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: could not add additional paths: %v\n", err)
-		}
-	}
-
-	// Start socket server for agent communication
-	socketPath := socketOverride
-	if socketPath == "" {
-		socketPath = adapters.DefaultSocketPath(repoRoot)
-	}
-	if err := engine.StartServer(socketPath); err != nil {
-		return fmt.Errorf("start server: %w", err)
-	}
-
-	// Run Wails desktop app (blocks until window closes)
-	if err := desktop.Run(engine); err != nil {
-		return fmt.Errorf("run desktop app: %w", err)
 	}
 
 	// Cleanup
