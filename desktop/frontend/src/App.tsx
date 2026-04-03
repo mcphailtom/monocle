@@ -4,6 +4,8 @@ import { Sidebar, type SidebarItem } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { DiffView } from "./components/DiffView";
 import { ContentView } from "./components/ContentView";
+import { CommentEditor } from "./components/CommentEditor";
+import { ReviewSubmitDialog } from "./components/ReviewSubmitDialog";
 import { useKeyboard } from "./hooks/useKeyboard";
 import type {
   ReviewSession,
@@ -11,6 +13,10 @@ import type {
   ContentItem,
   AdditionalFile,
   DiffResult,
+  ReviewSummary,
+  ReviewComment,
+  CommentType,
+  TargetType,
 } from "./types";
 import type { ViewType } from "react-diff-view";
 
@@ -35,6 +41,20 @@ function App() {
   const [feedbackStatus, setFeedbackStatus] = useState("");
   const [viewType, setViewType] = useState<ViewType>("unified");
   const [contentTitle, setContentTitle] = useState("");
+
+  // Comment editor state
+  const [commentEditorOpen, setCommentEditorOpen] = useState(false);
+  const [commentTarget, setCommentTarget] = useState<{
+    targetType: TargetType;
+    targetRef: string;
+    lineStart: number;
+    lineEnd: number;
+  } | null>(null);
+  const [editingComment, setEditingComment] = useState<ReviewComment | null>(null);
+
+  // Review submit state
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null);
 
   // --- Data loading ---
 
@@ -114,6 +134,113 @@ function App() {
       // ignore
     }
   }, []);
+
+  // --- Comment actions ---
+
+  const openCommentEditor = useCallback(
+    (lineStart: number, lineEnd: number = 0) => {
+      const targetType: TargetType = selectedContentId ? "content" : "file";
+      const targetRef = selectedContentId || selectedPath;
+      if (!targetRef) return;
+
+      setCommentTarget({ targetType, targetRef, lineStart, lineEnd: lineEnd || lineStart });
+      setEditingComment(null);
+      setCommentEditorOpen(true);
+    },
+    [selectedPath, selectedContentId],
+  );
+
+  const handleSaveComment = useCallback(
+    async (type: CommentType, body: string) => {
+      if (!commentTarget) return;
+      try {
+        if (editingComment) {
+          await api.editComment(editingComment.ID, type, body);
+        } else {
+          await api.addComment(
+            commentTarget.targetType,
+            commentTarget.targetRef,
+            commentTarget.lineStart,
+            commentTarget.lineEnd,
+            type,
+            body,
+          );
+        }
+        // Refresh session to get updated comments
+        loadSession();
+      } catch (err) {
+        console.error("Failed to save comment:", err);
+      }
+    },
+    [commentTarget, editingComment, loadSession],
+  );
+
+  const handleEditComment = useCallback((comment: ReviewComment) => {
+    setCommentTarget({
+      targetType: comment.TargetType,
+      targetRef: comment.TargetRef,
+      lineStart: comment.LineStart,
+      lineEnd: comment.LineEnd,
+    });
+    setEditingComment(comment);
+    setCommentEditorOpen(true);
+  }, []);
+
+  const handleMarkReviewed = useCallback(async () => {
+    try {
+      if (selectedContentId) {
+        const item = contentItems.find((c) => c.ID === selectedContentId);
+        if (item?.Reviewed) {
+          await api.unmarkContentReviewed(selectedContentId);
+        } else {
+          await api.markContentReviewed(selectedContentId);
+        }
+      } else if (selectedPath) {
+        const file = files.find((f) => f.Path === selectedPath);
+        if (file?.Reviewed) {
+          await api.unmarkReviewed(selectedPath);
+        } else {
+          await api.markReviewed(selectedPath);
+        }
+      }
+      loadSession();
+      loadFiles();
+    } catch (err) {
+      console.error("Failed to toggle reviewed:", err);
+    }
+  }, [selectedPath, selectedContentId, files, contentItems, loadSession, loadFiles]);
+
+  const openReviewDialog = useCallback(async () => {
+    try {
+      const summary = await api.getReviewSummary();
+      setReviewSummary(summary);
+      setReviewDialogOpen(true);
+    } catch (err) {
+      console.error("Failed to get review summary:", err);
+    }
+  }, []);
+
+  const handleSubmitReview = useCallback(
+    async (action: string, body: string) => {
+      try {
+        await api.submit(action, body);
+        loadSession();
+        refreshStatus();
+      } catch (err) {
+        console.error("Failed to submit review:", err);
+      }
+    },
+    [loadSession, refreshStatus],
+  );
+
+  const handleRequestPause = useCallback(async () => {
+    try {
+      await api.requestPause();
+      refreshStatus();
+    } catch (err) {
+      console.error("Failed to request pause:", err);
+    }
+  }, [refreshStatus]);
 
   // --- Initial load ---
 
@@ -255,6 +382,30 @@ function App() {
         setViewType((v) => (v === "unified" ? "split" : "unified")),
       when: () => focus === "main",
     },
+
+    // Commenting (when main pane focused, no dialog open)
+    {
+      key: "c",
+      handler: () => openCommentEditor(1),
+      when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
+    },
+
+    // Review actions (global, no dialog open)
+    {
+      key: "r",
+      handler: handleMarkReviewed,
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+    {
+      key: "shift+s",
+      handler: openReviewDialog,
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
+    {
+      key: "shift+p",
+      handler: handleRequestPause,
+      when: () => !commentEditorOpen && !reviewDialogOpen,
+    },
   ]);
 
   function getTotalItems(): number {
@@ -306,6 +457,8 @@ function App() {
               }
               viewType={viewType}
               focused={focus === "main"}
+              onLineClick={(lineNum) => openCommentEditor(lineNum)}
+              onCommentClick={handleEditComment}
             />
           ) : fileContent !== null ? (
             <ContentView
@@ -334,6 +487,25 @@ function App() {
         subscriberCount={subscriberCount}
         feedbackStatus={feedbackStatus}
         selectedFile={selectedPath || selectedContentId}
+      />
+
+      {/* Comment editor dialog */}
+      <CommentEditor
+        open={commentEditorOpen}
+        onClose={() => setCommentEditorOpen(false)}
+        onSave={handleSaveComment}
+        editingComment={editingComment}
+        targetLabel={commentTarget?.targetRef ?? ""}
+        lineStart={commentTarget?.lineStart ?? 0}
+        lineEnd={commentTarget?.lineEnd ?? 0}
+      />
+
+      {/* Review submit dialog */}
+      <ReviewSubmitDialog
+        open={reviewDialogOpen}
+        onClose={() => setReviewDialogOpen(false)}
+        onSubmit={handleSubmitReview}
+        summary={reviewSummary}
       />
     </div>
   );
