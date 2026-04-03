@@ -191,10 +191,10 @@ function useShikiHighlight(diff: DiffResult) {
 // --- Comment widget ---
 
 const COMMENT_TYPE_STYLES: Record<CommentType, { label: string; base: string; focused: string }> = {
-  issue: { label: "Issue", base: "bg-comment-issue/20 border-comment-issue/40 text-comment-issue", focused: "bg-comment-issue/35 border-comment-issue text-comment-issue" },
-  suggestion: { label: "Suggestion", base: "bg-comment-suggest/20 border-comment-suggest/40 text-comment-suggest", focused: "bg-comment-suggest/35 border-comment-suggest text-comment-suggest" },
-  note: { label: "Note", base: "bg-comment-note/20 border-comment-note/40 text-comment-note", focused: "bg-comment-note/35 border-comment-note text-comment-note" },
-  praise: { label: "Praise", base: "bg-comment-praise/20 border-comment-praise/40 text-comment-praise", focused: "bg-comment-praise/35 border-comment-praise text-comment-praise" },
+  issue: { label: "Issue", base: "bg-comment-issue/20 border-comment-issue/40 text-comment-issue", focused: "bg-comment-issue/50 border-comment-issue text-comment-issue" },
+  suggestion: { label: "Suggestion", base: "bg-comment-suggest/20 border-comment-suggest/40 text-comment-suggest", focused: "bg-comment-suggest/50 border-comment-suggest text-comment-suggest" },
+  note: { label: "Note", base: "bg-comment-note/20 border-comment-note/40 text-comment-note", focused: "bg-comment-note/50 border-comment-note text-comment-note" },
+  praise: { label: "Praise", base: "bg-comment-praise/20 border-comment-praise/40 text-comment-praise", focused: "bg-comment-praise/50 border-comment-praise text-comment-praise" },
 };
 
 function CommentWidget({
