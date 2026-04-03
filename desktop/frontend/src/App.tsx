@@ -817,35 +817,42 @@ function ReviewUI() {
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Section navigation ({/} — jump between sidebar sections)
+    // {/} — jump between comments (main pane) or sidebar sections (sidebar)
     {
       key: "{",
       handler: () => {
-        const items = sidebarItemsRef.current;
-        for (let i = sidebarCursor - 1; i >= 0; i--) {
-          if (items[i]?.kind === "section") {
-            // Move to first item after section header
-            const target = Math.min(i + 1, items.length - 1);
-            moveSidebarCursorTo(target);
-            return;
+        if (focus === "main") {
+          diffViewRef.current?.jumpToComment(-1);
+        } else {
+          const items = sidebarItemsRef.current;
+          for (let i = sidebarCursor - 1; i >= 0; i--) {
+            if (items[i]?.kind === "section") {
+              const target = Math.min(i + 1, items.length - 1);
+              moveSidebarCursorTo(target);
+              return;
+            }
           }
+          moveSidebarCursorTo(0);
         }
-        moveSidebarCursorTo(0);
       },
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
     {
       key: "}",
       handler: () => {
-        const items = sidebarItemsRef.current;
-        for (let i = sidebarCursor + 1; i < items.length; i++) {
-          if (items[i]?.kind === "section") {
-            const target = Math.min(i + 1, items.length - 1);
-            moveSidebarCursorTo(target);
-            return;
+        if (focus === "main") {
+          diffViewRef.current?.jumpToComment(1);
+        } else {
+          const items = sidebarItemsRef.current;
+          for (let i = sidebarCursor + 1; i < items.length; i++) {
+            if (items[i]?.kind === "section") {
+              const target = Math.min(i + 1, items.length - 1);
+              moveSidebarCursorTo(target);
+              return;
+            }
           }
+          moveSidebarCursorTo(items.length - 1);
         }
-        moveSidebarCursorTo(items.length - 1);
       },
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
