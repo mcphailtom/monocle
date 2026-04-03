@@ -374,16 +374,6 @@ function ReviewUI() {
     sidebarItemsRef.current = items;
   }, []);
 
-  const selectSidebarItem = useCallback(
-    (cursor: number) => {
-      const item = sidebarItemsRef.current[cursor];
-      if (item && item.kind !== "section" && item.kind !== "dir") {
-        handleSidebarSelect(item);
-      }
-    },
-    [handleSidebarSelect],
-  );
-
   const moveSidebarCursor = useCallback(
     (delta: number) => {
       setSidebarCursor((c) => {
@@ -457,7 +447,7 @@ function ReviewUI() {
     },
     {
       key: "shift+g",
-      handler: () => moveSidebarCursorTo(getTotalItems() - 1),
+      handler: () => moveSidebarCursorTo(sidebarItemsRef.current.length - 1),
       when: () => focus === "sidebar",
     },
 
@@ -538,16 +528,6 @@ function ReviewUI() {
       when: () => helpOpen || commandPaletteOpen,
     },
   ]);
-
-  function getTotalItems(): number {
-    return (
-      files.length +
-      contentItems.length +
-      additionalFiles.length +
-      // approximate — sections are non-navigable but counted in the flat list
-      10
-    );
-  }
 
   // --- Render ---
 

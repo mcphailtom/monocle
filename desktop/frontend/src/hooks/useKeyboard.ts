@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 type KeyHandler = (e: KeyboardEvent) => void;
 
@@ -76,11 +76,3 @@ function matchKey(e: KeyboardEvent, pattern: string): boolean {
   }
 }
 
-/**
- * Memoized callback that doesn't change identity.
- */
-export function useStableCallback<T extends (...args: unknown[]) => unknown>(fn: T): T {
-  const ref = useRef(fn);
-  ref.current = fn;
-  return useCallback((...args: unknown[]) => ref.current(...args), []) as T;
-}

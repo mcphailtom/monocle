@@ -114,8 +114,8 @@ function filterByReview<T extends { Reviewed: boolean }>(
   items: T[],
   filter: string,
 ): T[] {
-  if (filter === "reviewed") return items.filter((f) => !f.Reviewed);
-  if (filter === "unreviewed") return items.filter((f) => f.Reviewed);
+  if (filter === "reviewed") return items.filter((f) => f.Reviewed);
+  if (filter === "unreviewed") return items.filter((f) => !f.Reviewed);
   return items;
 }
 
@@ -251,9 +251,10 @@ export function Sidebar({
     [items, onSelect, onCursorChange, toggleDir],
   );
 
-  const selectableCount = items.filter(
-    (i) => i.kind !== "section",
-  ).length;
+  const selectableCount = useMemo(
+    () => items.filter((i) => i.kind !== "section").length,
+    [items],
+  );
 
   return (
     <aside
