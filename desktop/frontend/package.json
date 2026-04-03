@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@azurity/pure-nerd-font": "^3.0.5",
     "@base-ui/react": "^1.3.0",
     "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
     "@fontsource/instrument-serif": "^5.2.8",
