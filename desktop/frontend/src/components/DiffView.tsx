@@ -79,6 +79,7 @@ export interface DiffViewHandle {
   scrollToColumn: (target: "start" | "end") => void;
   getCursorLine: () => number;
   getCommentAtCursor: () => ReviewComment | null;
+  getFocusedComment: () => ReviewComment | null;
   toggleVisualMode: () => void;
   isVisualMode: () => boolean;
   getSelectionRange: () => { start: number; end: number } | null;
@@ -558,6 +559,11 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       return null;
     }, [allChanges, cursorIndex, comments, focusedCommentId]);
 
+    const getFocusedComment = useCallback(() => {
+      if (!focusedCommentId) return null;
+      return comments.find((c) => c.ID === focusedCommentId) ?? null;
+    }, [comments, focusedCommentId]);
+
     const toggleVisualMode = useCallback(() => {
       if (visualMode) {
         setVisualMode(false);
@@ -693,6 +699,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
         scrollToColumn,
         getCursorLine,
         getCommentAtCursor,
+        getFocusedComment,
         toggleVisualMode,
         isVisualMode,
         getSelectionRange,
@@ -700,7 +707,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
         jumpToComment,
         exitVisualMode,
       }),
-      [moveCursor, scroll, scrollHalfPage, scrollHorizontal, scrollToColumn, getCursorLine, getCommentAtCursor, toggleVisualMode, isVisualMode, getSelectionRange, getSelectedContent, jumpToComment, exitVisualMode],
+      [moveCursor, scroll, scrollHalfPage, scrollHorizontal, scrollToColumn, getCursorLine, getCommentAtCursor, getFocusedComment, toggleVisualMode, isVisualMode, getSelectionRange, getSelectedContent, jumpToComment, exitVisualMode],
     );
 
     // Selected change keys for highlight (single line or visual range)
