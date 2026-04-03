@@ -133,7 +133,7 @@ func (a *App) SelectProject(projectPath string) error {
 		socketPath = override
 	}
 	if err := engine.StartServer(socketPath); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not start server: %v\n", err)
+		return fmt.Errorf("start server: %w", err)
 	}
 
 	// Bridge engine events to Wails

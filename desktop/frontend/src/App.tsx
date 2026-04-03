@@ -27,18 +27,22 @@ type FocusTarget = "sidebar" | "main";
 
 function App() {
   const [projectPath, setProjectPath] = useState<string | null>(null);
+  const [projectError, setProjectError] = useState<string | null>(null);
 
   const handleSelectProject = useCallback(async (path: string) => {
+    setProjectError(null);
     try {
       await api.selectProject(path);
       setProjectPath(path);
     } catch (err) {
-      console.error("Failed to select project:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Failed to select project:", msg);
+      setProjectError(msg);
     }
   }, []);
 
   if (!projectPath) {
-    return <ProjectPicker onSelect={handleSelectProject} />;
+    return <ProjectPicker onSelect={handleSelectProject} error={projectError} />;
   }
 
   return <ReviewUI />;
