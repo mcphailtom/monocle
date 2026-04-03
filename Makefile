@@ -1,4 +1,4 @@
-.PHONY: build run build-app run-app install uninstall test vet lint sync-skills skills-tarball
+.PHONY: build run build-desktop dev-desktop install uninstall test vet lint sync-skills skills-tarball
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
@@ -9,10 +9,10 @@ build:
 run: build
 	./bin/monocle
 
-build-app:
+build-desktop:
 	wails build -ldflags "-X main.version=$(VERSION)"
 
-run-app:
+dev-desktop:
 	wails dev
 
 install:
