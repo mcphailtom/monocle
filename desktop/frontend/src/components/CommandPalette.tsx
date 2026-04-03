@@ -19,6 +19,7 @@ const COMMANDS = [
   { value: "pause", label: "Request pause", group: "Review" },
   { value: "clear", label: "Clear all comments", group: "Review" },
   { value: "mark-all-reviewed", label: "Mark all files reviewed", group: "Review" },
+  { value: "mark-all-unreviewed", label: "Mark all files unreviewed", group: "Review" },
   { value: "discard", label: "Discard review", group: "Review" },
   { value: "history", label: "View submission history", group: "Session" },
 ];
