@@ -199,19 +199,23 @@ const COMMENT_TYPE_STYLES: Record<CommentType, { label: string; className: strin
 
 function CommentWidget({
   comments,
+  focusedId,
   onClick,
 }: {
   comments: ReviewComment[];
+  focusedId?: string | null;
   onClick?: (c: ReviewComment) => void;
 }) {
   return (
     <div className="mx-2 my-1">
       {comments.map((comment) => {
         const style = COMMENT_TYPE_STYLES[comment.Type] ?? COMMENT_TYPE_STYLES.note;
+        const isFocused = focusedId === comment.ID;
         return (
           <div
             key={comment.ID}
-            className={`border rounded px-3 py-2 mb-1 text-xs cursor-pointer ${style.className}`}
+            data-comment-id={comment.ID}
+            className={`border rounded px-3 py-2 mb-1 text-xs cursor-pointer ${style.className} ${isFocused ? "ring-1 ring-primary" : ""}`}
             onClick={() => onClick?.(comment)}
           >
             <span className="font-bold mr-2">{style.label}</span>
@@ -251,6 +255,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const lineHtml = useShikiHighlight(diff);
     const [cursorIndex, setCursorIndex] = useState(0);
+    const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
     const [visualMode, setVisualMode] = useState(false);
     const [visualAnchor, setVisualAnchor] = useState(0);
 
@@ -274,26 +279,52 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       return changes;
     }, [file]);
 
+    // Map change index → comments on that line (for nav interleaving)
+    const commentsByChangeIdx = useMemo(() => {
+      const map = new Map<number, ReviewComment[]>();
+      if (allChanges.length === 0 || comments.length === 0) return map;
+      const lineToComments = new Map<number, ReviewComment[]>();
+      for (const c of comments) {
+        const line = c.LineEnd || c.LineStart;
+        if (line <= 0) continue;
+        const arr = lineToComments.get(line) ?? [];
+        arr.push(c);
+        lineToComments.set(line, arr);
+      }
+      for (let i = 0; i < allChanges.length; i++) {
+        const change = allChanges[i];
+        if (change.type === "delete") continue;
+        const lineNum = changeLineNumber(change);
+        const coms = lineToComments.get(lineNum);
+        if (coms && coms.length > 0) map.set(i, coms);
+      }
+      return map;
+    }, [allChanges, comments]);
+
     // Reset cursor and visual mode when diff changes
     useEffect(() => {
       setCursorIndex(0);
+      setFocusedCommentId(null);
       setVisualMode(false);
       containerRef.current?.scrollTo(0, 0);
     }, [diff.Path]);
 
-    // Scroll selected line into view after render
+    // Scroll selected line or focused comment into view after render
     useEffect(() => {
       if (!focused || allChanges.length === 0) return;
       const container = containerRef.current;
       if (!container) return;
-      // react-diff-view applies .diff-code-selected to the selected change row
+      if (focusedCommentId) {
+        const el = container.querySelector(`[data-comment-id="${focusedCommentId}"]`) as HTMLElement | null;
+        if (el) { el.scrollIntoView({ block: "nearest" }); return; }
+      }
       const selectedRow = container.querySelector(
         ".diff-code-selected",
       ) as HTMLElement | null;
       if (selectedRow) {
         selectedRow.scrollIntoView({ block: "nearest" });
       }
-    }, [cursorIndex, focused, allChanges.length]);
+    }, [cursorIndex, focusedCommentId, focused, allChanges.length]);
 
     // Map change key → index for fast DOM-to-index lookups
     const changeKeyToIndex = useMemo(() => {
@@ -306,10 +337,53 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
 
     const moveCursor = useCallback(
       (delta: number) => {
-        const normalMove = () =>
-          setCursorIndex((prev) =>
-            Math.max(0, Math.min(prev + delta, allChanges.length - 1)),
-          );
+        // When on a focused comment, navigate within or out of comments
+        if (focusedCommentId) {
+          const coms = commentsByChangeIdx.get(cursorIndex);
+          if (coms) {
+            const comIdx = coms.findIndex((c) => c.ID === focusedCommentId);
+            if (delta > 0) {
+              // Moving down: next comment on same line, or advance to next change
+              if (comIdx < coms.length - 1) {
+                setFocusedCommentId(coms[comIdx + 1].ID);
+                return;
+              }
+              // No more comments — move to next change
+              setFocusedCommentId(null);
+              setCursorIndex((prev) => Math.min(prev + 1, allChanges.length - 1));
+              return;
+            } else {
+              // Moving up: prev comment, or back to the code line
+              if (comIdx > 0) {
+                setFocusedCommentId(coms[comIdx - 1].ID);
+                return;
+              }
+              // Back to the code line itself
+              setFocusedCommentId(null);
+              return;
+            }
+          }
+          setFocusedCommentId(null);
+        }
+
+        const normalMove = () => {
+          setCursorIndex((prev) => {
+            const next = Math.max(0, Math.min(prev + delta, allChanges.length - 1));
+            // When moving down past a line with comments, stop on first comment
+            if (delta > 0 && commentsByChangeIdx.has(prev) && next !== prev) {
+              const coms = commentsByChangeIdx.get(prev)!;
+              setFocusedCommentId(coms[0].ID);
+              return prev; // stay on same change index
+            }
+            // When moving up into a line with comments, stop on last comment
+            if (delta < 0 && commentsByChangeIdx.has(next) && next !== prev) {
+              const coms = commentsByChangeIdx.get(next)!;
+              setFocusedCommentId(coms[coms.length - 1].ID);
+              return next;
+            }
+            return next;
+          });
+        };
 
         const container = containerRef.current;
         if (!container) {
@@ -332,7 +406,6 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
         }
 
         // Cursor is off-screen — snap to the first/last visible change
-        // react-diff-view puts data-change-key on code <td> elements
         const cells = container.querySelectorAll("td[data-change-key]");
         if (delta > 0) {
           for (const cell of cells) {
@@ -341,6 +414,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
               const key = cell.getAttribute("data-change-key");
               const idx = key ? changeKeyToIndex.get(key) : undefined;
               if (idx !== undefined) {
+                setFocusedCommentId(null);
                 setCursorIndex(idx);
                 return;
               }
@@ -353,6 +427,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
               const key = cells[i].getAttribute("data-change-key");
               const idx = key ? changeKeyToIndex.get(key) : undefined;
               if (idx !== undefined) {
+                setFocusedCommentId(null);
                 setCursorIndex(idx);
                 return;
               }
@@ -362,7 +437,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
 
         normalMove();
       },
-      [allChanges.length, changeKeyToIndex],
+      [allChanges.length, changeKeyToIndex, focusedCommentId, cursorIndex, commentsByChangeIdx],
     );
 
     const scroll = useCallback((delta: number) => {
@@ -395,17 +470,20 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     }, [allChanges, cursorIndex]);
 
     const getCommentAtCursor = useCallback(() => {
+      // If a specific comment is focused via j/k navigation, return it
+      if (focusedCommentId) {
+        return comments.find((c) => c.ID === focusedCommentId) ?? null;
+      }
       const change = allChanges[cursorIndex];
       if (!change) return null;
       const lineNum = changeLineNumber(change);
-      // Find any comment whose line range includes the cursor line
       for (const comment of comments) {
         const lo = comment.LineStart;
         const hi = comment.LineEnd || comment.LineStart;
         if (lineNum >= lo && lineNum <= hi) return comment;
       }
       return null;
-    }, [allChanges, cursorIndex, comments]);
+    }, [allChanges, cursorIndex, comments, focusedCommentId]);
 
     const toggleVisualMode = useCallback(() => {
       if (visualMode) {
@@ -480,6 +558,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
         isDragging.current = true;
         dragAnchor.current = idx;
         setCursorIndex(idx);
+        setFocusedCommentId(null);
         setVisualAnchor(idx);
         setVisualMode(false); // will activate on drag if mouse moves to a different line
       },
@@ -525,6 +604,8 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     // Selected change keys for highlight (single line or visual range)
     const selectedChanges = useMemo(() => {
       if (allChanges.length === 0) return [];
+      // Don't highlight a code line when a comment is focused
+      if (focusedCommentId) return [];
       if (visualMode) {
         const lo = Math.min(visualAnchor, cursorIndex);
         const hi = Math.max(visualAnchor, cursorIndex);
@@ -537,7 +618,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       const change = allChanges[cursorIndex];
       if (!change) return [];
       return [getChangeKey(change)];
-    }, [allChanges, cursorIndex, visualMode, visualAnchor]);
+    }, [allChanges, cursorIndex, visualMode, visualAnchor, focusedCommentId]);
 
     // Structural tokens (no syntax highlight — just gives renderToken something to work with)
     const tokens = useMemo((): HunkTokens | null => {
@@ -575,6 +656,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
             widgetMap[key] = (
               <CommentWidget
                 comments={commentsByLine.get(lineNum)!}
+                focusedId={focusedCommentId}
                 onClick={onCommentClick}
               />
             );
@@ -582,7 +664,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
         }
       }
       return widgetMap;
-    }, [file, comments, onCommentClick]);
+    }, [file, comments, focusedCommentId, onCommentClick]);
 
     // Gutter click handler
     const gutterEvents = useMemo(
