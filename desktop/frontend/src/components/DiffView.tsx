@@ -75,6 +75,10 @@ export interface DiffViewHandle {
   moveCursor: (delta: number) => void;
   scroll: (delta: number) => void;
   getCursorLine: () => number;
+  toggleVisualMode: () => void;
+  isVisualMode: () => boolean;
+  getSelectionRange: () => { start: number; end: number } | null;
+  exitVisualMode: () => void;
 }
 
 interface DiffViewProps {
@@ -82,6 +86,7 @@ interface DiffViewProps {
   comments: ReviewComment[];
   viewType: ViewType;
   focused: boolean;
+  onFocus?: () => void;
   onLineClick?: (lineNumber: number, side: "old" | "new") => void;
   onCommentClick?: (comment: ReviewComment) => void;
 }
@@ -234,12 +239,14 @@ function changeLineNumber(change: ChangeData): number {
 
 export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
   function DiffView(
-    { diff, comments, viewType, focused, onLineClick, onCommentClick },
+    { diff, comments, viewType, focused, onFocus, onLineClick, onCommentClick },
     ref,
   ) {
     const containerRef = useRef<HTMLDivElement>(null);
     const lineHtml = useShikiHighlight(diff);
     const [cursorIndex, setCursorIndex] = useState(0);
+    const [visualMode, setVisualMode] = useState(false);
+    const [visualAnchor, setVisualAnchor] = useState(0);
 
     // Parse diff
     const [file] = useMemo(() => {
@@ -261,9 +268,10 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       return changes;
     }, [file]);
 
-    // Reset cursor when diff changes
+    // Reset cursor and visual mode when diff changes
     useEffect(() => {
       setCursorIndex(0);
+      setVisualMode(false);
       containerRef.current?.scrollTo(0, 0);
     }, [diff.Path]);
 
@@ -360,18 +368,113 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       return change ? changeLineNumber(change) : 0;
     }, [allChanges, cursorIndex]);
 
-    useImperativeHandle(ref, () => ({ moveCursor, scroll, getCursorLine }), [
-      moveCursor,
-      scroll,
-      getCursorLine,
-    ]);
+    const toggleVisualMode = useCallback(() => {
+      if (visualMode) {
+        setVisualMode(false);
+      } else {
+        setVisualAnchor(cursorIndex);
+        setVisualMode(true);
+      }
+    }, [visualMode, cursorIndex]);
 
-    // Selected change key for highlight
+    const exitVisualMode = useCallback(() => {
+      setVisualMode(false);
+    }, []);
+
+    const isVisualMode = useCallback(() => visualMode, [visualMode]);
+
+    const getSelectionRange = useCallback(() => {
+      if (!visualMode) return null;
+      const lo = Math.min(visualAnchor, cursorIndex);
+      const hi = Math.max(visualAnchor, cursorIndex);
+      const startChange = allChanges[lo];
+      const endChange = allChanges[hi];
+      if (!startChange || !endChange) return null;
+      return {
+        start: changeLineNumber(startChange),
+        end: changeLineNumber(endChange),
+      };
+    }, [visualMode, visualAnchor, cursorIndex, allChanges]);
+
+    // Mouse-driven selection: click moves cursor, drag enters visual mode
+    const isDragging = useRef(false);
+    const dragAnchor = useRef(0);
+
+    const indexFromMouseEvent = useCallback(
+      (e: React.MouseEvent | MouseEvent): number | undefined => {
+        const target = e.target as HTMLElement;
+        const cell = target.closest("td[data-change-key]") as HTMLElement | null;
+        if (!cell) return undefined;
+        const key = cell.getAttribute("data-change-key");
+        return key ? changeKeyToIndex.get(key) : undefined;
+      },
+      [changeKeyToIndex],
+    );
+
+    const handleMouseDown = useCallback(
+      (e: React.MouseEvent) => {
+        // Always claim focus when clicking in the diff view
+        onFocus?.();
+        const idx = indexFromMouseEvent(e);
+        if (idx === undefined) return;
+        // Prevent native text selection during drag
+        e.preventDefault();
+        isDragging.current = true;
+        dragAnchor.current = idx;
+        setCursorIndex(idx);
+        setVisualAnchor(idx);
+        setVisualMode(false); // will activate on drag if mouse moves to a different line
+      },
+      [indexFromMouseEvent, onFocus],
+    );
+
+    const handleMouseMove = useCallback(
+      (e: React.MouseEvent) => {
+        if (!isDragging.current) return;
+        const idx = indexFromMouseEvent(e);
+        if (idx === undefined) return;
+        setCursorIndex(idx);
+        if (idx !== dragAnchor.current) {
+          setVisualMode(true);
+        }
+      },
+      [indexFromMouseEvent],
+    );
+
+    const handleMouseUp = useCallback(() => {
+      isDragging.current = false;
+    }, []);
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        moveCursor,
+        scroll,
+        getCursorLine,
+        toggleVisualMode,
+        isVisualMode,
+        getSelectionRange,
+        exitVisualMode,
+      }),
+      [moveCursor, scroll, getCursorLine, toggleVisualMode, isVisualMode, getSelectionRange, exitVisualMode],
+    );
+
+    // Selected change keys for highlight (single line or visual range)
     const selectedChanges = useMemo(() => {
+      if (allChanges.length === 0) return [];
+      if (visualMode) {
+        const lo = Math.min(visualAnchor, cursorIndex);
+        const hi = Math.max(visualAnchor, cursorIndex);
+        const keys: string[] = [];
+        for (let i = lo; i <= hi && i < allChanges.length; i++) {
+          keys.push(getChangeKey(allChanges[i]));
+        }
+        return keys;
+      }
       const change = allChanges[cursorIndex];
-      if (!change || !focused) return [];
+      if (!change) return [];
       return [getChangeKey(change)];
-    }, [allChanges, cursorIndex, focused]);
+    }, [allChanges, cursorIndex, visualMode, visualAnchor]);
 
     // Structural tokens (no syntax highlight — just gives renderToken something to work with)
     const tokens = useMemo((): HunkTokens | null => {
@@ -481,7 +584,10 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     return (
       <div
         ref={containerRef}
-        className={`h-full overflow-auto selectable ${focused ? "" : "opacity-90"}`}
+        className={`h-full overflow-auto ${focused ? "" : "opacity-90"}`}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
       >
         <div className="sticky top-0 z-10 bg-card border-b border-border px-4 py-1.5 text-xs text-muted-foreground flex items-center gap-2">
           <span className="text-foreground font-medium">{diff.Path}</span>
@@ -492,6 +598,9 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
             <span className="text-ctp-yellow">
               {comments.length} comment{comments.length !== 1 ? "s" : ""}
             </span>
+          )}
+          {visualMode && (
+            <span className="text-ctp-mauve font-medium">VISUAL</span>
           )}
         </div>
 
