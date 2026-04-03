@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { api, onEvent } from "./api";
 import { Sidebar, type SidebarItem } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
@@ -366,6 +366,58 @@ function ReviewUI() {
     [loadDiff, loadContentItem, loadAdditionalFile],
   );
 
+  // --- Sidebar cursor movement with auto-select ---
+
+  // Track sidebar items so cursor movement can trigger selection
+  const sidebarItemsRef = useRef<SidebarItem[]>([]);
+  const handleSidebarItems = useCallback((items: SidebarItem[]) => {
+    sidebarItemsRef.current = items;
+  }, []);
+
+  const selectSidebarItem = useCallback(
+    (cursor: number) => {
+      const item = sidebarItemsRef.current[cursor];
+      if (item && item.kind !== "section" && item.kind !== "dir") {
+        handleSidebarSelect(item);
+      }
+    },
+    [handleSidebarSelect],
+  );
+
+  const moveSidebarCursor = useCallback(
+    (delta: number) => {
+      setSidebarCursor((c) => {
+        const items = sidebarItemsRef.current;
+        let next = c + delta;
+        // Skip section headers
+        while (next >= 0 && next < items.length && items[next]?.kind === "section") {
+          next += delta > 0 ? 1 : -1;
+        }
+        next = Math.max(0, Math.min(next, items.length - 1));
+        // Select the item at new cursor
+        const item = items[next];
+        if (item && item.kind !== "section" && item.kind !== "dir") {
+          handleSidebarSelect(item);
+        }
+        return next;
+      });
+    },
+    [handleSidebarSelect],
+  );
+
+  const moveSidebarCursorTo = useCallback(
+    (pos: number) => {
+      const items = sidebarItemsRef.current;
+      const clamped = Math.max(0, Math.min(pos, items.length - 1));
+      setSidebarCursor(clamped);
+      const item = items[clamped];
+      if (item && item.kind !== "section" && item.kind !== "dir") {
+        handleSidebarSelect(item);
+      }
+    },
+    [handleSidebarSelect],
+  );
+
   // --- Keyboard ---
 
   useKeyboard([
@@ -390,23 +442,22 @@ function ReviewUI() {
     // Sidebar navigation (when sidebar focused)
     {
       key: "j",
-      handler: () =>
-        setSidebarCursor((c) => Math.min(c + 1, getTotalItems() - 1)),
+      handler: () => moveSidebarCursor(1),
       when: () => focus === "sidebar",
     },
     {
       key: "k",
-      handler: () => setSidebarCursor((c) => Math.max(c - 1, 0)),
+      handler: () => moveSidebarCursor(-1),
       when: () => focus === "sidebar",
     },
     {
       key: "g",
-      handler: () => setSidebarCursor(0),
+      handler: () => moveSidebarCursorTo(0),
       when: () => focus === "sidebar",
     },
     {
       key: "shift+g",
-      handler: () => setSidebarCursor(getTotalItems() - 1),
+      handler: () => moveSidebarCursorTo(getTotalItems() - 1),
       when: () => focus === "sidebar",
     },
 
@@ -428,12 +479,11 @@ function ReviewUI() {
     // File navigation (global)
     {
       key: "[",
-      handler: () => setSidebarCursor((c) => Math.max(c - 1, 0)),
+      handler: () => moveSidebarCursor(-1),
     },
     {
       key: "]",
-      handler: () =>
-        setSidebarCursor((c) => Math.min(c + 1, getTotalItems() - 1)),
+      handler: () => moveSidebarCursor(1),
     },
 
     // Diff view controls (when main pane focused)
@@ -519,6 +569,7 @@ function ReviewUI() {
             treeMode={treeMode}
             onSelect={handleSidebarSelect}
             onCursorChange={setSidebarCursor}
+            onItemsChange={handleSidebarItems}
           />
         )}
 
