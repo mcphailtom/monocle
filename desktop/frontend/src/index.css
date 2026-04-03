@@ -191,3 +191,8 @@ html, body, #root {
   --diff-code-selected-text-color: #cdd6f4;
   --diff-omit-gutter-line-color: #6c7086;
 }
+
+/* Cursor highlight for selected diff line */
+.diff-code-selected {
+  outline: 1px solid #89b4fa40;
+}

@@ -46,8 +46,15 @@ function matchKey(e: KeyboardEvent, pattern: string): boolean {
   const needAlt = parts.includes("alt");
 
   if (needCtrl !== e.ctrlKey) return false;
-  if (needShift !== e.shiftKey) return false;
   if (needAlt !== e.altKey) return false;
+
+  // Only enforce shiftKey for letter keys (a-z) or when shift is explicitly
+  // in the pattern. Characters like ?, :, {, } require physical shift but
+  // shouldn't need "shift+" in the pattern — we match on the produced character.
+  const isLetter = key.length === 1 && key >= "a" && key <= "z";
+  if (isLetter || needShift) {
+    if (needShift !== e.shiftKey) return false;
+  }
 
   // Handle special key names
   switch (key) {
