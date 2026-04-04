@@ -478,8 +478,8 @@ nav {
 }
 .feat-player-close:hover { background: var(--surface0); color: var(--text); }
 .feat-player-close svg { width: 14px; height: 14px; }
-.feat-player-body { flex: 1; position: relative; background: var(--base); padding: 0.5rem; }
-.feat-player-body img { width: 100%; display: block; border-radius: 4px; }
+.feat-player-body { position: relative; background: var(--base); padding: 0.5rem; padding-bottom: calc(58.78% + 0.5rem); }
+.feat-player-body img { position: absolute; top: 0.5rem; left: 0.5rem; width: calc(100% - 1rem); height: calc(100% - 1rem); object-fit: contain; display: block; border-radius: 4px; }
 
 /* ───── How it works ───── */
 .steps {
@@ -896,8 +896,17 @@ document.querySelectorAll('[data-reveal]').forEach(el => observer.observe(el));
   });
   const sidebarItems = [...sidebar.querySelectorAll('.feat-sidebar-item')];
 
+  const gifSizes = {
+    'assets/diff.gif': [2960, 1740],
+    'assets/structure-feedback.gif': [2960, 1740],
+    'assets/plan-review.gif': [2960, 1740],
+    'assets/instant-review-loop.gif': [1838, 1080],
+  };
+
   function showGif(url) {
-    playerBody.innerHTML = '<img src="' + url + '" alt="Demo">';
+    const sz = gifSizes[url] || [];
+    const attrs = sz.length ? ' width="' + sz[0] + '" height="' + sz[1] + '"' : '';
+    playerBody.innerHTML = '<img src="' + url + '"' + attrs + ' alt="Demo">';
   }
 
   function onSidebarClick(item) {
