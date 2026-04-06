@@ -975,13 +975,11 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
   // --- Render ---
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Main content area */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar — extends full height, behind traffic lights */}
-        {!sidebarHidden && (
-          <div className="flex" onClick={() => setFocus("sidebar")}>
-            <Sidebar
+    <div className="flex h-full">
+      {/* Sidebar — extends full height, behind traffic lights */}
+      {!sidebarHidden && (
+        <div className="flex" onClick={() => setFocus("sidebar")}>
+          <Sidebar
               ref={sidebarRef}
               files={files}
               contentItems={contentItems}
@@ -998,11 +996,11 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
               onCursorChange={setSidebarCursor}
               onItemsChange={handleSidebarItems}
             />
-          </div>
-        )}
+        </div>
+      )}
 
-        {/* Right side: toolbar + main content */}
-        <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Right side: toolbar + main content + status bar */}
+      <div className="flex flex-1 flex-col overflow-hidden">
           {/* Toolbar with logo and project name */}
           <Toolbar
             projectPath={projectPath}
@@ -1107,16 +1105,15 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
               </div>
             )}
           </main>
-        </div>
-      </div>
 
-      {/* Status bar */}
-      <StatusBar
-        session={session}
-        subscriberCount={subscriberCount}
-        feedbackStatus={feedbackStatus}
-        selectedFile={selectedPath || selectedContentId}
-      />
+          {/* Status bar */}
+          <StatusBar
+            session={session}
+            subscriberCount={subscriberCount}
+            feedbackStatus={feedbackStatus}
+            selectedFile={selectedPath || selectedContentId}
+          />
+        </div>
 
       {/* Comment editor dialog */}
       <CommentEditor
