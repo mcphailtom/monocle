@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { api, onEvent } from "./api";
 import { Sidebar, type SidebarItem, type SidebarHandle } from "./components/Sidebar";
+import { Toolbar } from "./components/Toolbar";
 import { StatusBar } from "./components/StatusBar";
 import { DiffView, type DiffViewHandle } from "./components/DiffView";
 import { CommentEditor } from "./components/CommentEditor";
@@ -82,10 +83,10 @@ function App() {
     return <ProjectPicker onSelect={handleSelectProject} error={projectError} />;
   }
 
-  return <ReviewUI key={projectPath} />;
+  return <ReviewUI key={projectPath} projectPath={projectPath} />;
 }
 
-function ReviewUI() {
+function ReviewUI({ projectPath }: { projectPath: string }) {
   // --- State ---
   const [session, setSession] = useState<ReviewSession | null>(null);
   const [files, setFiles] = useState<ChangedFile[]>([]);
@@ -977,7 +978,7 @@ function ReviewUI() {
     <div className="flex h-full flex-col">
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
+        {/* Sidebar — extends full height, behind traffic lights */}
         {!sidebarHidden && (
           <div className="flex" onClick={() => setFocus("sidebar")}>
             <Sidebar
@@ -1000,45 +1001,55 @@ function ReviewUI() {
           </div>
         )}
 
-        {/* Main pane */}
-        <main
-          className={`flex-1 overflow-auto border-r transition-colors duration-150 ${
-            focus === "main" ? "border-primary" : "border-transparent"
-          }`}
-          onClick={() => setFocus("main")}
-        >
-          {diff ? (
-            <DiffView
-              ref={diffViewRef}
-              diff={diff}
-              comments={
-                session?.Comments?.filter(
-                  (c) => c.TargetRef === (selectedPath || selectedContentId),
-                ) ?? []
-              }
-              viewType={viewMode === "split" ? "split" : "unified"}
-              focused={focus === "main"}
-              wrap={wrap}
-              plain={viewMode === "file"}
-              title={contentTitle || undefined}
-              onFocus={() => setFocus("main")}
-              onLineClick={(lineNum) => openCommentEditor(lineNum)}
-              onCommentClick={handleEditComment}
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <p className="text-lg font-serif">Monocle</p>
-                <p className="text-sm mt-2">
-                  Select a file to view its diff
-                </p>
-                <p className="text-xs mt-4 text-muted-foreground/60">
-                  j/k to navigate &middot; Tab to switch panes &middot; ? for help
-                </p>
+        {/* Right side: toolbar + main content */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Toolbar with logo and project name */}
+          <Toolbar
+            projectPath={projectPath}
+            subscriberCount={subscriberCount}
+          />
+
+          {/* Main pane */}
+          <main
+            className={`flex-1 overflow-auto border-r transition-colors duration-150 ${
+              focus === "main" ? "border-primary" : "border-transparent"
+            }`}
+            onClick={() => setFocus("main")}
+          >
+            {diff ? (
+              <DiffView
+                ref={diffViewRef}
+                diff={diff}
+                comments={
+                  session?.Comments?.filter(
+                    (c) => c.TargetRef === (selectedPath || selectedContentId),
+                  ) ?? []
+                }
+                viewType={viewMode === "split" ? "split" : "unified"}
+                focused={focus === "main"}
+                wrap={wrap}
+                plain={viewMode === "file"}
+                title={contentTitle || undefined}
+                onFocus={() => setFocus("main")}
+                onLineClick={(lineNum) => openCommentEditor(lineNum)}
+                onCommentClick={handleEditComment}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                  <p className="text-lg font-serif">Monocle</p>
+                  <p className="text-sm mt-2">
+                    Select a file to view its diff
+                  </p>
+                  <p className="text-xs mt-4 text-muted-foreground/60">
+                    j/k to navigate &middot; Tab to switch panes &middot; ? for
+                    help
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
-        </main>
+            )}
+          </main>
+        </div>
       </div>
 
       {/* Status bar */}
