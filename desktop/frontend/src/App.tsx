@@ -1044,7 +1044,12 @@ function ReviewUI({ projectPath }: { projectPath: string }) {
             ) : (
               <div className="flex h-full items-center justify-center text-muted-foreground">
                 <div className="text-center">
-                  <p className="text-lg font-serif">Monocle</p>
+                  <p
+                    className="text-lg font-semibold text-ctp-blue"
+                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                  >
+                    o_(<span className="text-ctp-lavender">&#x25C9;</span>) monocle
+                  </p>
                   <p className="text-sm mt-2">
                     Select a file to view its diff
                   </p>
