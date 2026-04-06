@@ -1025,6 +1025,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
             subscriberCount={subscriberCount}
             connectionMode={connectionMode}
             feedbackStatus={feedbackStatus}
+            sidebarHidden={sidebarHidden}
             onSelectProject={onSelectProject}
           />
 

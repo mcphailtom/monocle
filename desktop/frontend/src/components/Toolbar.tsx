@@ -8,10 +8,11 @@ interface ToolbarProps {
   subscriberCount: number;
   connectionMode: string;
   feedbackStatus: string;
+  sidebarHidden: boolean;
   onSelectProject: (path: string) => void;
 }
 
-export function Toolbar({ projectPath, subscriberCount, connectionMode, feedbackStatus, onSelectProject }: ToolbarProps) {
+export function Toolbar({ projectPath, subscriberCount, connectionMode, feedbackStatus, sidebarHidden, onSelectProject }: ToolbarProps) {
   const projectName = projectPath.split("/").pop() || "Monocle";
   const [open, setOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -69,8 +70,25 @@ export function Toolbar({ projectPath, subscriberCount, connectionMode, feedback
 
   return (
     <div
-      className="flex items-center h-[52px] px-4 border-b border-border shrink-0 drag-region"
+      className={`flex items-center h-[52px] px-4 border-b border-border shrink-0 drag-region ${sidebarHidden ? "pl-[88px]" : ""}`}
     >
+      {/* Logotype — shown when sidebar is hidden (focus mode) to fill the traffic light area */}
+      {sidebarHidden && (
+        <span
+          className="no-drag text-[13px] font-semibold select-none text-ctp-blue mr-3"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          o_(<span className="text-ctp-lavender">&#x25C9;</span>) monocle
+        </span>
+      )}
+
+      {/* Focus mode badge */}
+      {sidebarHidden && (
+        <span className="text-[10px] font-bold tracking-wider uppercase px-1.5 py-0.5 rounded bg-ctp-mauve/20 text-ctp-mauve mr-3 no-drag">
+          Focus Mode
+        </span>
+      )}
+
       {/* Project switcher */}
       <div className="relative no-drag" ref={dropdownRef}>
         <button
