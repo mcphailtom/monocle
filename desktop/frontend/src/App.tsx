@@ -83,10 +83,10 @@ function App() {
     return <ProjectPicker onSelect={handleSelectProject} error={projectError} />;
   }
 
-  return <ReviewUI key={projectPath} projectPath={projectPath} />;
+  return <ReviewUI key={projectPath} projectPath={projectPath} onSelectProject={handleSelectProject} />;
 }
 
-function ReviewUI({ projectPath }: { projectPath: string }) {
+function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSelectProject: (path: string) => void }) {
   // --- State ---
   const [session, setSession] = useState<ReviewSession | null>(null);
   const [files, setFiles] = useState<ChangedFile[]>([]);
@@ -1007,6 +1007,7 @@ function ReviewUI({ projectPath }: { projectPath: string }) {
           <Toolbar
             projectPath={projectPath}
             subscriberCount={subscriberCount}
+            onSelectProject={onSelectProject}
           />
 
           {/* Focus indicator bar */}
