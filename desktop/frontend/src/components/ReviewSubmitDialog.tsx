@@ -86,7 +86,7 @@ export function ReviewSubmitDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md" onKeyDown={handleKeyDown}>
+      <DialogContent className="sm:max-w-2xl" onKeyDown={handleKeyDown}>
         <DialogHeader>
           <DialogTitle>Submit Review</DialogTitle>
         </DialogHeader>
