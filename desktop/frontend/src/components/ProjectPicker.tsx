@@ -90,12 +90,12 @@ export function ProjectPicker({ onSelect, error }: ProjectPickerProps) {
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           {/* Monocle logo */}
-          <div className="text-2xl font-mono font-semibold tracking-tight mb-2 select-none">
-            <span className="text-ctp-blue">o_(</span>
-            <span className="text-ctp-lavender">&#x25C9;</span>
-            <span className="text-ctp-blue">)</span>
+          <div
+            className="text-2xl font-semibold mb-3 select-none text-ctp-blue"
+            style={{ fontFamily: "'JetBrains Mono', monospace" }}
+          >
+            o_(<span className="text-ctp-lavender">&#x25C9;</span>) monocle
           </div>
-          <h1 className="text-2xl font-serif text-foreground mb-1">Monocle</h1>
           <p className="text-sm text-muted-foreground">
             Select a project to review
           </p>

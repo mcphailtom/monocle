@@ -308,8 +308,15 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
       className="flex flex-col border-r border-border overflow-hidden bg-card"
       style={{ width: 260 }}
     >
-      {/* Drag region for traffic lights */}
-      <div className="h-[52px] shrink-0 drag-region" />
+      {/* Drag region for traffic lights + logotype */}
+      <div className="h-[52px] shrink-0 drag-region flex items-center pl-[78px]">
+        <span
+          className="no-drag text-[13px] font-semibold select-none text-ctp-blue"
+          style={{ fontFamily: "'JetBrains Mono', monospace" }}
+        >
+          o_(<span className="text-ctp-lavender">&#x25C9;</span>) monocle
+        </span>
+      </div>
 
       {/* Focus indicator bar */}
       <div
