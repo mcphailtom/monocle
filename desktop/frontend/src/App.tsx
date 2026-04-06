@@ -1042,21 +1042,66 @@ function ReviewUI({ projectPath }: { projectPath: string }) {
                 onCommentClick={handleEditComment}
               />
             ) : (
-              <div className="flex h-full items-center justify-center text-muted-foreground">
-                <div className="text-center">
-                  <p
-                    className="text-lg font-semibold text-ctp-blue"
-                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
-                  >
-                    o_(<span className="text-ctp-lavender">&#x25C9;</span>) monocle
+              <div className="flex h-full items-center justify-center text-muted-foreground font-mono text-[13px]">
+                <div className="space-y-4 leading-relaxed">
+                  {/* Logo */}
+                  <div>
+                    <p
+                      className="text-xl font-semibold text-ctp-blue"
+                      style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                    >
+                      o_(<span className="text-ctp-lavender">&#x25C9;</span>) monocle
+                    </p>
+                    <p className="text-muted-foreground">
+                      code review companion for your AI agent
+                    </p>
+                  </div>
+
+                  {/* Getting started */}
+                  <div>
+                    <p className="text-muted-foreground">To get started, register Monocle with your agent:</p>
+                    <p className="text-ctp-yellow ml-4">monocle register</p>
+                  </div>
+
+                  {/* Manual install */}
+                  <div>
+                    <p className="text-muted-foreground">Or manually install via your agent's plugin/extension system:</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Claude Code:</p>
+                    <p className="text-ctp-yellow ml-4">/plugin marketplace add josephschmitt/monocle</p>
+                    <p className="text-ctp-yellow ml-4">/plugin install monocle@monocle</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Gemini CLI:</p>
+                    <p className="text-ctp-yellow ml-4">gemini extensions install josephschmitt/monocle</p>
+                  </div>
+
+                  <p className="text-muted-foreground">
+                    Diffs appear here as your agent works.
                   </p>
-                  <p className="text-sm mt-2">
-                    Select a file to view its diff
-                  </p>
-                  <p className="text-xs mt-4 text-muted-foreground/60">
-                    j/k to navigate &middot; Tab to switch panes &middot; ? for
-                    help
-                  </p>
+
+                  {/* Divider */}
+                  <p className="text-muted-foreground/30">─────</p>
+
+                  {/* Review section */}
+                  <div>
+                    <p className="text-ctp-sky">Review</p>
+                    <p className="text-muted-foreground">press <span className="text-ctp-yellow inline-block w-4">c</span>  to comment on a line</p>
+                    <p className="text-muted-foreground">press <span className="text-ctp-yellow inline-block w-4">C</span>  to comment on a file</p>
+                    <p className="text-muted-foreground">press <span className="text-ctp-yellow inline-block w-4">S</span>  to submit your review</p>
+                  </div>
+
+                  {/* Feedback section */}
+                  <div>
+                    <p className="text-ctp-sky">Feedback</p>
+                    <p className="text-muted-foreground">Submit sends your review to the feedback queue.</p>
+                    <p className="text-muted-foreground">The agent picks it up via the <span className="text-ctp-yellow">/get-feedback</span> skill.</p>
+                  </div>
+
+                  <div>
+                    <p className="text-muted-foreground">press <span className="text-ctp-yellow inline-block w-4">?</span>  for keybinding help</p>
+                  </div>
                 </div>
               </div>
             )}
