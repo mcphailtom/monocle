@@ -3,6 +3,7 @@ import type { ReviewSession } from "../types";
 interface StatusBarProps {
   session: ReviewSession | null;
   subscriberCount: number;
+  connectionMode: string;
   feedbackStatus: string;
   selectedFile: string;
 }
@@ -10,9 +11,11 @@ interface StatusBarProps {
 export function StatusBar({
   session,
   subscriberCount,
+  connectionMode,
   feedbackStatus,
   selectedFile,
 }: StatusBarProps) {
+  const isConnected = subscriberCount > 0 || connectionMode === "queue";
   const fileCount = session?.ChangedFiles?.length ?? 0;
   const contentCount = session?.ContentItems?.length ?? 0;
   const commentCount = session?.Comments?.length ?? 0;
@@ -39,11 +42,11 @@ export function StatusBar({
         </span>
         <span
           className={
-            subscriberCount > 0 ? "text-ctp-green" : "text-muted-foreground"
+            isConnected ? "text-ctp-green" : "text-muted-foreground"
           }
         >
-          {subscriberCount > 0
-            ? `Agent connected`
+          {isConnected
+            ? "Agent connected"
             : "No agent"}
         </span>
         <span className="text-muted-foreground font-mono">?:help</span>

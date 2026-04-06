@@ -107,8 +107,6 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
   const [contentTitle, setContentTitle] = useState("");
   const [wrap, setWrap] = useState(false);
   const preFocusWrap = useRef(false);
-  const [collapseAllSignal, setCollapseAllSignal] = useState(0);
-  const [expandAllSignal, setExpandAllSignal] = useState(0);
 
   // Comment editor state
   const [commentEditorOpen, setCommentEditorOpen] = useState(false);
@@ -359,18 +357,21 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     [loadSession],
   );
 
+  const reloadCurrentView = useCallback(() => {
+    loadFiles();
+    loadSession();
+    if (selectedPath) loadDiff(selectedPath);
+    else if (selectedContentId) loadContentItem(selectedContentId);
+  }, [loadFiles, loadSession, loadDiff, loadContentItem, selectedPath, selectedContentId]);
+
   const handleForceReload = useCallback(async () => {
     try {
       await api.refreshChangedFiles();
-      loadFiles();
-      loadSession();
-      // Reload current selection
-      if (selectedPath) loadDiff(selectedPath);
-      else if (selectedContentId) loadContentItem(selectedContentId);
+      reloadCurrentView();
     } catch (err) {
       console.error("Failed to reload:", err);
     }
-  }, [loadFiles, loadSession, loadDiff, loadContentItem, selectedPath, selectedContentId]);
+  }, [reloadCurrentView]);
 
   const handleClearReview = useCallback(async () => {
     try {
@@ -386,16 +387,12 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     async (ref: string) => {
       try {
         await api.setBaseRef(ref);
-        // Reload everything with new base
-        loadFiles();
-        loadSession();
-        if (selectedPath) loadDiff(selectedPath);
-        else if (selectedContentId) loadContentItem(selectedContentId);
+        reloadCurrentView();
       } catch (err) {
         console.error("Failed to set base ref:", err);
       }
     },
-    [loadFiles, loadSession, loadDiff, loadContentItem, selectedPath, selectedContentId],
+    [reloadCurrentView],
   );
 
   const toggleFocusMode = useCallback(() => {
@@ -470,17 +467,16 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
       onEvent("connection_changed", (data) => {
         setSubscriberCount(data.count ?? 0);
         setConnectionMode(data.mode ?? "");
-        refreshStatus();
       }),
-      onEvent("feedback_status_changed", () => {
-        refreshStatus();
+      onEvent("feedback_status_changed", (data) => {
+        setFeedbackStatus(data.status ?? "");
       }),
       onEvent("feedback_picked_up", () => {
-        refreshStatus();
+        setFeedbackStatus("none");
       }),
     ];
     return () => unsubs.forEach((u) => u());
-  }, [loadFiles, loadSession, refreshStatus]);
+  }, [loadFiles, loadSession]);
 
   // --- Selection ---
 
@@ -533,6 +529,16 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     sidebarItemsRef.current = items;
   }, []);
 
+  const selectSidebarItemAt = useCallback(
+    (index: number) => {
+      const item = sidebarItemsRef.current[index];
+      if (item && item.kind !== "section" && item.kind !== "dir") {
+        handleSidebarSelect(item);
+      }
+    },
+    [handleSidebarSelect],
+  );
+
   const moveSidebarCursor = useCallback(
     (delta: number) => {
       setSidebarCursor((c) => {
@@ -543,28 +549,20 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
           next += delta > 0 ? 1 : -1;
         }
         next = Math.max(0, Math.min(next, items.length - 1));
-        // Select the item at new cursor
-        const item = items[next];
-        if (item && item.kind !== "section" && item.kind !== "dir") {
-          handleSidebarSelect(item);
-        }
+        selectSidebarItemAt(next);
         return next;
       });
     },
-    [handleSidebarSelect],
+    [selectSidebarItemAt],
   );
 
   const moveSidebarCursorTo = useCallback(
     (pos: number) => {
-      const items = sidebarItemsRef.current;
-      const clamped = Math.max(0, Math.min(pos, items.length - 1));
+      const clamped = Math.max(0, Math.min(pos, sidebarItemsRef.current.length - 1));
       setSidebarCursor(clamped);
-      const item = items[clamped];
-      if (item && item.kind !== "section" && item.kind !== "dir") {
-        handleSidebarSelect(item);
-      }
+      selectSidebarItemAt(clamped);
     },
-    [handleSidebarSelect],
+    [selectSidebarItemAt],
   );
 
   // --- Keyboard ---
@@ -635,13 +633,13 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     // Collapse all tree dirs (z key)
     {
       key: "z",
-      handler: () => setCollapseAllSignal((n) => n + 1),
+      handler: () => sidebarRef.current?.collapseAll(),
       when: () => focus === "sidebar" && treeMode,
     },
     // Expand all tree dirs (e key)
     {
       key: "e",
-      handler: () => setExpandAllSignal((n) => n + 1),
+      handler: () => sidebarRef.current?.expandAll(),
       when: () => focus === "sidebar" && treeMode,
     },
     {
@@ -981,25 +979,22 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     <div className="flex h-full">
       {/* Sidebar — extends full height, behind traffic lights */}
       {!sidebarHidden && (
-        <div className="flex" onClick={() => setFocus("sidebar")}>
           <Sidebar
-              ref={sidebarRef}
-              files={files}
-              contentItems={contentItems}
-              additionalFiles={additionalFiles}
-              selectedPath={selectedPath}
-              selectedContentId={selectedContentId}
-              focused={focus === "sidebar"}
-              cursor={sidebarCursor}
-              reviewFilter={reviewFilter}
-              treeMode={treeMode}
-              collapseAllSignal={collapseAllSignal}
-              expandAllSignal={expandAllSignal}
-              onSelect={handleSidebarSelect}
-              onCursorChange={setSidebarCursor}
-              onItemsChange={handleSidebarItems}
-            />
-        </div>
+            ref={sidebarRef}
+            files={files}
+            contentItems={contentItems}
+            additionalFiles={additionalFiles}
+            selectedPath={selectedPath}
+            selectedContentId={selectedContentId}
+            focused={focus === "sidebar"}
+            cursor={sidebarCursor}
+            reviewFilter={reviewFilter}
+            treeMode={treeMode}
+            onSelect={handleSidebarSelect}
+            onCursorChange={setSidebarCursor}
+            onItemsChange={handleSidebarItems}
+            onFocus={() => setFocus("sidebar")}
+          />
       )}
 
       {/* Right side: toolbar + main content + status bar */}
@@ -1115,6 +1110,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
           <StatusBar
             session={session}
             subscriberCount={subscriberCount}
+            connectionMode={connectionMode}
             feedbackStatus={feedbackStatus}
             selectedFile={selectedPath || selectedContentId}
           />

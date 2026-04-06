@@ -15,6 +15,8 @@ import type {
   SubmitResult,
   Config,
   RecentProject,
+  TargetType,
+  CommentType,
   FileChangedEvent,
   FeedbackStatusChangedEvent,
   ContentItemAddedEvent,
@@ -54,16 +56,16 @@ declare global {
 
           // Comments
           AddComment(
-            targetType: string,
+            targetType: TargetType,
             targetRef: string,
             lineStart: number,
             lineEnd: number,
-            commentType: string,
+            commentType: CommentType,
             body: string,
           ): Promise<ReviewComment>;
           EditComment(
             commentID: string,
-            commentType: string,
+            commentType: CommentType,
             body: string,
           ): Promise<ReviewComment>;
           DeleteComment(commentID: string): Promise<void>;
@@ -148,14 +150,14 @@ export const api = {
 
   // Comments
   addComment: (
-    targetType: string,
+    targetType: TargetType,
     targetRef: string,
     lineStart: number,
     lineEnd: number,
-    commentType: string,
+    commentType: CommentType,
     body: string,
   ) => app().AddComment(targetType, targetRef, lineStart, lineEnd, commentType, body),
-  editComment: (commentID: string, commentType: string, body: string) =>
+  editComment: (commentID: string, commentType: CommentType, body: string) =>
     app().EditComment(commentID, commentType, body),
   deleteComment: (commentID: string) => app().DeleteComment(commentID),
   resolveComment: (commentID: string) => app().ResolveComment(commentID),
