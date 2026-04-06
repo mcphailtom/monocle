@@ -1,0 +1,121 @@
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-desktop-macos:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-latest
+            arch: arm64
+          - runner: macos-13
+            arch: amd64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Go version from devbox.json
+        id: go-version
+        run: |
+          version=$(jq -r '.packages[] | select(startswith("go@")) | split("@")[1]' devbox.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache: true
+
+      - uses: oven-sh/setup-bun@v2
+
+      # Wails version must match go.mod (github.com/wailsapp/wails/v2 v2.11.0)
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build desktop app
+        env:
+          CGO_ENABLED: "1"
+        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.version }}"
+
+      - name: Upload .app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: monocle-app-darwin-${{ matrix.arch }}
+          path: build/bin/monocle.app
+
+  package-and-release:
+    needs: build-desktop-macos
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download arm64 .app
+        uses: actions/download-artifact@v4
+        with:
+          name: monocle-app-darwin-arm64
+          path: arm64-app/monocle.app
+
+      - name: Download amd64 .app
+        uses: actions/download-artifact@v4
+        with:
+          name: monocle-app-darwin-amd64
+          path: amd64-app/monocle.app
+
+      - name: Create universal binary
+        run: |
+          lipo -create \
+            arm64-app/monocle.app/Contents/MacOS/monocle \
+            amd64-app/monocle.app/Contents/MacOS/monocle \
+            -output universal-monocle
+          chmod +x universal-monocle
+          lipo -info universal-monocle
+
+      - name: Assemble universal .app bundle
+        run: |
+          cp -R arm64-app/monocle.app Monocle.app
+          cp universal-monocle Monocle.app/Contents/MacOS/monocle
+
+      - name: Create zip archive
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            Monocle.app \
+            "Monocle-Desktop_${{ steps.version.outputs.version }}_darwin_universal.zip"
+
+      - name: Wait for GitHub Release to exist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "Waiting for release ${TAG} to be created by GoReleaser..."
+          for i in $(seq 1 60); do
+            if gh release view "${TAG}" --json tagName -q .tagName 2>/dev/null; then
+              echo "Release found!"
+              exit 0
+            fi
+            echo "Attempt ${i}/60 — release not yet created, waiting 10s..."
+            sleep 10
+          done
+          echo "ERROR: Timed out waiting for release ${TAG}"
+          exit 1
+
+      - name: Upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${GITHUB_REF_NAME}" \
+            "Monocle-Desktop_${{ steps.version.outputs.version }}_darwin_universal.zip" \
+            --clobber
