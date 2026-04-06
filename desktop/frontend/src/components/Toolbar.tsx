@@ -10,17 +10,7 @@ export function Toolbar({ projectPath, subscriberCount }: ToolbarProps) {
     <div
       className="flex items-center h-[52px] px-4 border-b border-border shrink-0 drag-region"
     >
-      <div className="flex items-center gap-3 no-drag">
-        {/* Monocle logo */}
-        <span className="text-[15px] font-mono font-semibold tracking-tight select-none">
-          <span className="text-ctp-blue">o_(</span>
-          <span className="text-ctp-lavender">&#x25C9;</span>
-          <span className="text-ctp-blue">)</span>
-        </span>
-
-        {/* Separator */}
-        <span className="text-ctp-surface2 text-xs select-none">/</span>
-
+      <div className="flex items-center no-drag">
         {/* Project name */}
         <span className="text-[13px] text-foreground font-medium">
           {projectName}
