@@ -1009,11 +1009,18 @@ function ReviewUI({ projectPath }: { projectPath: string }) {
             subscriberCount={subscriberCount}
           />
 
+          {/* Focus indicator bar */}
+          <div
+            className={`h-[2px] shrink-0 transition-all duration-200 ${
+              focus === "main"
+                ? "bg-primary shadow-[0_0_8px_var(--color-primary)]"
+                : "bg-ctp-surface0/30"
+            }`}
+          />
+
           {/* Main pane */}
           <main
-            className={`flex-1 overflow-auto border-r transition-colors duration-150 ${
-              focus === "main" ? "border-primary" : "border-transparent"
-            }`}
+            className="flex-1 overflow-auto"
             onClick={() => setFocus("main")}
           >
             {diff ? (

@@ -305,13 +305,20 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
 
   return (
     <aside
-      className={`flex flex-col border-r overflow-hidden transition-colors duration-150 bg-card ${
-        focused ? "border-primary" : "border-border"
-      }`}
+      className="flex flex-col border-r border-border overflow-hidden bg-card"
       style={{ width: 260 }}
     >
       {/* Drag region for traffic lights */}
       <div className="h-[52px] shrink-0 drag-region" />
+
+      {/* Focus indicator bar */}
+      <div
+        className={`h-[2px] shrink-0 transition-all duration-200 ${
+          focused
+            ? "bg-primary shadow-[0_0_8px_var(--color-primary)]"
+            : "bg-ctp-surface0/30"
+        }`}
+      />
 
       <ScrollArea className="flex-1" ref={scrollRef}>
         <div className="py-1">
