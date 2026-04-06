@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"context"
 	"embed"
 
 	wails "github.com/wailsapp/wails/v2"
@@ -49,6 +50,10 @@ func Run() error {
 		},
 		OnStartup:  app.startup,
 		OnShutdown: app.shutdown,
+		OnDomReady: func(_ context.Context) {
+			// Align traffic lights vertically with the 52px toolbar (center = 26px).
+			configureTrafficLightPosition(26)
+		},
 		Bind: []interface{}{
 			app,
 		},
