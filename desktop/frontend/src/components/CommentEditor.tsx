@@ -117,7 +117,7 @@ export function CommentEditor({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
-        className="sm:max-w-lg"
+        className="sm:max-w-2xl"
         onKeyDown={handleKeyDown}
       >
         <DialogHeader>
