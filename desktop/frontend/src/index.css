@@ -214,3 +214,13 @@ html, body, #root {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* Plain mode — suppress diff insert/delete coloring for file/content views */
+.diff-plain {
+  --diff-gutter-insert-background-color: transparent;
+  --diff-gutter-delete-background-color: transparent;
+  --diff-code-insert-background-color: transparent;
+  --diff-code-delete-background-color: transparent;
+  --diff-code-insert-edit-background-color: transparent;
+  --diff-code-delete-edit-background-color: transparent;
+}

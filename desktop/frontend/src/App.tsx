@@ -3,7 +3,6 @@ import { api, onEvent } from "./api";
 import { Sidebar, type SidebarItem, type SidebarHandle } from "./components/Sidebar";
 import { StatusBar } from "./components/StatusBar";
 import { DiffView, type DiffViewHandle } from "./components/DiffView";
-import { ContentView } from "./components/ContentView";
 import { CommentEditor } from "./components/CommentEditor";
 import { ReviewSubmitDialog } from "./components/ReviewSubmitDialog";
 import { HelpDialog } from "./components/HelpDialog";
@@ -24,9 +23,28 @@ import type {
   CommentType,
   TargetType,
 } from "./types";
-import type { ViewType } from "react-diff-view";
+import type { DiffLine } from "./types";
 
 type FocusTarget = "sidebar" | "main";
+type ViewMode = "unified" | "split" | "file";
+
+/** Convert plain text into a synthetic DiffResult with all-added lines. */
+function textToDiffResult(content: string, path: string): DiffResult {
+  const lines = content.split("\n");
+  if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+  const diffLines: DiffLine[] = lines.map((line, i) => ({
+    Kind: "added" as const,
+    OldLineNum: 0,
+    NewLineNum: i + 1,
+    Content: line,
+  }));
+  return {
+    Path: path,
+    Hunks: diffLines.length > 0
+      ? [{ OldStart: 0, OldCount: 0, NewStart: 1, NewCount: diffLines.length, Header: "", Lines: diffLines }]
+      : [],
+  };
+}
 
 function App() {
   const [projectPath, setProjectPath] = useState<string | null>(null);
@@ -76,7 +94,6 @@ function ReviewUI() {
   const [selectedPath, setSelectedPath] = useState("");
   const [selectedContentId, setSelectedContentId] = useState("");
   const [diff, setDiff] = useState<DiffResult | null>(null);
-  const [fileContent, setFileContent] = useState<string | null>(null);
   const [focus, setFocus] = useState<FocusTarget>("sidebar");
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [sidebarCursor, setSidebarCursor] = useState(0);
@@ -84,7 +101,7 @@ function ReviewUI() {
   const [treeMode, setTreeMode] = useState(false);
   const [subscriberCount, setSubscriberCount] = useState(0);
   const [feedbackStatus, setFeedbackStatus] = useState("");
-  const [viewType, setViewType] = useState<ViewType>("unified");
+  const [viewMode, setViewMode] = useState<ViewMode>("unified");
   const [contentTitle, setContentTitle] = useState("");
   const [wrap, setWrap] = useState(false);
   const preFocusWrap = useRef(false);
@@ -144,51 +161,47 @@ function ReviewUI() {
   }, []);
 
   const loadDiff = useCallback(async (path: string) => {
+    setDiff(null);
     try {
       const d = await api.getFileDiff(path);
       setDiff(d);
-      setFileContent(null);
     } catch {
       setDiff(null);
     }
   }, []);
 
   const loadContentItem = useCallback(async (id: string) => {
-    // Clear stale state before async load
     setDiff(null);
-    setFileContent(null);
     try {
       const item = await api.getContentItem(id);
+      const contentPath = `content.${item?.ContentType || "md"}`;
       setContentTitle(item?.Title ?? "");
       if (item?.PreviousContent) {
         const d = await api.getContentDiff(id);
         if (d?.Hunks?.length) {
           setDiff(d);
-          setFileContent(null);
+          setViewMode("unified");
         } else {
-          // No meaningful diff — show content directly
-          setDiff(null);
-          setFileContent(item?.Content ?? null);
+          setDiff(textToDiffResult(item?.Content ?? "", contentPath));
+          setViewMode("file");
         }
       } else {
-        setDiff(null);
-        setFileContent(item?.Content ?? null);
+        setDiff(textToDiffResult(item?.Content ?? "", contentPath));
+        setViewMode("file");
       }
     } catch {
       setDiff(null);
-      setFileContent(null);
       setContentTitle("");
     }
   }, []);
 
   const loadAdditionalFile = useCallback(async (path: string) => {
+    setDiff(null);
     try {
       const content = await api.getAdditionalFileContent(path);
-      setDiff(null);
-      setFileContent(content);
+      setDiff(textToDiffResult(content, path));
     } catch {
       setDiff(null);
-      setFileContent(null);
     }
   }, []);
 
@@ -474,6 +487,7 @@ function ReviewUI() {
         case "tree-file":
           setSelectedPath(item.file.Path);
           setSelectedContentId("");
+          setViewMode("unified");
           loadDiff(item.file.Path);
           break;
         case "content":
@@ -484,6 +498,7 @@ function ReviewUI() {
         case "additional":
           setSelectedPath(item.file.Path);
           setSelectedContentId("");
+          setViewMode("file");
           loadAdditionalFile(item.file.Path);
           break;
       }
@@ -663,8 +678,32 @@ function ReviewUI() {
     // Diff view controls (when main pane focused)
     {
       key: "t",
-      handler: () =>
-        setViewType((v) => (v === "unified" ? "split" : "unified")),
+      handler: () => {
+        const next: ViewMode = viewMode === "unified" ? "split" : viewMode === "split" ? "file" : "unified";
+        setViewMode(next);
+        if (next === "file") {
+          // Switch to full file/content view
+          if (selectedContentId) {
+            api.getContentItem(selectedContentId).then(item => {
+              if (item) {
+                setDiff(textToDiffResult(item.Content, `content.${item.ContentType || "md"}`));
+                setContentTitle(item.Title);
+              }
+            }).catch(() => {});
+          } else if (selectedPath) {
+            api.getFileContent(selectedPath).then(content => {
+              setDiff(textToDiffResult(content, selectedPath));
+            }).catch(() => {});
+          }
+        } else if (viewMode === "file") {
+          // Leaving file mode — reload the actual diff/content
+          if (selectedContentId) {
+            loadContentItem(selectedContentId);
+          } else if (selectedPath) {
+            loadDiff(selectedPath);
+          }
+        }
+      },
       when: () => focus === "main",
     },
 
@@ -977,17 +1016,14 @@ function ReviewUI() {
                   (c) => c.TargetRef === (selectedPath || selectedContentId),
                 ) ?? []
               }
-              viewType={viewType}
+              viewType={viewMode === "split" ? "split" : "unified"}
               focused={focus === "main"}
               wrap={wrap}
+              plain={viewMode === "file"}
+              title={contentTitle || undefined}
               onFocus={() => setFocus("main")}
               onLineClick={(lineNum) => openCommentEditor(lineNum)}
               onCommentClick={handleEditComment}
-            />
-          ) : fileContent !== null ? (
-            <ContentView
-              content={fileContent}
-              title={contentTitle || undefined}
             />
           ) : (
             <div className="flex h-full items-center justify-center text-muted-foreground">

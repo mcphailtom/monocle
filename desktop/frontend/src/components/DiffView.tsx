@@ -94,6 +94,8 @@ interface DiffViewProps {
   viewType: ViewType;
   focused: boolean;
   wrap?: boolean;
+  plain?: boolean;
+  title?: string;
   onFocus?: () => void;
   onLineClick?: (lineNumber: number, side: "old" | "new") => void;
   onCommentClick?: (comment: ReviewComment) => void;
@@ -189,7 +191,7 @@ function useShikiHighlight(diff: DiffResult | null) {
     });
 
     return () => { cancelled = true; };
-  }, [diff?.Path, diff?.Hunks?.length]);
+  }, [diff]);
 
   return lineHtml;
 }
@@ -311,7 +313,7 @@ function changeLineNumber(change: ChangeData): number {
 
 export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
   function DiffView(
-    { diff: rawDiff, comments, viewType, focused, wrap, onFocus, onLineClick, onCommentClick },
+    { diff: rawDiff, comments, viewType, focused, wrap, plain, title, onFocus, onLineClick, onCommentClick },
     ref,
   ) {
     // Normalize: Go nil slices serialize as JSON null
@@ -863,16 +865,18 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     return (
       <div
         ref={containerRef}
-        className={`h-full overflow-auto selectable font-mono ${focused ? "" : "opacity-90"} ${wrap ? "diff-wrap" : ""}`}
+        className={`h-full overflow-auto selectable font-mono ${focused ? "" : "opacity-90"} ${wrap ? "diff-wrap" : ""} ${plain ? "diff-plain" : ""}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
       >
         <div className="sticky top-0 z-10 bg-card border-b border-border px-4 py-1.5 text-xs text-muted-foreground flex items-center gap-2">
-          <span className="text-foreground font-medium">{diff.Path}</span>
-          <span>
-            {diff.Hunks.length} hunk{diff.Hunks.length !== 1 ? "s" : ""}
-          </span>
+          <span className="text-foreground font-medium">{title || diff.Path}</span>
+          {!plain && (
+            <span>
+              {diff.Hunks.length} hunk{diff.Hunks.length !== 1 ? "s" : ""}
+            </span>
+          )}
           {comments.length > 0 && (
             <span className="text-ctp-yellow">
               {comments.length} comment{comments.length !== 1 ? "s" : ""}
