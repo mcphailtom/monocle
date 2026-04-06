@@ -153,7 +153,12 @@ html, body, #root {
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
+    outline: none !important;
+  }
+  *:focus,
+  *:focus-visible {
+    outline: none !important;
   }
   body {
     @apply bg-background text-foreground;
