@@ -213,6 +213,13 @@ html, body, #root {
 .diff-code-selected {
   outline: 1px solid #89b4fa40;
 }
+.diff-unfocused .diff-code-selected {
+  outline: 1px solid #89b4fa1a;
+}
+.diff-unfocused {
+  --diff-code-selected-background-color: #45475a66;
+  --diff-gutter-selected-background-color: #45475a66;
+}
 
 /* macOS frameless window drag regions */
 .drag-region {
