@@ -28,6 +28,8 @@ type SidebarItem =
 
 export interface SidebarHandle {
   toggleDir: (path: string) => void;
+  collapseAll: () => void;
+  expandAll: () => void;
 }
 
 interface SidebarProps {
@@ -40,11 +42,10 @@ interface SidebarProps {
   cursor: number;
   reviewFilter: string;
   treeMode: boolean;
-  collapseAllSignal?: number;
-  expandAllSignal?: number;
   onSelect: (item: SidebarItem) => void;
   onCursorChange: (cursor: number) => void;
   onItemsChange?: (items: SidebarItem[]) => void;
+  onFocus?: () => void;
 }
 
 // --- Helpers ---
@@ -141,8 +142,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
   onSelect,
   onCursorChange,
   onItemsChange,
-  collapseAllSignal,
-  expandAllSignal,
+  onFocus,
 }, ref) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -183,23 +183,13 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
     return paths;
   }, [tree]);
 
-  // Collapse all directories when signal fires (not on allDirPaths changes)
-  const lastCollapseSignal = useRef(0);
-  useEffect(() => {
-    if (collapseAllSignal && collapseAllSignal > lastCollapseSignal.current) {
-      lastCollapseSignal.current = collapseAllSignal;
-      setCollapsed(new Set(allDirPaths));
-    }
-  }, [collapseAllSignal, allDirPaths]);
+  const collapseAll = useCallback(() => {
+    setCollapsed(new Set(allDirPaths));
+  }, [allDirPaths]);
 
-  // Expand all directories when signal fires
-  const lastExpandSignal = useRef(0);
-  useEffect(() => {
-    if (expandAllSignal && expandAllSignal > lastExpandSignal.current) {
-      lastExpandSignal.current = expandAllSignal;
-      setCollapsed(new Set());
-    }
-  }, [expandAllSignal]);
+  const expandAll = useCallback(() => {
+    setCollapsed(new Set());
+  }, []);
 
   const items = useMemo((): SidebarItem[] => {
     const result: SidebarItem[] = [];
@@ -275,7 +265,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
     [],
   );
 
-  useImperativeHandle(ref, () => ({ toggleDir }), [toggleDir]);
+  useImperativeHandle(ref, () => ({ toggleDir, collapseAll, expandAll }), [toggleDir, collapseAll, expandAll]);
 
   const handleClick = useCallback(
     (index: number) => {
@@ -307,6 +297,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
     <aside
       className="flex flex-col border-r border-border overflow-hidden bg-card"
       style={{ width: 260 }}
+      onClick={onFocus}
     >
       {/* Drag region for traffic lights + logotype */}
       <div className="h-[52px] shrink-0 drag-region flex items-center pl-[78px]">
