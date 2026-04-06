@@ -70,18 +70,31 @@ export function ProjectPicker({ onSelect, error }: ProjectPickerProps) {
 
   if (selecting) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground">Opening project...</p>
+      <div className="flex h-full flex-col">
+        <div className="h-[52px] shrink-0 drag-region" />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">Opening project...</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full items-center justify-center">
+    <div className="flex h-full flex-col">
+      {/* Drag region for window movement (no title bar) */}
+      <div className="h-[52px] shrink-0 drag-region" />
+
+      <div className="flex flex-1 items-center justify-center">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
+          {/* Monocle logo */}
+          <div className="text-2xl font-mono font-semibold tracking-tight mb-2 select-none">
+            <span className="text-ctp-blue">o_(</span>
+            <span className="text-ctp-lavender">&#x25C9;</span>
+            <span className="text-ctp-blue">)</span>
+          </div>
           <h1 className="text-2xl font-serif text-foreground mb-1">Monocle</h1>
           <p className="text-sm text-muted-foreground">
             Select a project to review
@@ -140,6 +153,7 @@ export function ProjectPicker({ onSelect, error }: ProjectPickerProps) {
             No recent projects. Open a folder to get started.
           </p>
         )}
+      </div>
       </div>
     </div>
   );

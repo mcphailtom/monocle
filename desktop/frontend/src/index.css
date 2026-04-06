@@ -208,6 +208,14 @@ html, body, #root {
   outline: 1px solid #89b4fa40;
 }
 
+/* macOS frameless window drag regions */
+.drag-region {
+  --wails-draggable: drag;
+}
+.no-drag {
+  --wails-draggable: no-drag;
+}
+
 /* Line wrapping for diff view */
 .diff-wrap .diff-code-cell,
 .diff-wrap .diff-code {
