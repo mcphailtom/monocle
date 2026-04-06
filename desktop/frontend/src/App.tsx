@@ -1005,6 +1005,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
           <Toolbar
             projectPath={projectPath}
             subscriberCount={subscriberCount}
+            feedbackStatus={feedbackStatus}
             onSelectProject={onSelectProject}
           />
 
