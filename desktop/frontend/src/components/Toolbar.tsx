@@ -6,11 +6,12 @@ import type { RecentProject } from "../types";
 interface ToolbarProps {
   projectPath: string;
   subscriberCount: number;
+  connectionMode: string;
   feedbackStatus: string;
   onSelectProject: (path: string) => void;
 }
 
-export function Toolbar({ projectPath, subscriberCount, feedbackStatus, onSelectProject }: ToolbarProps) {
+export function Toolbar({ projectPath, subscriberCount, connectionMode, feedbackStatus, onSelectProject }: ToolbarProps) {
   const projectName = projectPath.split("/").pop() || "Monocle";
   const [open, setOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -124,26 +125,31 @@ export function Toolbar({ projectPath, subscriberCount, feedbackStatus, onSelect
       </div>
 
       {/* Right side: connection status (matches TUI statusbar.go) */}
-      <div className="ml-auto flex items-center gap-1.5 no-drag text-[12px]">
-        {feedbackStatus === "waiting" ? (
-          <>
-            <span className={`${subscriberCount > 0 ? "text-ctp-yellow" : "text-ctp-yellow/60"}`}>
-              {subscriberCount > 0 ? "●" : "○"}
-            </span>
-            <span className="text-ctp-yellow">Waiting for Review</span>
-          </>
-        ) : subscriberCount > 0 ? (
-          <>
-            <span className="text-ctp-green">●</span>
-            <span className="text-ctp-green">Connected</span>
-          </>
-        ) : (
-          <>
-            <span className="text-muted-foreground">○</span>
-            <span className="text-muted-foreground">Waiting</span>
-          </>
-        )}
-      </div>
+      {(() => {
+        const isConnected = subscriberCount > 0 || connectionMode === "queue";
+        return (
+          <div className="ml-auto flex items-center gap-1.5 no-drag text-[12px]">
+            {feedbackStatus === "waiting" ? (
+              <>
+                <span className={isConnected ? "text-ctp-yellow" : "text-ctp-yellow/60"}>
+                  {isConnected ? "●" : "○"}
+                </span>
+                <span className="text-ctp-yellow">Waiting for Review</span>
+              </>
+            ) : isConnected ? (
+              <>
+                <span className="text-ctp-green">●</span>
+                <span className="text-ctp-green">Connected</span>
+              </>
+            ) : (
+              <>
+                <span className="text-muted-foreground">○</span>
+                <span className="text-muted-foreground">Waiting</span>
+              </>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

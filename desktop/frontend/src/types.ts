@@ -196,7 +196,8 @@ export interface PauseChangedEvent {
 }
 
 export interface ConnectionChangedEvent {
-  status: string;
+  count: number;
+  mode: string;
   message: string;
 }
 
