@@ -139,6 +139,10 @@ func (a *App) emitProjectChanged(path string, err error) {
 // SelectProject initializes the engine for the given project directory.
 // Returns the resolved repo root path on success.
 func (a *App) SelectProject(projectPath string) (string, error) {
+	if a.database == nil {
+		return "", fmt.Errorf("database not available — it may need to be reset")
+	}
+
 	// Shut down existing engine if switching projects
 	if a.engine != nil {
 		a.engine.Shutdown()
