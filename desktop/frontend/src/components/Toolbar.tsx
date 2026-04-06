@@ -6,10 +6,11 @@ import type { RecentProject } from "../types";
 interface ToolbarProps {
   projectPath: string;
   subscriberCount: number;
+  feedbackStatus: string;
   onSelectProject: (path: string) => void;
 }
 
-export function Toolbar({ projectPath, subscriberCount, onSelectProject }: ToolbarProps) {
+export function Toolbar({ projectPath, subscriberCount, feedbackStatus, onSelectProject }: ToolbarProps) {
   const projectName = projectPath.split("/").pop() || "Monocle";
   const [open, setOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -122,16 +123,26 @@ export function Toolbar({ projectPath, subscriberCount, onSelectProject }: Toolb
         )}
       </div>
 
-      {/* Right side: connection indicator */}
-      <div className="ml-auto flex items-center gap-2 no-drag">
-        <span
-          className={`inline-block w-2 h-2 rounded-full transition-colors duration-300 ${
-            subscriberCount > 0
-              ? "bg-ctp-green shadow-[0_0_6px_var(--color-ctp-green)]"
-              : "bg-ctp-surface2"
-          }`}
-          title={subscriberCount > 0 ? "Agent connected" : "No agent connected"}
-        />
+      {/* Right side: connection status (matches TUI statusbar.go) */}
+      <div className="ml-auto flex items-center gap-1.5 no-drag text-[12px]">
+        {feedbackStatus === "waiting" ? (
+          <>
+            <span className={`${subscriberCount > 0 ? "text-ctp-yellow" : "text-ctp-yellow/60"}`}>
+              {subscriberCount > 0 ? "●" : "○"}
+            </span>
+            <span className="text-ctp-yellow">Waiting for Review</span>
+          </>
+        ) : subscriberCount > 0 ? (
+          <>
+            <span className="text-ctp-green">●</span>
+            <span className="text-ctp-green">Connected</span>
+          </>
+        ) : (
+          <>
+            <span className="text-muted-foreground">○</span>
+            <span className="text-muted-foreground">Waiting</span>
+          </>
+        )}
       </div>
     </div>
   );
