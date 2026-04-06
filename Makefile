@@ -32,7 +32,7 @@ install: bundle
 test:
 	go test ./internal/...
 
-vet:
+vet: frontend-dist
 	go vet ./...
 
 lint: vet
