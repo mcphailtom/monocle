@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "react-diff-view/style/index.css";
 @import "@azurity/pure-nerd-font/pure-nerd-font.css";
+@import "@fontsource/jetbrains-mono/600.css";
 
 @custom-variant dark (&:is(.dark *));
 
