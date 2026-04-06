@@ -1,4 +1,4 @@
-.PHONY: build run test vet lint bundle sync-skills skills-tarball
+.PHONY: build run build-desktop dev-desktop frontend-deps frontend-dist test vet lint bundle sync-skills skills-tarball
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
@@ -10,6 +10,21 @@ build: bundle
 
 run: build
 	./bin/monocle
+
+build-desktop: frontend-deps
+	wails build -ldflags "-X main.version=$(VERSION)"
+
+dev-desktop: frontend-dist
+	MONOCLE_DB=$(CURDIR)/.monocle-dev.db wails dev
+
+frontend-deps:
+	cd desktop/frontend && bun install
+
+frontend-dist: frontend-deps
+	@if [ ! -d desktop/frontend/dist ] || [ -z "$$(ls -A desktop/frontend/dist 2>/dev/null)" ]; then \
+		echo "Building frontend dist..."; \
+		cd desktop/frontend && bun run build; \
+	fi
 
 install: bundle
 	go install ./cmd/monocle

@@ -37,6 +37,36 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+  build-desktop:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Go version from devbox.json
+        id: go-version
+        run: |
+          version=$(jq -r '.packages[] | select(startswith("go@")) | split("@")[1]' devbox.json)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.go-version.outputs.version }}
+          cache: true
+
+      - uses: oven-sh/setup-bun@v2
+
+      # Wails version must match go.mod (github.com/wailsapp/wails/v2 v2.11.0)
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+
+      - name: Build desktop app
+        env:
+          CGO_ENABLED: "1"
+        run: wails build -ldflags "-X main.version=ci"
+
+      - name: Verify .app bundle exists
+        run: test -f build/bin/monocle.app/Contents/MacOS/monocle
+
   goreleaser-check:
     runs-on: ubuntu-latest
     steps:

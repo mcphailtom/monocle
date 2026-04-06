@@ -1,0 +1,40 @@
+{
+  "name": "monocle-desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@azurity/pure-nerd-font": "^3.0.5",
+    "@base-ui/react": "^1.3.0",
+    "@fontsource-variable/plus-jakarta-sans": "^5.2.8",
+    "@fontsource/instrument-serif": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "lucide-react": "^1.7.0",
+    "react": "^19.1.0",
+    "react-diff-view": "^3.3.3",
+    "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "shadcn": "^4.1.2",
+    "shiki": "^4.0.2",
+    "tailwind-merge": "^3.5.0",
+    "tw-animate-css": "^1.4.0",
+    "unidiff": "^1.0.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.5",
+    "tailwindcss": "^4.1.7",
+    "@tailwindcss/vite": "^4.1.7"
+  }
+}
