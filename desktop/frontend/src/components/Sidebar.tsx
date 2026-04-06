@@ -305,11 +305,14 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
 
   return (
     <aside
-      className={`flex flex-col border-r overflow-hidden transition-colors duration-150 ${
+      className={`flex flex-col border-r overflow-hidden transition-colors duration-150 bg-card ${
         focused ? "border-primary" : "border-border"
       }`}
       style={{ width: 260 }}
     >
+      {/* Drag region for traffic lights */}
+      <div className="h-[52px] shrink-0 drag-region" />
+
       <ScrollArea className="flex-1" ref={scrollRef}>
         <div className="py-1">
           {items.map((item, index) => (
@@ -376,9 +379,9 @@ function SidebarRow({
 }: SidebarRowProps) {
   if (item.kind === "section") {
     return (
-      <div className="px-3 pt-3 pb-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+      <div className="px-4 pt-3 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
         {item.label}
-        <span className="ml-1 text-muted-foreground/60">{item.count}</span>
+        <span className="ml-1.5 text-muted-foreground/50">{item.count}</span>
       </div>
     );
   }
@@ -428,12 +431,12 @@ function SidebarRow({
   return (
     <div
       ref={setRef}
-      className={`flex items-center gap-1 px-3 py-0.5 cursor-pointer text-[13px] truncate transition-colors duration-150 ${
+      className={`flex items-center gap-1.5 px-2 py-[3px] mx-2 cursor-pointer text-[13px] truncate transition-colors duration-150 rounded-md ${
         isActive || isCursor
           ? "bg-accent text-accent-foreground"
           : "text-foreground hover:bg-secondary/50"
       } ${reviewed ? "opacity-50" : ""}`}
-      style={{ paddingLeft: `${12 + indent}px` }}
+      style={{ paddingLeft: `${8 + indent}px` }}
       onClick={() => onClick(index)}
     >
       {status && (
