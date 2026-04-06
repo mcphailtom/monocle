@@ -865,7 +865,7 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     return (
       <div
         ref={containerRef}
-        className={`h-full overflow-auto selectable font-mono ${focused ? "" : "opacity-90"} ${wrap ? "diff-wrap" : ""} ${plain ? "diff-plain" : ""}`}
+        className={`h-full overflow-auto selectable font-mono ${focused ? "" : "opacity-90 diff-unfocused"} ${wrap ? "diff-wrap" : ""} ${plain ? "diff-plain" : ""}`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
