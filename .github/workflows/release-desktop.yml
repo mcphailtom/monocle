@@ -9,15 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  build-desktop-macos:
-    strategy:
-      matrix:
-        include:
-          - runner: macos-latest
-            arch: arm64
-          - runner: macos-13
-            arch: amd64
-    runs-on: ${{ matrix.runner }}
+  build-and-release:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -45,58 +38,36 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Build desktop app
+      - name: Build arm64
         env:
           CGO_ENABLED: "1"
-        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.version }}"
+        run: |
+          wails build -platform darwin/arm64 -ldflags "-X main.version=${{ steps.version.outputs.version }}"
+          cp build/bin/monocle.app/Contents/MacOS/monocle monocle-arm64
 
-      - name: Upload .app bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: monocle-app-darwin-${{ matrix.arch }}
-          path: build/bin/monocle.app
-
-  package-and-release:
-    needs: build-desktop-macos
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Extract version from tag
-        id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Download arm64 .app
-        uses: actions/download-artifact@v4
-        with:
-          name: monocle-app-darwin-arm64
-          path: arm64-app/monocle.app
-
-      - name: Download amd64 .app
-        uses: actions/download-artifact@v4
-        with:
-          name: monocle-app-darwin-amd64
-          path: amd64-app/monocle.app
+      - name: Build amd64
+        env:
+          CGO_ENABLED: "1"
+        run: |
+          wails build -platform darwin/amd64 -ldflags "-X main.version=${{ steps.version.outputs.version }}"
+          cp build/bin/monocle.app/Contents/MacOS/monocle monocle-amd64
 
       - name: Create universal binary
         run: |
-          lipo -create \
-            arm64-app/monocle.app/Contents/MacOS/monocle \
-            amd64-app/monocle.app/Contents/MacOS/monocle \
-            -output universal-monocle
-          chmod +x universal-monocle
-          lipo -info universal-monocle
+          lipo -create monocle-arm64 monocle-amd64 -output monocle-universal
+          chmod +x monocle-universal
+          lipo -info monocle-universal
 
       - name: Assemble universal .app bundle
         run: |
-          cp -R arm64-app/monocle.app Monocle.app
-          cp universal-monocle Monocle.app/Contents/MacOS/monocle
+          cp monocle-universal build/bin/monocle.app/Contents/MacOS/monocle
 
       - name: Create zip archive
         run: |
+          cd build/bin
           ditto -c -k --sequesterRsrc --keepParent \
-            Monocle.app \
-            "Monocle-Desktop_${{ steps.version.outputs.version }}_darwin_universal.zip"
+            monocle.app \
+            "../../Monocle-Desktop_${{ steps.version.outputs.version }}_darwin_universal.zip"
 
       - name: Wait for GitHub Release to exist
         env:
