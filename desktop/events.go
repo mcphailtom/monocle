@@ -2,6 +2,7 @@ package desktop
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/josephschmitt/monocle/internal/core"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -41,8 +42,17 @@ func bridgeEngineEvents(engine core.EngineAPI, ctx context.Context) {
 	})
 
 	engine.On(core.EventConnectionChanged, func(e core.EventPayload) {
-		wailsRuntime.EventsEmit(ctx, "connection_changed", map[string]string{
-			"status":  e.Status,
+		// Parse subscriber count from status (matches TUI's app.go logic).
+		count := 0
+		mode := ""
+		if e.Status == "queue" {
+			mode = "queue"
+		} else {
+			count, _ = strconv.Atoi(e.Status)
+		}
+		wailsRuntime.EventsEmit(ctx, "connection_changed", map[string]interface{}{
+			"count":   count,
+			"mode":    mode,
 			"message": e.Message,
 		})
 	})

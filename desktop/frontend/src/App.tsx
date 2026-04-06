@@ -101,6 +101,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
   const [reviewFilter, setReviewFilter] = useState("");
   const [treeMode, setTreeMode] = useState(false);
   const [subscriberCount, setSubscriberCount] = useState(0);
+  const [connectionMode, setConnectionMode] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("unified");
   const [contentTitle, setContentTitle] = useState("");
@@ -466,7 +467,9 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
         loadFiles();
         loadSession();
       }),
-      onEvent("connection_changed", () => {
+      onEvent("connection_changed", (data) => {
+        setSubscriberCount(data.count ?? 0);
+        setConnectionMode(data.mode ?? "");
         refreshStatus();
       }),
       onEvent("feedback_status_changed", () => {
@@ -1005,6 +1008,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
           <Toolbar
             projectPath={projectPath}
             subscriberCount={subscriberCount}
+            connectionMode={connectionMode}
             feedbackStatus={feedbackStatus}
             onSelectProject={onSelectProject}
           />
