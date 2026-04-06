@@ -149,7 +149,7 @@ export function ReviewSubmitDialog({
         <DialogFooter>
           <div className="flex items-center justify-between w-full">
             <span className="text-[10px] text-muted-foreground">
-              Tab to toggle &middot; Ctrl+Enter to submit &middot; Ctrl+Y to copy
+              Tab to toggle &middot; {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}Enter to submit &middot; {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}Y to copy
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={onClose}>

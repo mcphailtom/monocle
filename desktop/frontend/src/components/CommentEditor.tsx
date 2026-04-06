@@ -161,7 +161,7 @@ export function CommentEditor({
         <DialogFooter>
           <div className="flex items-center justify-between w-full">
             <span className="text-[10px] text-muted-foreground">
-              Ctrl+Enter to save &middot; Esc to cancel
+              {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}Enter to save<span className="mx-2">&middot;</span>Esc to cancel
             </span>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={onClose}>
