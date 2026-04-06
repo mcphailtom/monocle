@@ -66,6 +66,20 @@ const STATUS_COLORS: Record<FileChangeStatus, string> = {
   none: "text-muted-foreground",
 };
 
+// Sort tree nodes: directories first, then files, alphabetical within each group (case-insensitive).
+// Matches TUI's sortChildren in internal/tui/filetree.go.
+function sortTree(nodes: FileTreeNode[]): void {
+  nodes.sort((a, b) => {
+    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  });
+  for (const node of nodes) {
+    if (node.isDir && node.children.length > 0) {
+      sortTree(node.children);
+    }
+  }
+}
+
 function buildTree(files: ChangedFile[]): FileTreeNode[] {
   const root: FileTreeNode[] = [];
   const dirs = new Map<string, FileTreeNode>();
@@ -95,6 +109,7 @@ function buildTree(files: ChangedFile[]): FileTreeNode[] {
     });
   }
 
+  sortTree(root);
   return root;
 }
 
