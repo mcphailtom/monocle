@@ -55,6 +55,9 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
+      - name: Bundle MCP channel
+        run: cd channel && bun install && bun run build.mjs
+
       # Wails version must match go.mod (github.com/wailsapp/wails/v2 v2.11.0)
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
