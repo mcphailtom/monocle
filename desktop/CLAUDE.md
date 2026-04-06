@@ -2,6 +2,8 @@
 
 Native desktop app version of Monocle using [Wails v2](https://wails.io/) — Go backend + React frontend in a native WebView.
 
+**Read [DESIGN.md](DESIGN.md) before making UI changes.** It documents all visual and interaction design decisions — window chrome, focus system, branding, color conventions, and platform considerations.
+
 ## How It Relates to the TUI
 
 The TUI (`internal/tui/`) and the desktop app are two independent frontends for the same engine. They share 100% of the backend:
