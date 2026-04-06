@@ -23,8 +23,9 @@ import type {
   ReviewComment,
   CommentType,
   TargetType,
+  Config,
+  DiffLine,
 } from "./types";
-import type { DiffLine } from "./types";
 
 type FocusTarget = "sidebar" | "main";
 type ViewMode = "unified" | "split" | "file";
@@ -133,6 +134,9 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
   // Component refs for keyboard navigation
   const diffViewRef = useRef<DiffViewHandle>(null);
   const sidebarRef = useRef<SidebarHandle>(null);
+
+  // Config ref for live access (e.g., auto_focus_mode on plan selection)
+  const configRef = useRef<Config | null>(null);
 
   // --- Data loading ---
 
@@ -446,6 +450,16 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     loadSession();
     loadFiles();
     refreshStatus();
+
+    // Load config and apply to initial state
+    api.getConfig().then((cfg) => {
+      if (!cfg) return;
+      configRef.current = cfg;
+      if (cfg.sidebar_style === "tree") setTreeMode(true);
+      if (cfg.diff_style === "split") setViewMode("split");
+      else if (cfg.diff_style === "file") setViewMode("file");
+      if (cfg.wrap) setWrap(true);
+    }).catch(() => {});
   }, [loadSession, loadFiles, refreshStatus]);
 
   // --- Events ---
@@ -518,8 +532,14 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
 
     if (newPlan) {
       handleSidebarSelect({ kind: "content", item: newPlan });
+      // Auto-enter focus mode for plans if configured (matches TUI behavior)
+      if (configRef.current?.auto_focus_mode && !sidebarHidden) {
+        preFocusWrap.current = wrap;
+        setSidebarHidden(true);
+        setWrap(true);
+      }
     }
-  }, [contentItems, handleSidebarSelect]);
+  }, [contentItems, handleSidebarSelect, sidebarHidden, wrap]);
 
   // --- Sidebar cursor movement with auto-select ---
 
