@@ -11,6 +11,9 @@ interface HelpDialogProps {
   onClose: () => void;
 }
 
+const isMac = typeof navigator !== "undefined" && /Mac/.test(navigator.platform);
+const modKey = (label: string) => isMac ? label.replace("Ctrl+", "⌘") : label;
+
 const SECTIONS = [
   {
     title: "Navigation",
@@ -114,7 +117,7 @@ export function HelpDialog({ open, onClose }: HelpDialogProps) {
                       className="flex items-center justify-between text-xs py-0.5"
                     >
                       <kbd className="bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded text-[11px] font-mono">
-                        {key}
+                        {modKey(key)}
                       </kbd>
                       <span className="text-muted-foreground">{desc}</span>
                     </div>
