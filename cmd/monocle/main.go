@@ -15,6 +15,7 @@ import (
 	"github.com/josephschmitt/monocle/internal/client"
 	"github.com/josephschmitt/monocle/internal/core"
 	"github.com/josephschmitt/monocle/internal/db"
+	monocleMCP "github.com/josephschmitt/monocle/internal/mcp"
 	"github.com/josephschmitt/monocle/internal/protocol"
 	"github.com/josephschmitt/monocle/internal/tui"
 )
@@ -26,7 +27,8 @@ type CLI struct {
 	Review          ReviewCmd          `cmd:"review" help:"Commands for interacting with a Monocle review session"`
 	Register        RegisterCmd        `cmd:"" help:"Register Monocle for an agent"`
 	Unregister      UnregisterCmd      `cmd:"" help:"Remove Monocle registration"`
-	ServeMcpChannel ServeMCPChannelCmd `cmd:"serve-mcp-channel" help:"Run the MCP channel server" hidden:""`
+	ServeMcp        ServeMCPCmd        `cmd:"serve-mcp" help:"Run the MCP server" hidden:""`
+	ServeMcpChannel ServeMCPChannelCmd `cmd:"serve-mcp-channel" help:"Run the MCP channel server (deprecated)" hidden:""`
 	Install         InstallCmd         `cmd:"" help:"Install MCP channel (alias for register)" hidden:""`
 	Uninstall       UninstallCmd       `cmd:"" help:"Remove MCP channel (alias for unregister)" hidden:""`
 	Version         kong.VersionFlag   `help:"Print version" name:"version"`
@@ -83,6 +85,10 @@ type RegisterCmd struct {
 type UnregisterCmd struct {
 	Agent  string `arg:"" optional:"" help:"Agent to unregister (claude, opencode, codex, gemini, all)"`
 	Global bool   `help:"Remove from user-level config instead of project" default:"false"`
+}
+
+type ServeMCPCmd struct {
+	ExperimentalChannels bool `help:"Enable experimental MCP channel push notifications" default:"false"`
 }
 
 // ServeMCPChannelCmd is the deprecated MCP channel command.
@@ -180,9 +186,18 @@ func resolveAgents(name, pickerTitle string) ([]adapters.AgentAdapter, error) {
 	}
 }
 
+func (cmd *ServeMCPCmd) Run() error {
+	monocleMCP.Version = version
+	return monocleMCP.Run(monocleMCP.Options{
+		EnableChannels: cmd.ExperimentalChannels,
+	})
+}
+
+// Deprecated: use 'monocle serve-mcp --experimental-channels' instead.
 func (cmd *ServeMCPChannelCmd) Run() error {
 	fmt.Fprintln(os.Stderr, "Note: 'monocle serve-mcp-channel' is deprecated, use 'monocle serve-mcp --experimental-channels' instead")
-	return fmt.Errorf("serve-mcp-channel has been replaced by serve-mcp")
+	monocleMCP.Version = version
+	return monocleMCP.Run(monocleMCP.Options{EnableChannels: true})
 }
 
 // Deprecated: use 'monocle register' instead.
