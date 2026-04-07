@@ -391,6 +391,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     async (ref: string) => {
       try {
         await api.setBaseRef(ref);
+        await api.refreshChangedFiles();
         reloadCurrentView();
       } catch (err) {
         console.error("Failed to set base ref:", err);
