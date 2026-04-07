@@ -9,7 +9,7 @@ run: build
 	./bin/monocle
 
 install:
-	go install ./cmd/monocle
+	go install -ldflags "-X main.version=$(VERSION)" ./cmd/monocle
 
 uninstall:
 	rm -f $(shell go env GOPATH)/bin/monocle
