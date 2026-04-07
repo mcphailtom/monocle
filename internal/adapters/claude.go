@@ -17,16 +17,25 @@ var MonocleClaudePermissions = []string{
 	"Skill(review-plan-wait)",
 }
 
-// ClaudeAdapter handles Claude Code MCP channel registration.
-type ClaudeAdapter struct{}
+// ClaudeAdapter handles Claude Code registration.
+// Set Mode before calling Register to control the integration style.
+type ClaudeAdapter struct {
+	// Mode controls the integration style. Set before calling Register.
+	// ModeMCPTools (default): MCP tools + channels, no skills.
+	// ModeSkills: channels only + skills + bash permissions.
+	Mode IntegrationMode
+}
 
 func (a *ClaudeAdapter) Name() string  { return "claude" }
 func (a *ClaudeAdapter) Label() string { return "Claude Code" }
 
 // ConfigPaths returns the files written by Register.
 func (a *ClaudeAdapter) ConfigPaths(global bool) []string {
-	paths := []string{mcpJSONPath(global), claudeSettingsPath(global)}
-	paths = append(paths, SkillPaths(claudeSkillsDir(global))...)
+	paths := []string{mcpJSONPath(global)}
+	if a.effectiveMode() == ModeSkills {
+		paths = append(paths, claudeSettingsPath(global))
+		paths = append(paths, SkillPaths(claudeSkillsDir(global))...)
+	}
 	return paths
 }
 
@@ -57,16 +66,21 @@ func (a *ClaudeAdapter) Detect() bool {
 	return false
 }
 
-// Register adds monocle to .mcp.json, configures permissions, and installs skill files.
+// Register adds monocle to .mcp.json and optionally configures permissions and skills.
+// In MCP tools mode: configures MCP server with tools + channels, no skills or bash permissions.
+// In skills mode: configures MCP server with channels only, installs skills and bash permissions.
 func (a *ClaudeAdapter) Register(global bool) error {
 	if err := a.configureMCP(global); err != nil {
 		return fmt.Errorf("configure mcp: %w", err)
 	}
-	if err := configureClaudeSettings(claudeSettingsPath(global)); err != nil {
-		return fmt.Errorf("configure settings: %w", err)
-	}
-	if err := InstallSkills(claudeSkillsDir(global)); err != nil {
-		return fmt.Errorf("install skills: %w", err)
+
+	if a.effectiveMode() == ModeSkills {
+		if err := configureClaudeSettings(claudeSettingsPath(global)); err != nil {
+			return fmt.Errorf("configure settings: %w", err)
+		}
+		if err := InstallSkills(claudeSkillsDir(global)); err != nil {
+			return fmt.Errorf("install skills: %w", err)
+		}
 	}
 	return nil
 }
@@ -155,13 +169,21 @@ func (a *ClaudeAdapter) RegisterDetails(global bool) []string {
 	return []string{fmt.Sprintf("mcp → %s", mcpJSONPath(global))}
 }
 
+// effectiveMode returns the integration mode, defaulting to MCP tools.
+func (a *ClaudeAdapter) effectiveMode() IntegrationMode {
+	if a.Mode == "" {
+		return ModeMCPTools
+	}
+	return a.Mode
+}
+
 // configureMCP adds monocle to .mcp.json.
 func (a *ClaudeAdapter) configureMCP(global bool) error {
-	return configureMCPServersJSON(
-		mcpJSONPath(global),
-		ResolveCommand(global),
-		[]string{"serve-mcp", "--experimental-channels"},
-	)
+	args := []string{"serve-mcp", "--experimental-channels"}
+	if a.effectiveMode() == ModeSkills {
+		args = []string{"serve-mcp", "--experimental-channels-only"}
+	}
+	return configureMCPServersJSON(mcpJSONPath(global), ResolveCommand(global), args)
 }
 
 // unconfigureMCP removes monocle from .mcp.json.

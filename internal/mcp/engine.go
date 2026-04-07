@@ -19,12 +19,13 @@ import (
 // for receiving push event notifications. It forwards events as MCP channel
 // notifications through the captured stdio connection.
 type engineConn struct {
-	conn      mcp.Connection // MCP stdio connection for writing notifications
-	agentName string
+	conn         mcp.Connection // MCP stdio connection for writing notifications
+	agentName    string
+	channelsOnly bool // true = reference CLI commands in notifications, false = reference tools
 }
 
-func newEngineConn(conn mcp.Connection) *engineConn {
-	return &engineConn{conn: conn}
+func newEngineConn(conn mcp.Connection, channelsOnly bool) *engineConn {
+	return &engineConn{conn: conn, channelsOnly: channelsOnly}
 }
 
 // run connects to the engine and listens for events, forwarding them as
@@ -133,7 +134,11 @@ func (e *engineConn) handleEvent(ctx context.Context, notif *protocol.EventNotif
 	case "feedback_submitted":
 		msg, _ := notif.Payload["message"].(string)
 		if msg == "" {
-			msg = "Your reviewer has submitted feedback. Use the get_feedback tool to retrieve it."
+			if e.channelsOnly {
+				msg = "Your reviewer has submitted feedback. Run `monocle review get-feedback` to retrieve it."
+			} else {
+				msg = "Your reviewer has submitted feedback. Use the get_feedback tool to retrieve it."
+			}
 		}
 		content = msg
 		meta = map[string]any{"event": "feedback_submitted"}
@@ -143,8 +148,13 @@ func (e *engineConn) handleEvent(ctx context.Context, notif *protocol.EventNotif
 		if status != "pause_requested" {
 			return
 		}
-		content = "Your reviewer has requested you pause and wait for feedback. " +
-			"Use the get_feedback tool with wait=true to block until feedback is ready."
+		if e.channelsOnly {
+			content = "Your reviewer has requested you pause and wait for feedback. " +
+				"Run `monocle review get-feedback --wait` to block until feedback is ready."
+		} else {
+			content = "Your reviewer has requested you pause and wait for feedback. " +
+				"Use the get_feedback tool with wait=true to block until feedback is ready."
+		}
 		meta = map[string]any{"event": "pause_requested"}
 
 	default:

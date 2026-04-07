@@ -13,8 +13,13 @@ import (
 // Options configures the MCP server.
 type Options struct {
 	// EnableChannels adds the experimental claude/channel capability and
-	// subscribes to engine events for push notifications.
+	// subscribes to engine events for push notifications alongside tools.
 	EnableChannels bool
+
+	// ChannelsOnly enables channels without registering any tools.
+	// Used when the agent integrates via skills (CLI commands) instead of MCP tools.
+	// Channel notifications reference CLI commands instead of tools.
+	ChannelsOnly bool
 }
 
 // Run creates and runs the MCP server over stdio, blocking until the client
@@ -23,17 +28,27 @@ func Run(opts Options) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	serverOpts := &sdkmcp.ServerOptions{
-		Instructions: toolInstructions,
+	wantChannels := opts.EnableChannels || opts.ChannelsOnly
+	wantTools := !opts.ChannelsOnly
+
+	serverOpts := &sdkmcp.ServerOptions{}
+
+	// Set instructions based on mode
+	switch {
+	case wantTools && wantChannels:
+		serverOpts.Instructions = toolInstructions + "\n" + channelToolInstructions
+	case wantTools:
+		serverOpts.Instructions = toolInstructions
+	case wantChannels:
+		serverOpts.Instructions = channelCLIInstructions
 	}
 
-	if opts.EnableChannels {
+	if wantChannels {
 		serverOpts.Capabilities = &sdkmcp.ServerCapabilities{
 			Experimental: map[string]any{
 				"claude/channel": map[string]any{},
 			},
 		}
-		serverOpts.Instructions = toolInstructions + "\n" + channelInstructions
 	}
 
 	server := sdkmcp.NewServer(&sdkmcp.Implementation{
@@ -41,11 +56,13 @@ func Run(opts Options) error {
 		Version: version(),
 	}, serverOpts)
 
-	registerTools(server)
+	if wantTools {
+		registerTools(server)
+	}
 
 	transport := &sdkmcp.StdioTransport{}
 
-	if opts.EnableChannels {
+	if wantChannels {
 		// Use Connect instead of Run so we can capture the connection
 		// for sending custom channel notifications.
 		ct := &capturingTransport{inner: transport}
@@ -54,7 +71,7 @@ func Run(opts Options) error {
 			return err
 		}
 
-		engine := newEngineConn(ct.conn)
+		engine := newEngineConn(ct.conn, opts.ChannelsOnly)
 		defer engine.close()
 
 		// Identify agent after handshake
@@ -102,5 +119,10 @@ Use the get_feedback tool to retrieve review feedback.
 Use the send_artifact tool to send content for review.
 Use the add_files tool to add files to the review.`
 
-const channelInstructions = `When you receive a feedback_submitted event, use the get_feedback tool to retrieve the review.
+// channelToolInstructions tells agents to use MCP tools when receiving channel events.
+const channelToolInstructions = `When you receive a feedback_submitted event, use the get_feedback tool to retrieve the review.
 When you receive a pause_requested event, use the get_feedback tool with wait=true to block until the reviewer submits feedback.`
+
+// channelCLIInstructions tells agents to use CLI commands when receiving channel events.
+const channelCLIInstructions = `When you receive a feedback_submitted event, run ` + "`monocle review get-feedback`" + ` to retrieve the review.
+When you receive a pause_requested event, run ` + "`monocle review get-feedback --wait`" + ` to block until the reviewer submits feedback.`

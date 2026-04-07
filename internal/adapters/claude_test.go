@@ -7,7 +7,55 @@ import (
 	"testing"
 )
 
-func TestClaudeChannelRegister(t *testing.T) {
+func TestClaudeRegister_MCPToolsMode(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", filepath.Join(dir, "home"))
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	projDir := filepath.Join(dir, "project")
+	os.MkdirAll(projDir, 0755)
+	os.Chdir(projDir)
+	defer os.Chdir(origDir)
+
+	adapter := &ClaudeAdapter{Mode: ModeMCPTools}
+
+	if !adapter.NeedsRegister() {
+		t.Fatal("should need register initially")
+	}
+
+	if err := adapter.Register(false); err != nil {
+		t.Fatalf("register failed: %v", err)
+	}
+
+	// Verify .mcp.json has serve-mcp --experimental-channels
+	mcpData, err := os.ReadFile(filepath.Join(projDir, ".mcp.json"))
+	if err != nil {
+		t.Fatalf("read .mcp.json: %v", err)
+	}
+	var mcpConfig map[string]any
+	json.Unmarshal(mcpData, &mcpConfig)
+	servers := mcpConfig["mcpServers"].(map[string]any)
+	entry := servers["monocle"].(map[string]any)
+
+	args, _ := entry["args"].([]any)
+	if len(args) != 2 || args[0] != "serve-mcp" || args[1] != "--experimental-channels" {
+		t.Fatalf("args should be ['serve-mcp', '--experimental-channels'], got %v", args)
+	}
+
+	// Should NOT have skills or settings (MCP tools mode)
+	if _, err := os.Stat(filepath.Join(projDir, ".claude", "settings.json")); !os.IsNotExist(err) {
+		t.Fatal("MCP tools mode should not create settings.json")
+	}
+
+	if !adapter.HasMCPConfig() {
+		t.Fatal("should have MCP config after register")
+	}
+}
+
+func TestClaudeRegister_SkillsMode(t *testing.T) {
 	setupTestSkills(t)
 	dir := t.TempDir()
 	t.Setenv("HOME", filepath.Join(dir, "home"))
@@ -21,52 +69,34 @@ func TestClaudeChannelRegister(t *testing.T) {
 	os.Chdir(projDir)
 	defer os.Chdir(origDir)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 
-	// Not registered initially
-	if adapter.HasMCPConfig() {
-		t.Fatal("should not have MCP config initially")
-	}
-	if !adapter.NeedsRegister() {
-		t.Fatal("should need register initially")
-	}
-
-	// Register
 	if err := adapter.Register(false); err != nil {
 		t.Fatalf("register failed: %v", err)
 	}
 
-	// Verify .mcp.json exists with monocle entry
+	// Verify .mcp.json has serve-mcp --experimental-channels-only
 	mcpData, err := os.ReadFile(filepath.Join(projDir, ".mcp.json"))
 	if err != nil {
 		t.Fatalf("read .mcp.json: %v", err)
 	}
 	var mcpConfig map[string]any
-	if err := json.Unmarshal(mcpData, &mcpConfig); err != nil {
-		t.Fatalf("parse .mcp.json: %v", err)
-	}
-	servers, ok := mcpConfig["mcpServers"].(map[string]any)
-	if !ok {
-		t.Fatal("mcpServers should exist in .mcp.json")
-	}
-	entry, ok := servers["monocle"].(map[string]any)
-	if !ok {
-		t.Fatal("monocle should be in mcpServers")
-	}
+	json.Unmarshal(mcpData, &mcpConfig)
+	servers := mcpConfig["mcpServers"].(map[string]any)
+	entry := servers["monocle"].(map[string]any)
 
-	// Verify the entry points to monocle serve-mcp --experimental-channels
-	command, _ := entry["command"].(string)
-	if command != "monocle" {
-		t.Fatalf("command should be 'monocle', got %q", command)
-	}
 	args, _ := entry["args"].([]any)
-	if len(args) != 2 || args[0] != "serve-mcp" || args[1] != "--experimental-channels" {
-		t.Fatalf("args should be ['serve-mcp', '--experimental-channels'], got %v", args)
+	if len(args) != 2 || args[0] != "serve-mcp" || args[1] != "--experimental-channels-only" {
+		t.Fatalf("args should be ['serve-mcp', '--experimental-channels-only'], got %v", args)
 	}
 
-	// Should no longer need registration
-	if adapter.NeedsRegister() {
-		t.Fatal("should not need register after Register()")
+	// Should have skills and settings in skills mode
+	if _, err := os.Stat(filepath.Join(projDir, ".claude", "settings.json")); err != nil {
+		t.Fatal("skills mode should create settings.json")
+	}
+
+	if !adapter.HasMCPConfig() {
+		t.Fatal("should have MCP config after register")
 	}
 }
 
@@ -83,7 +113,7 @@ func TestClaudeChannelRegister_Global(t *testing.T) {
 	os.Chdir(projDir)
 	defer os.Chdir(origDir)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if err := adapter.Register(true); err != nil {
 		t.Fatalf("register global failed: %v", err)
 	}
@@ -116,7 +146,7 @@ func TestHasMCPConfig_NoFiles(t *testing.T) {
 	os.Chdir(projDir)
 	defer os.Chdir(origDir)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if adapter.HasMCPConfig() {
 		t.Fatal("should return false when no .mcp.json exists")
 	}
@@ -144,7 +174,7 @@ func TestHasMCPConfig_GlobalExists(t *testing.T) {
 	data, _ := json.Marshal(mcpData)
 	os.WriteFile(filepath.Join(homeDir, ".mcp.json"), data, 0644)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if !adapter.HasMCPConfig() {
 		t.Fatal("should return true when global .mcp.json has monocle")
 	}
@@ -169,7 +199,7 @@ func TestHasMCPConfig_LocalExists(t *testing.T) {
 	data, _ := json.Marshal(mcpData)
 	os.WriteFile(filepath.Join(projDir, ".mcp.json"), data, 0644)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if !adapter.HasMCPConfig() {
 		t.Fatal("should return true when local .mcp.json has monocle")
 	}
@@ -197,7 +227,7 @@ func TestHasMCPConfig_OldStyleReturnsFalse(t *testing.T) {
 	data, _ := json.Marshal(mcpData)
 	os.WriteFile(filepath.Join(projDir, ".mcp.json"), data, 0644)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if adapter.HasMCPConfig() {
 		t.Fatal("should return false for old-style bun config — needs re-registration")
 	}
@@ -213,7 +243,7 @@ func TestNeedsRegister_NoConfig(t *testing.T) {
 	os.Chdir(projDir)
 	defer os.Chdir(origDir)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if !adapter.NeedsRegister() {
 		t.Fatal("should need register when no .mcp.json exists")
 	}
@@ -241,7 +271,7 @@ func TestNeedsRegister_Registered(t *testing.T) {
 	data, _ := json.Marshal(mcpData)
 	os.WriteFile(filepath.Join(homeDir, ".mcp.json"), data, 0644)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if adapter.NeedsRegister() {
 		t.Fatal("should not need register when MCP config exists")
 	}
@@ -258,7 +288,7 @@ func TestClaudeChannelRegister_Idempotent(t *testing.T) {
 	os.Chdir(projDir)
 	defer os.Chdir(origDir)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if err := adapter.Register(false); err != nil {
 		t.Fatalf("first register: %v", err)
 	}
@@ -282,7 +312,7 @@ func TestClaudeChannelUnregister(t *testing.T) {
 	os.Chdir(projDir)
 	defer os.Chdir(origDir)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if err := adapter.Register(false); err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -311,7 +341,7 @@ func TestClaudeRegister_AddsPermissions(t *testing.T) {
 	os.Chdir(projDir)
 	defer os.Chdir(origDir)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if err := adapter.Register(false); err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -365,7 +395,7 @@ func TestClaudeRegister_PreservesExistingPermissions(t *testing.T) {
 		t.Fatalf("write existing settings: %v", err)
 	}
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if err := adapter.Register(false); err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -408,7 +438,7 @@ func TestClaudeRegister_PermissionsIdempotent(t *testing.T) {
 	os.Chdir(projDir)
 	defer os.Chdir(origDir)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if err := adapter.Register(false); err != nil {
 		t.Fatalf("first register: %v", err)
 	}
@@ -448,7 +478,7 @@ func TestClaudeUnregister_RemovesPermissions(t *testing.T) {
 	os.Chdir(projDir)
 	defer os.Chdir(origDir)
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if err := adapter.Register(false); err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -486,7 +516,7 @@ func TestClaudeUnregister_PreservesOtherPermissions(t *testing.T) {
 	}
 
 	// Register first (adds all monocle perms), then unregister
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if err := adapter.Register(false); err != nil {
 		t.Fatalf("register: %v", err)
 	}
@@ -537,7 +567,7 @@ func TestHasPluginConfig_UserScope(t *testing.T) {
 		},
 	})
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if !adapter.HasPluginConfig() {
 		t.Fatal("should return true for user-scoped monocle plugin")
 	}
@@ -561,7 +591,7 @@ func TestHasPluginConfig_ProjectScope_Matching(t *testing.T) {
 		},
 	})
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if !adapter.HasPluginConfig() {
 		t.Fatal("should return true for project-scoped plugin matching cwd")
 	}
@@ -585,7 +615,7 @@ func TestHasPluginConfig_ProjectScope_NonMatching(t *testing.T) {
 		},
 	})
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if adapter.HasPluginConfig() {
 		t.Fatal("should return false for project-scoped plugin with non-matching path")
 	}
@@ -595,7 +625,7 @@ func TestHasPluginConfig_NoFile(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", filepath.Join(dir, "home"))
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if adapter.HasPluginConfig() {
 		t.Fatal("should return false when no installed_plugins.json exists")
 	}
@@ -620,7 +650,7 @@ func TestNeedsRegister_PluginRegistered(t *testing.T) {
 		},
 	})
 
-	adapter := &ClaudeAdapter{}
+	adapter := &ClaudeAdapter{Mode: ModeSkills}
 	if adapter.NeedsRegister() {
 		t.Fatal("should not need register when plugin is installed")
 	}

@@ -78,8 +78,10 @@ type RunCmd struct {
 }
 
 type RegisterCmd struct {
-	Agent  string `arg:"" optional:"" help:"Agent to register (claude, opencode, codex, gemini, all)"`
-	Global bool   `help:"Register in user-level config instead of project" default:"false"`
+	Agent    string `arg:"" optional:"" help:"Agent to register (claude, opencode, codex, gemini, all)"`
+	Global   bool   `help:"Register in user-level config instead of project" default:"false"`
+	MCPTools bool   `help:"Use MCP tools integration (Claude only)" default:"false"`
+	Skills   bool   `help:"Use skills/CLI integration (Claude only)" default:"false"`
 }
 
 type UnregisterCmd struct {
@@ -88,7 +90,8 @@ type UnregisterCmd struct {
 }
 
 type ServeMCPCmd struct {
-	ExperimentalChannels bool `help:"Enable experimental MCP channel push notifications" default:"false"`
+	ExperimentalChannels     bool `help:"Enable experimental MCP channel push notifications alongside tools" default:"false"`
+	ExperimentalChannelsOnly bool `help:"Enable channels only (no tools) for agents using skills" default:"false"`
 }
 
 // ServeMCPChannelCmd is the deprecated MCP channel command.
@@ -133,6 +136,18 @@ func (cmd *RegisterCmd) Run() error {
 	}
 
 	for _, a := range agents {
+		// For Claude, resolve the integration mode
+		if ca, ok := a.(*adapters.ClaudeAdapter); ok {
+			mode, err := cmd.resolveMode()
+			if err != nil {
+				return err
+			}
+			if mode == "" {
+				return nil // user cancelled
+			}
+			ca.Mode = mode
+		}
+
 		wasRegistered := a.HasConfig(cmd.Global)
 		if err := a.Register(cmd.Global); err != nil {
 			return fmt.Errorf("register %s: %w", a.Name(), err)
@@ -147,6 +162,19 @@ func (cmd *RegisterCmd) Run() error {
 		}
 	}
 	return nil
+}
+
+// resolveMode determines the integration mode for Claude.
+// Uses flags if specified, otherwise shows an interactive picker.
+func (cmd *RegisterCmd) resolveMode() (adapters.IntegrationMode, error) {
+	switch {
+	case cmd.MCPTools:
+		return adapters.ModeMCPTools, nil
+	case cmd.Skills:
+		return adapters.ModeSkills, nil
+	default:
+		return adapters.PickIntegrationMode()
+	}
 }
 
 func (cmd *UnregisterCmd) Run() error {
@@ -190,14 +218,15 @@ func (cmd *ServeMCPCmd) Run() error {
 	monocleMCP.Version = version
 	return monocleMCP.Run(monocleMCP.Options{
 		EnableChannels: cmd.ExperimentalChannels,
+		ChannelsOnly:   cmd.ExperimentalChannelsOnly,
 	})
 }
 
-// Deprecated: use 'monocle serve-mcp --experimental-channels' instead.
+// Deprecated: use 'monocle serve-mcp --experimental-channels-only' instead.
 func (cmd *ServeMCPChannelCmd) Run() error {
-	fmt.Fprintln(os.Stderr, "Note: 'monocle serve-mcp-channel' is deprecated, use 'monocle serve-mcp --experimental-channels' instead")
+	fmt.Fprintln(os.Stderr, "Note: 'monocle serve-mcp-channel' is deprecated, use 'monocle serve-mcp --experimental-channels-only' instead")
 	monocleMCP.Version = version
-	return monocleMCP.Run(monocleMCP.Options{EnableChannels: true})
+	return monocleMCP.Run(monocleMCP.Options{ChannelsOnly: true})
 }
 
 // Deprecated: use 'monocle register' instead.
