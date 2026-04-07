@@ -1,6 +1,6 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "monocle",
+  "name": "Monocle",
   "outputfilename": "monocle",
   "frontend:dir": "desktop/frontend",
   "frontend:install": "bun install",

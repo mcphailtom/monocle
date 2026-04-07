@@ -77,14 +77,14 @@ jobs:
           codesign --deep --force --options runtime \
             --sign "$APPLE_SIGNING_IDENTITY" \
             --timestamp \
-            build/bin/monocle.app
-          codesign --verify --verbose build/bin/monocle.app
+            build/bin/Monocle.app
+          codesign --verify --verbose build/bin/Monocle.app
 
       - name: Create zip for notarization
         run: |
           cd build/bin
           ditto -c -k --sequesterRsrc --keepParent \
-            monocle.app \
+            Monocle.app \
             "../../Monocle-Desktop_${{ steps.version.outputs.version }}_darwin_arm64.zip"
 
       - name: Notarize app
@@ -102,14 +102,14 @@ jobs:
 
       - name: Staple notarization ticket
         run: |
-          xcrun stapler staple build/bin/monocle.app
+          xcrun stapler staple build/bin/Monocle.app
 
       - name: Re-create zip with stapled ticket
         run: |
           rm "Monocle-Desktop_${{ steps.version.outputs.version }}_darwin_arm64.zip"
           cd build/bin
           ditto -c -k --sequesterRsrc --keepParent \
-            monocle.app \
+            Monocle.app \
             "../../Monocle-Desktop_${{ steps.version.outputs.version }}_darwin_arm64.zip"
 
       - name: Clean up keychain
@@ -175,7 +175,7 @@ jobs:
 
             depends_on formula: "${FORMULA_NAME}"
 
-            app "monocle.app"
+            app "Monocle.app"
 
             zap trash: [
               "~/Library/Application Support/com.wails.monocle",
