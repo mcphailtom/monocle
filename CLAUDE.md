@@ -18,7 +18,7 @@ devbox run -- make lint               # Vet + build check
 Single binary with CLI subcommands:
 - **`monocle`** — TUI (Kong). Manages sessions, renders diffs/plans, collects comments, delivers reviews.
 - **`monocle review`** — Agent-facing CLI commands: `status`, `get-feedback`, `send-artifact`, `add-files`.
-- **`monocle register`** — Register Monocle for an agent (prompts for MCP tools vs skills mode for Claude).
+- **`monocle register`** — Register Monocle for an agent. Claude defaults to MCP tools mode; others default to skills. Override with `--integration-mode mcp` or `--integration-mode skills`.
 - **`monocle unregister`** — Remove Monocle registration.
 - **`monocle serve-mcp`** — (hidden) Run the MCP server. Supports `--experimental-channels` (tools + push notifications) and `--experimental-channels-only` (push notifications only, for skills mode).
 
