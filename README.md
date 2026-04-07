@@ -148,7 +148,7 @@ The `/review-plan-wait` skill submits content to your TUI **and blocks** until y
 
 ## Features
 
-- **Works with any coding agent** — Claude Code, OpenCode, Codex CLI, Gemini CLI, or any agent that supports [skills](https://agentskills.io) or can call CLI commands
+- **Works with any coding agent** — Claude Code, OpenCode, Codex CLI, Gemini CLI, or any MCP-compatible agent
 - **Push notifications** — With Claude Code channels, feedback is pushed directly into the agent's context the moment you submit
 - **Pull-based feedback** — Agents without channel support retrieve feedback via the `/get-feedback` skill or `monocle review get-feedback`; multiple reviews queue up and are delivered together
 - **Plan & architecture review** — Your agent can submit plans, architecture decisions, and other content for review with markdown rendering. When iterating, Monocle shows diffs between plan versions so you can see exactly what changed. Use focus mode (`F`) for distraction-free reading

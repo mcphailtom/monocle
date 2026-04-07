@@ -337,6 +337,9 @@ nav {
   content: ''; width: 5px; height: 5px; border-radius: 50%;
   background: var(--green); opacity: 0.6;
 }
+.agent-name.agent-generic::before {
+  background: var(--yellow);
+}
 
 /* ───── Problem section ───── */
 .problem {
@@ -750,6 +753,7 @@ footer {
     <span class="agent-name">Codex</span>
     <span class="agent-name">Gemini&nbsp;CLI</span>
     <span class="agent-name">OpenCode</span>
+    <span class="agent-name agent-generic">Any MCP-compatible agent</span>
   </div>
 </div>
 
@@ -802,7 +806,7 @@ footer {
       <div class="feat dr3" data-reveal data-color="var(--teal)">
         <div class="feat-bar" style="background:var(--teal)"></div>
         <h3>Multi-agent support</h3>
-        <p>Works with Claude Code, Codex, Gemini CLI, OpenCode, or any agent that supports skills or CLI commands.</p>
+        <p>Works with Claude Code, Codex, Gemini CLI, OpenCode, or any MCP-compatible agent.</p>
       </div>
       <div class="feat dr4" data-reveal data-color="var(--red)">
         <div class="feat-bar" style="background:var(--red)"></div>
