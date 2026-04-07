@@ -138,15 +138,14 @@ func (cmd *RegisterCmd) Run() error {
 		// Set integration mode based on --integration-mode flag.
 		// "auto" (default): Claude → MCP tools, others → skills.
 		// "mcp" / "skills": explicit override for any agent.
-		if ca, ok := a.(*adapters.ClaudeAdapter); ok {
-			switch cmd.IntegrationMode {
-			case "mcp":
-				ca.Mode = adapters.ModeMCPTools
-			case "skills":
-				ca.Mode = adapters.ModeSkills
-			default: // auto
-				ca.Mode = adapters.ModeMCPTools
-			}
+		mode := cmd.resolveMode(a)
+		switch v := a.(type) {
+		case *adapters.ClaudeAdapter:
+			v.Mode = mode
+		case *adapters.OpenCodeAdapter:
+			v.Mode = mode
+		case *adapters.GeminiAdapter:
+			v.Mode = mode
 		}
 
 		wasRegistered := a.HasConfig(cmd.Global)
@@ -163,6 +162,22 @@ func (cmd *RegisterCmd) Run() error {
 		}
 	}
 	return nil
+}
+
+// resolveMode returns the integration mode for the given agent.
+// "auto" uses per-agent defaults: Claude → MCP tools, others → skills.
+func (cmd *RegisterCmd) resolveMode(a adapters.AgentAdapter) adapters.IntegrationMode {
+	switch cmd.IntegrationMode {
+	case "mcp":
+		return adapters.ModeMCPTools
+	case "skills":
+		return adapters.ModeSkills
+	default: // auto
+		if a.Name() == "claude" {
+			return adapters.ModeMCPTools
+		}
+		return adapters.ModeSkills
+	}
 }
 
 func (cmd *UnregisterCmd) Run() error {

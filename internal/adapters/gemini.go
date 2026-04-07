@@ -8,13 +8,17 @@ import (
 )
 
 // GeminiAdapter handles Monocle registration for Google Gemini CLI.
-// Installs skill files only — no MCP server needed.
-type GeminiAdapter struct{}
+type GeminiAdapter struct {
+	Mode IntegrationMode
+}
 
 func (a *GeminiAdapter) Name() string  { return "gemini" }
 func (a *GeminiAdapter) Label() string { return "Gemini CLI" }
 
 func (a *GeminiAdapter) ConfigPaths(global bool) []string {
+	if a.Mode == ModeMCPTools {
+		return CommandPaths(geminiCommandsDir(global), ".toml")
+	}
 	paths := []string{geminiPolicyPath(global)}
 	paths = append(paths, SkillPaths(geminiSkillsDir(global))...)
 	return paths
@@ -36,6 +40,10 @@ func (a *GeminiAdapter) Register(global bool) error {
 	// Clean up legacy MCP config if present
 	_ = unconfigureMCPServersJSON(geminiConfigPath(global))
 
+	if a.Mode == ModeMCPTools {
+		return InstallTOMLCommands(geminiCommandsDir(global))
+	}
+
 	// Remove legacy command files
 	cmdDir := geminiCommandsDir(global)
 	for _, name := range SkillNames {
@@ -53,15 +61,10 @@ func (a *GeminiAdapter) Unregister(global bool) error {
 	// Remove legacy MCP config if present
 	_ = unconfigureMCPServersJSON(geminiConfigPath(global))
 
-	// Remove legacy command files
-	cmdDir := geminiCommandsDir(global)
-	for _, name := range SkillNames {
-		_ = RemoveFileIfExists(filepath.Join(cmdDir, name+".toml"))
-	}
-
 	_ = unconfigureGeminiPolicy(geminiPolicyPath(global))
 
 	RemoveSkills(geminiSkillsDir(global))
+	RemoveCommands(geminiCommandsDir(global), ".toml")
 
 	return nil
 }

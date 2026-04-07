@@ -8,15 +8,20 @@ import (
 )
 
 // OpenCodeAdapter handles Monocle registration for OpenCode.
-// Installs skill files only — no MCP server needed.
-type OpenCodeAdapter struct{}
+type OpenCodeAdapter struct {
+	Mode IntegrationMode
+}
 
 func (a *OpenCodeAdapter) Name() string  { return "opencode" }
 func (a *OpenCodeAdapter) Label() string { return "OpenCode" }
 
 func (a *OpenCodeAdapter) ConfigPaths(global bool) []string {
 	paths := []string{openCodeConfigPath(global)}
-	paths = append(paths, SkillPaths(openCodeSkillsDir(global))...)
+	if a.Mode == ModeMCPTools {
+		paths = append(paths, CommandPaths(openCodeCommandsDir(global), ".md")...)
+	} else {
+		paths = append(paths, SkillPaths(openCodeSkillsDir(global))...)
+	}
 	return paths
 }
 
@@ -36,6 +41,10 @@ func (a *OpenCodeAdapter) Register(global bool) error {
 	// Clean up legacy MCP config if present
 	removeLegacyOpenCodeMCP(global)
 
+	if a.Mode == ModeMCPTools {
+		return InstallMarkdownCommands(openCodeCommandsDir(global))
+	}
+
 	if err := configureOpenCodePermissions(openCodeConfigPath(global)); err != nil {
 		return fmt.Errorf("configure permissions: %w", err)
 	}
@@ -50,12 +59,7 @@ func (a *OpenCodeAdapter) Unregister(global bool) error {
 	_ = unconfigureOpenCodePermissions(openCodeConfigPath(global))
 
 	RemoveSkills(openCodeSkillsDir(global))
-
-	// Also remove legacy command files
-	cmdDir := openCodeCommandsDir(global)
-	for _, name := range SkillNames {
-		_ = RemoveFileIfExists(filepath.Join(cmdDir, name+".md"))
-	}
+	RemoveCommands(openCodeCommandsDir(global), ".md")
 
 	return nil
 }
