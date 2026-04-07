@@ -138,3 +138,53 @@ jobs:
           gh release upload "${GITHUB_REF_NAME}" \
             "Monocle-Desktop_${{ steps.version.outputs.version }}_darwin_arm64.zip" \
             --clobber
+
+      - name: Update Homebrew cask
+        env:
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA256=$(shasum -a 256 "Monocle-Desktop_${VERSION}_darwin_arm64.zip" | awk '{print $1}')
+          URL="https://github.com/josephschmitt/monocle/releases/download/${GITHUB_REF_NAME}/Monocle-Desktop_${VERSION}_darwin_arm64.zip"
+
+          # Determine cask file: beta for prereleases, stable otherwise
+          if [[ "$VERSION" == *-* ]]; then
+            CASK_FILE="Casks/monocle-desktop@beta.rb"
+          else
+            CASK_FILE="Casks/monocle-desktop.rb"
+          fi
+
+          CASK_NAME="monocle-desktop"
+          if [[ "$VERSION" == *-* ]]; then CASK_NAME="monocle-desktop@beta"; fi
+
+          cat > /tmp/cask.rb <<CASK
+          cask "${CASK_NAME}" do
+            version "${VERSION}"
+            sha256 "${SHA256}"
+            url "${URL}"
+
+            name "Monocle Desktop"
+            desc "Code review companion for AI coding agents"
+            homepage "https://github.com/josephschmitt/monocle"
+
+            depends_on formula: "josephschmitt/tap/monocle"
+
+            app "monocle.app"
+
+            zap trash: [
+              "~/Library/Application Support/com.wails.monocle",
+            ]
+          end
+          CASK
+          sed 's/^          //' /tmp/cask.rb > /tmp/cask-clean.rb
+
+          # Push to homebrew-tap repo
+          cd "$(mktemp -d)"
+          git clone "https://x-access-token:${HOMEBREW_TAP_GITHUB_TOKEN}@github.com/josephschmitt/homebrew-tap.git" .
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p Casks
+          cp /tmp/cask-clean.rb "$CASK_FILE"
+          git add "$CASK_FILE"
+          git commit -m "Update monocle-desktop cask to ${VERSION}" || exit 0
+          git push
