@@ -114,7 +114,7 @@ export function BaseRefPicker({ open, onClose, onSelect, onAutoSelect }: BaseRef
           className="font-mono text-xs"
         />
 
-        <ScrollArea className="min-h-0 flex-1">
+        <ScrollArea className="max-h-[40vh]">
           <div className="space-y-0.5">
             {/* Auto (follow HEAD) option */}
             <button
@@ -159,7 +159,7 @@ export function BaseRefPicker({ open, onClose, onSelect, onAutoSelect }: BaseRef
           </div>
         </ScrollArea>
 
-        <DialogFooter className="items-center">
+        <DialogFooter className="items-center relative z-10 bg-muted">
           <span className="text-[10px] text-muted-foreground sm:mr-auto">
             Enter to select &middot; j/k to navigate &middot; Esc to cancel
           </span>
