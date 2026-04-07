@@ -7,6 +7,7 @@
   "frontend:build": "bun run build",
   "frontend:dev:watcher": "bun run dev",
   "frontend:dev:serverUrl": "http://localhost:5173",
+  "reloaddirs": "desktop,internal/core,internal/types,internal/db,internal/adapters,internal/protocol,internal/client,internal/mcp,internal/clipboard",
   "author": {
     "name": "Monocle",
     "email": ""
