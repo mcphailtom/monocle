@@ -52,7 +52,7 @@
 ### Skills
 - **Source of truth**: `skills/` directory (embedded `SKILL.md` files)
 - **Docs to update**:
-  - `docs/concepts/skills.mdx` — available skills table and descriptions
+  - `docs/concepts/agent-integration.mdx` — agent integration modes, available skills, and commands
 
 ### Supported agents
 - **Source of truth**: `internal/adapters/` (agent adapter implementations)
