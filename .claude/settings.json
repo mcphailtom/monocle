@@ -25,10 +25,7 @@
       "Bash(diff:*)",
       "Bash(devbox run -- make*)",
       "Bash(monocle review:*)",
-      "Bash(./bin/monocle review:*)",
-      "Skill(get-feedback)",
-      "Skill(review-plan)",
-      "Skill(review-plan-wait)"
+      "Bash(./bin/monocle review:*)"
     ]
   },
   "hooks": {
