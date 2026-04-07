@@ -101,8 +101,13 @@ func (m pickerModel) View() tea.View {
 			name = lipgloss.NewStyle().Bold(true).Render(name)
 		}
 
-		paths := strings.Join(a.ConfigPaths(false), ", ")
-		desc := lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("(%s)", paths))
+		paths := a.ConfigPaths(false)
+		var desc string
+		if len(paths) <= 2 {
+			desc = lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("(%s)", strings.Join(paths, ", ")))
+		} else {
+			desc = lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("(%s + %d more)", paths[0], len(paths)-1))
+		}
 
 		b.WriteString(fmt.Sprintf("%s%s %s %s\n", cursor, check, name, desc))
 	}
