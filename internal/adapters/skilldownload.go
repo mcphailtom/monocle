@@ -12,7 +12,10 @@ import (
 	"strings"
 )
 
-var skillsReleaseURLTemplate = "https://github.com/josephschmitt/monocle/releases/download/v%s/skills.tar.gz"
+var (
+	skillsReleaseURLTemplate = "https://github.com/josephschmitt/monocle/releases/download/v%s/skills.tar.gz"
+	skillsLatestURL          = "https://github.com/josephschmitt/monocle/releases/latest/download/skills.tar.gz"
+)
 
 // EnsureSkillsCached checks if skills for the given version are cached in the
 // temp directory. If not, downloads and extracts the tarball from GitHub releases.
@@ -58,25 +61,32 @@ func skillsCacheDir(version string) string {
 }
 
 func downloadSkillsTarball(version string) ([]byte, error) {
-	url := fmt.Sprintf(skillsReleaseURLTemplate, version)
-	resp, err := http.Get(url) //nolint:gosec // URL is constructed from a constant template
+	// Try exact version first, fall back to latest release
+	urls := []string{
+		fmt.Sprintf(skillsReleaseURLTemplate, version),
+		skillsLatestURL,
+	}
+	for _, u := range urls {
+		data, err := fetchURL(u)
+		if err == nil {
+			return data, nil
+		}
+	}
+	return nil, fmt.Errorf("skills tarball not found for version %s (tried exact and latest release)", version)
+}
+
+func fetchURL(url string) ([]byte, error) {
+	resp, err := http.Get(url) //nolint:gosec // URL is constructed from constant templates
 	if err != nil {
-		return nil, fmt.Errorf("download skills: %w", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("skills tarball not found for version %s (release may not exist)", version)
-	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("download skills: HTTP %d", resp.StatusCode)
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read skills tarball: %w", err)
-	}
-	return data, nil
+	return io.ReadAll(resp.Body)
 }
 
 func extractSkillsTarball(data []byte, destDir string) error {
