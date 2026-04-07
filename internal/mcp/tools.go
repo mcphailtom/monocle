@@ -3,6 +3,8 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/josephschmitt/monocle/internal/client"
 	"github.com/josephschmitt/monocle/internal/protocol"
@@ -22,7 +24,7 @@ func registerTools(s *sdkmcp.Server) {
 
 	sdkmcp.AddTool(s, &sdkmcp.Tool{
 		Name:        "send_artifact",
-		Description: "Send content to Monocle for the reviewer to see. Use this to share plans, code, or other artifacts for review.",
+		Description: "Send content to Monocle for the reviewer to see. Provide content directly or pass file_path to read from disk.",
 	}, handleSendArtifact)
 
 	sdkmcp.AddTool(s, &sdkmcp.Tool{
@@ -42,8 +44,9 @@ type getFeedbackParams struct {
 type sendArtifactParams struct {
 	ID          string `json:"id"`
 	Title       string `json:"title"`
-	Content     string `json:"content"`
-	ContentType string `json:"content_type,omitempty" jsonschema:"optional"`
+	Content     string `json:"content,omitempty"`
+	FilePath    string `json:"file_path,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
 }
 
 type addFilesParams struct {
@@ -103,6 +106,21 @@ func handleGetFeedback(ctx context.Context, req *sdkmcp.CallToolRequest, params 
 }
 
 func handleSendArtifact(ctx context.Context, req *sdkmcp.CallToolRequest, params sendArtifactParams) (*sdkmcp.CallToolResult, any, error) {
+	content := params.Content
+	if content == "" && params.FilePath != "" {
+		data, err := os.ReadFile(params.FilePath)
+		if err != nil {
+			return errResult("read file: %v", err), nil, nil
+		}
+		content = string(data)
+		if params.ID == "" {
+			params.ID = filepath.Base(params.FilePath)
+		}
+	}
+	if content == "" {
+		return errResult("either content or file_path is required"), nil, nil
+	}
+
 	c, err := client.ConnectDefault()
 	if err != nil {
 		return errResult("connect: %v", err), nil, nil
@@ -114,7 +132,7 @@ func handleSendArtifact(ctx context.Context, req *sdkmcp.CallToolRequest, params
 			Type:        protocol.TypeSubmitContent,
 			ID:          params.ID,
 			Title:       params.Title,
-			Content:     params.Content,
+			Content:     content,
 			ContentType: params.ContentType,
 			IsPlan:      true,
 		},
