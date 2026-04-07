@@ -17,6 +17,17 @@ var MonocleClaudePermissions = []string{
 	"Skill(review-plan-wait)",
 }
 
+// IntegrationMode describes how an agent integrates with Monocle.
+type IntegrationMode string
+
+const (
+	// ModeMCPTools uses MCP tools for all operations (recommended for Claude).
+	ModeMCPTools IntegrationMode = "mcp-tools"
+
+	// ModeSkills uses skill files and CLI commands with MCP channel notifications.
+	ModeSkills IntegrationMode = "skills"
+)
+
 // ClaudeAdapter handles Claude Code registration.
 // Set Mode before calling Register to control the integration style.
 type ClaudeAdapter struct {

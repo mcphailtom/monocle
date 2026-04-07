@@ -78,10 +78,9 @@ type RunCmd struct {
 }
 
 type RegisterCmd struct {
-	Agent    string `arg:"" optional:"" help:"Agent to register (claude, opencode, codex, gemini, all)"`
-	Global   bool   `help:"Register in user-level config instead of project" default:"false"`
-	MCPTools bool   `help:"Use MCP tools integration (Claude only)" default:"false"`
-	Skills   bool   `help:"Use skills/CLI integration (Claude only)" default:"false"`
+	Agent           string `arg:"" optional:"" help:"Agent to register (claude, opencode, codex, gemini, all)"`
+	Global          bool   `help:"Register in user-level config instead of project" default:"false"`
+	IntegrationMode string `help:"Override the default integration mode (auto, mcp, or skills)" enum:"auto,mcp,skills" default:"auto"`
 }
 
 type UnregisterCmd struct {
@@ -136,16 +135,18 @@ func (cmd *RegisterCmd) Run() error {
 	}
 
 	for _, a := range agents {
-		// For Claude, resolve the integration mode
+		// Set integration mode based on --integration-mode flag.
+		// "auto" (default): Claude → MCP tools, others → skills.
+		// "mcp" / "skills": explicit override for any agent.
 		if ca, ok := a.(*adapters.ClaudeAdapter); ok {
-			mode, err := cmd.resolveMode()
-			if err != nil {
-				return err
+			switch cmd.IntegrationMode {
+			case "mcp":
+				ca.Mode = adapters.ModeMCPTools
+			case "skills":
+				ca.Mode = adapters.ModeSkills
+			default: // auto
+				ca.Mode = adapters.ModeMCPTools
 			}
-			if mode == "" {
-				return nil // user cancelled
-			}
-			ca.Mode = mode
 		}
 
 		wasRegistered := a.HasConfig(cmd.Global)
@@ -162,19 +163,6 @@ func (cmd *RegisterCmd) Run() error {
 		}
 	}
 	return nil
-}
-
-// resolveMode determines the integration mode for Claude.
-// Uses flags if specified, otherwise shows an interactive picker.
-func (cmd *RegisterCmd) resolveMode() (adapters.IntegrationMode, error) {
-	switch {
-	case cmd.MCPTools:
-		return adapters.ModeMCPTools, nil
-	case cmd.Skills:
-		return adapters.ModeSkills, nil
-	default:
-		return adapters.PickIntegrationMode()
-	}
 }
 
 func (cmd *UnregisterCmd) Run() error {
