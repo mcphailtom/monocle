@@ -1083,20 +1083,6 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
                     <p className="text-ctp-yellow ml-4">monocle register</p>
                   </div>
 
-                  {/* Manual install */}
-                  <div>
-                    <p className="text-muted-foreground">Or manually install via your agent's plugin/extension system:</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Claude Code:</p>
-                    <p className="text-ctp-yellow ml-4">/plugin marketplace add josephschmitt/monocle</p>
-                    <p className="text-ctp-yellow ml-4">/plugin install monocle@monocle</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Gemini CLI:</p>
-                    <p className="text-ctp-yellow ml-4">gemini extensions install josephschmitt/monocle</p>
-                  </div>
-
                   <p className="text-muted-foreground">
                     Diffs appear here as your agent works.
                   </p>
@@ -1116,7 +1102,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
                   <div>
                     <p className="text-ctp-sky">Feedback</p>
                     <p className="text-muted-foreground">Submit sends your review to the feedback queue.</p>
-                    <p className="text-muted-foreground">The agent picks it up via the <span className="text-ctp-yellow">/get-feedback</span> skill.</p>
+                    <p className="text-muted-foreground">The agent retrieves it automatically or on request.</p>
                   </div>
 
                   <div>
