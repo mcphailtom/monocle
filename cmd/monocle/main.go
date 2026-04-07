@@ -115,6 +115,7 @@ func main() {
 		kong.Name("monocle"),
 		kong.Description("Terminal-based code review companion for Claude Code"),
 		kong.UsageOnError(),
+		kong.ConfigureHelp(kong.HelpOptions{Tree: true}),
 		kong.Vars{"version": version},
 	)
 	err := ctx.Run()
