@@ -32,6 +32,10 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
 
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
@@ -39,3 +43,74 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+      - name: Update next CLI formula
+        if: contains(steps.version.outputs.version, '-')
+        env:
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${GITHUB_REF_NAME}"
+          BASE_URL="https://github.com/josephschmitt/monocle/releases/download/${TAG}"
+
+          # Download checksums from the release we just created
+          curl -sL "${BASE_URL}/checksums.txt" -o checksums.txt
+
+          SHA_DARWIN_ARM64=$(grep "monocle_darwin_arm64" checksums.txt | awk '{print $1}')
+          SHA_DARWIN_AMD64=$(grep "monocle_darwin_amd64" checksums.txt | awk '{print $1}')
+          SHA_LINUX_ARM64=$(grep "monocle_linux_arm64" checksums.txt | awk '{print $1}')
+          SHA_LINUX_AMD64=$(grep "monocle_linux_amd64" checksums.txt | awk '{print $1}')
+
+          cat > /tmp/formula.rb <<FORMULA
+          # typed: false
+          # frozen_string_literal: true
+
+          class MonocleNext < Formula
+            desc "Terminal-based code review companion for AI coding agents (next)"
+            homepage "https://github.com/josephschmitt/monocle"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "${BASE_URL}/monocle_darwin_arm64.tar.gz"
+                sha256 "${SHA_DARWIN_ARM64}"
+              end
+              if Hardware::CPU.intel?
+                url "${BASE_URL}/monocle_darwin_amd64.tar.gz"
+                sha256 "${SHA_DARWIN_AMD64}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
+                url "${BASE_URL}/monocle_linux_arm64.tar.gz"
+                sha256 "${SHA_LINUX_ARM64}"
+              end
+              if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
+                url "${BASE_URL}/monocle_linux_amd64.tar.gz"
+                sha256 "${SHA_LINUX_AMD64}"
+              end
+            end
+
+            def install
+              bin.install "monocle"
+            end
+
+            test do
+              system "#{bin}/monocle", "--help"
+            end
+          end
+          FORMULA
+          sed 's/^          //' /tmp/formula.rb > /tmp/formula-clean.rb
+
+          # Push to homebrew-tap repo
+          cd "$(mktemp -d)"
+          git clone "https://x-access-token:${HOMEBREW_TAP_GITHUB_TOKEN}@github.com/josephschmitt/homebrew-tap.git" .
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p Formula
+          cp /tmp/formula-clean.rb "Formula/monocle-next.rb"
+          git add "Formula/monocle-next.rb"
+          git commit -m "Update monocle@beta formula to ${VERSION}" || exit 0
+          git push

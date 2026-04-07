@@ -149,9 +149,9 @@ jobs:
           SHA256=$(shasum -a 256 "Monocle-Desktop_${VERSION}_darwin_arm64.zip" | awk '{print $1}')
           URL="https://github.com/josephschmitt/monocle/releases/download/${GITHUB_REF_NAME}/Monocle-Desktop_${VERSION}_darwin_arm64.zip"
 
-          # Determine cask file: beta for prereleases, stable otherwise
+          # Determine cask file: next for prereleases, stable otherwise
           if [[ "$VERSION" == *-* ]]; then
-            CASK_FILE="Casks/monocle-desktop@beta.rb"
+            CASK_FILE="Casks/monocle-desktop-next.rb"
           else
             CASK_FILE="Casks/monocle-desktop.rb"
           fi
@@ -159,8 +159,8 @@ jobs:
           CASK_NAME="monocle-desktop"
           FORMULA_NAME="josephschmitt/tap/monocle"
           if [[ "$VERSION" == *-* ]]; then
-            CASK_NAME="monocle-desktop@beta"
-            FORMULA_NAME="josephschmitt/tap/monocle@beta"
+            CASK_NAME="monocle-desktop-next"
+            FORMULA_NAME="josephschmitt/tap/monocle-next"
           fi
 
           cat > /tmp/cask.rb <<CASK
