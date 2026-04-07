@@ -157,7 +157,11 @@ jobs:
           fi
 
           CASK_NAME="monocle-desktop"
-          if [[ "$VERSION" == *-* ]]; then CASK_NAME="monocle-desktop@beta"; fi
+          FORMULA_NAME="josephschmitt/tap/monocle"
+          if [[ "$VERSION" == *-* ]]; then
+            CASK_NAME="monocle-desktop@beta"
+            FORMULA_NAME="josephschmitt/tap/monocle@beta"
+          fi
 
           cat > /tmp/cask.rb <<CASK
           cask "${CASK_NAME}" do
@@ -169,7 +173,7 @@ jobs:
             desc "Code review companion for AI coding agents"
             homepage "https://github.com/josephschmitt/monocle"
 
-            depends_on formula: "josephschmitt/tap/monocle"
+            depends_on formula: "${FORMULA_NAME}"
 
             app "monocle.app"
 
