@@ -104,6 +104,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
   const [subscriberCount, setSubscriberCount] = useState(0);
   const [connectionMode, setConnectionMode] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState("");
+  const [baseRef, setBaseRef] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("unified");
   const [contentTitle, setContentTitle] = useState("");
   const [wrap, setWrap] = useState(false);
@@ -142,8 +143,13 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
 
   const loadSession = useCallback(async () => {
     try {
-      const s = await api.getSession();
+      const [s, isAuto, ref] = await Promise.all([
+        api.getSession(),
+        api.isAutoAdvanceRef(),
+        api.selectedBaseRef(),
+      ]);
       setSession(s);
+      setBaseRef(isAuto ? "HEAD" : ref || s?.BaseRef || "");
     } catch {
       // Bindings not ready
     }
@@ -399,6 +405,16 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     },
     [reloadCurrentView],
   );
+
+  const handleAutoRefSelect = useCallback(async () => {
+    try {
+      await api.setAutoAdvanceRef(true);
+      await api.refreshChangedFiles();
+      reloadCurrentView();
+    } catch (err) {
+      console.error("Failed to set auto ref:", err);
+    }
+  }, [reloadCurrentView]);
 
   const toggleFocusMode = useCallback(() => {
     if (!sidebarHidden) {
@@ -1117,10 +1133,9 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
           {/* Status bar */}
           <StatusBar
             session={session}
-            subscriberCount={subscriberCount}
-            connectionMode={connectionMode}
             feedbackStatus={feedbackStatus}
             selectedFile={selectedPath || selectedContentId}
+            baseRef={baseRef}
           />
         </div>
 
@@ -1180,6 +1195,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
         open={baseRefPickerOpen}
         onClose={() => setBaseRefPickerOpen(false)}
         onSelect={handleBaseRefSelect}
+        onAutoSelect={handleAutoRefSelect}
       />
     </div>
   );
