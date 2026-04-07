@@ -67,22 +67,6 @@ brews:
     install: |
       bin.install "monocle"
 
-  - name: monocle@beta
-    ids:
-      - monocle
-    repository:
-      owner: josephschmitt
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
-    homepage: https://github.com/josephschmitt/monocle
-    description: "Terminal-based code review companion for AI coding agents (beta)"
-    license: MIT
-    test: |
-      system "#{bin}/monocle", "--help"
-    install: |
-      bin.install "monocle"
-
 release:
   github:
     owner: josephschmitt
