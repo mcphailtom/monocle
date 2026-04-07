@@ -126,18 +126,10 @@ func (cmd *RunCmd) Run() error {
 }
 
 func (cmd *RegisterCmd) Run() error {
-	agents, err := resolveAgents(cmd.Agent, "Select agents to register")
-	if err != nil {
-		return err
-	}
-	if len(agents) == 0 {
-		return nil // user cancelled picker
-	}
-
-	for _, a := range agents {
-		// Set integration mode based on --integration-mode flag.
-		// "auto" (default): Claude → MCP tools, others → skills.
-		// "mcp" / "skills": explicit override for any agent.
+	// Set integration mode on all adapters BEFORE the picker runs,
+	// so ConfigPaths() reflects the correct mode in the preview.
+	allAdapters := adapters.AllAdapters()
+	for _, a := range allAdapters {
 		mode := cmd.resolveMode(a)
 		switch v := a.(type) {
 		case *adapters.ClaudeAdapter:
@@ -149,7 +141,17 @@ func (cmd *RegisterCmd) Run() error {
 		case *adapters.CodexAdapter:
 			v.Mode = mode
 		}
+	}
 
+	agents, err := resolveAgentsFrom(allAdapters, cmd.Agent, "Select agents to register")
+	if err != nil {
+		return err
+	}
+	if len(agents) == 0 {
+		return nil // user cancelled picker
+	}
+
+	for _, a := range agents {
 		wasRegistered := a.HasConfig(cmd.Global)
 		if err := a.Register(cmd.Global); err != nil {
 			return fmt.Errorf("register %s: %w", a.Name(), err)
@@ -159,6 +161,7 @@ func (cmd *RegisterCmd) Run() error {
 		if wasRegistered {
 			action = "updated"
 		}
+		mode := cmd.resolveMode(a)
 		modeLabel := "skills"
 		if mode == adapters.ModeMCPTools {
 			modeLabel = "mcp tools"
@@ -210,17 +213,22 @@ func (cmd *UnregisterCmd) Run() error {
 }
 
 func resolveAgents(name, pickerTitle string) ([]adapters.AgentAdapter, error) {
+	return resolveAgentsFrom(adapters.AllAdapters(), name, pickerTitle)
+}
+
+func resolveAgentsFrom(agents []adapters.AgentAdapter, name, pickerTitle string) ([]adapters.AgentAdapter, error) {
 	switch name {
 	case "":
-		return adapters.PickAgents(adapters.AllAdapters(), pickerTitle)
+		return adapters.PickAgents(agents, pickerTitle)
 	case "all":
-		return adapters.AllAdapters(), nil
+		return agents, nil
 	default:
-		a, err := adapters.GetAdapter(name)
-		if err != nil {
-			return nil, err
+		for _, a := range agents {
+			if a.Name() == name {
+				return []adapters.AgentAdapter{a}, nil
+			}
 		}
-		return []adapters.AgentAdapter{a}, nil
+		return nil, fmt.Errorf("unknown agent %q (valid: claude, opencode, codex, gemini)", name)
 	}
 }
 
