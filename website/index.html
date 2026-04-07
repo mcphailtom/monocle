@@ -558,11 +558,29 @@ nav {
   margin-top: 1.5rem;
 }
 .sneak-peek-inner { overflow: hidden; }
+.sneak-peek-carousel {
+  display: flex; gap: 1rem;
+  overflow-x: auto; scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; padding-bottom: 0.5rem;
+}
+.sneak-peek-carousel::-webkit-scrollbar { display: none; }
 .sneak-peek-img {
+  flex: 0 0 100%; scroll-snap-align: center;
   width: 100%; border-radius: 12px;
   border: 1px solid var(--surface0);
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
+.sneak-peek-dots {
+  display: flex; justify-content: center; gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.sneak-peek-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--surface1); border: none;
+  cursor: pointer; padding: 0; transition: background 0.2s;
+}
+.sneak-peek-dot.active { background: var(--blue); }
 
 /* ───── Divider ───── */
 .divider {
@@ -863,7 +881,16 @@ footer {
   </button>
   <div class="sneak-peek-body">
     <div class="sneak-peek-inner">
-      <img class="sneak-peek-img" src="assets/desktop-preview.png" alt="Monocle desktop app preview" loading="lazy">
+      <div class="sneak-peek-carousel" id="sneak-carousel">
+        <img class="sneak-peek-img" src="assets/desktop-preview-4.png" alt="Monocle desktop app — project picker" loading="lazy">
+        <img class="sneak-peek-img" src="assets/desktop-preview.png" alt="Monocle desktop app — code review" loading="lazy">
+        <img class="sneak-peek-img" src="assets/desktop-preview-3.png" alt="Monocle desktop app — plan review" loading="lazy">
+      </div>
+      <div class="sneak-peek-dots" id="sneak-dots">
+        <button class="sneak-peek-dot active" aria-label="Slide 1"></button>
+        <button class="sneak-peek-dot" aria-label="Slide 2"></button>
+        <button class="sneak-peek-dot" aria-label="Slide 3"></button>
+      </div>
     </div>
   </div>
 </section>
@@ -1033,6 +1060,30 @@ document.querySelectorAll('[data-reveal]').forEach(el => observer.observe(el));
     e.stopPropagation();
     closeDemo();
   });
+})();
+</script>
+<script>
+(function() {
+  const carousel = document.getElementById('sneak-carousel');
+  const dots = [...document.querySelectorAll('.sneak-peek-dot')];
+  if (!carousel || !dots.length) return;
+
+  dots.forEach((dot, i) => {
+    dot.addEventListener('click', () => {
+      carousel.children[i].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    });
+  });
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const idx = [...carousel.children].indexOf(entry.target);
+        dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+      }
+    });
+  }, { root: carousel, threshold: 0.6 });
+
+  [...carousel.children].forEach(img => observer.observe(img));
 })();
 </script>
 </body>
