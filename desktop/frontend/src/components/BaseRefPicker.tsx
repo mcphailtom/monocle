@@ -72,7 +72,7 @@ export function BaseRefPicker({ open, onClose, onSelect }: BaseRefPickerProps) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[80vh]" onKeyDown={handleKeyDown}>
+      <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-hidden" onKeyDown={handleKeyDown}>
         <DialogHeader>
           <DialogTitle>Change Base Ref</DialogTitle>
           {currentRef && (
@@ -112,8 +112,8 @@ export function BaseRefPicker({ open, onClose, onSelect }: BaseRefPickerProps) {
           </div>
         </ScrollArea>
 
-        <DialogFooter>
-          <span className="text-[10px] text-muted-foreground">
+        <DialogFooter className="items-center">
+          <span className="text-[10px] text-muted-foreground sm:mr-auto">
             Enter to select &middot; j/k to navigate &middot; Esc to cancel
           </span>
           <Button variant="outline" size="sm" onClick={onClose}>
