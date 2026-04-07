@@ -81,6 +81,8 @@ func (m pickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m pickerModel) View() tea.View {
+	dim := lipgloss.NewStyle().Faint(true)
+
 	var b strings.Builder
 	b.WriteString(lipgloss.NewStyle().Bold(true).Render(m.title))
 	b.WriteString("\n\n")
@@ -102,18 +104,27 @@ func (m pickerModel) View() tea.View {
 		}
 
 		paths := a.ConfigPaths(false)
-		var desc string
-		if len(paths) <= 2 {
-			desc = lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("(%s)", strings.Join(paths, ", ")))
-		} else {
-			desc = lipgloss.NewStyle().Faint(true).Render(fmt.Sprintf("(%s + %d more)", paths[0], len(paths)-1))
-		}
 
-		b.WriteString(fmt.Sprintf("%s%s %s %s\n", cursor, check, name, desc))
+		if i == m.cursor {
+			// Expanded: show agent name, then each path on its own line
+			b.WriteString(fmt.Sprintf("%s%s %s\n", cursor, check, name))
+			for _, p := range paths {
+				b.WriteString(fmt.Sprintf("       %s\n", dim.Render("→ "+p)))
+			}
+		} else {
+			// Compact: agent name + summary
+			var desc string
+			if len(paths) == 1 {
+				desc = dim.Render(fmt.Sprintf("(%s)", paths[0]))
+			} else {
+				desc = dim.Render(fmt.Sprintf("(%s + %d more)", paths[0], len(paths)-1))
+			}
+			b.WriteString(fmt.Sprintf("%s%s %s %s\n", cursor, check, name, desc))
+		}
 	}
 
 	b.WriteString("\n")
-	b.WriteString(lipgloss.NewStyle().Faint(true).Render("space: toggle  a: all  enter: confirm  esc: cancel"))
+	b.WriteString(dim.Render("space: toggle  a: all  enter: confirm  esc: cancel"))
 
 	return tea.NewView(b.String())
 }
