@@ -24,16 +24,19 @@ lint: vet
 	go build ./...
 
 SKILL_NAMES := $(notdir $(patsubst %/SKILL.md,%,$(wildcard skills/*/SKILL.md)))
-PLUGIN_AGENTS := claude codex gemini
+SKILLS_AGENTS := codex gemini
 
 sync-skills:
-	@for agent in $(PLUGIN_AGENTS); do \
+	@for agent in $(SKILLS_AGENTS); do \
 		rm -rf plugins/$$agent/skills; \
 		mkdir -p plugins/$$agent/skills; \
 		for skill in $(SKILL_NAMES); do \
 			cp -r skills/$$skill plugins/$$agent/skills/$$skill; \
 		done; \
 	done
+	@rm -rf plugins/claude/skills
+	@mkdir -p plugins/claude/commands
+	@cp .claude/commands/*.md plugins/claude/commands/
 
 skills-tarball:
 	mkdir -p dist
