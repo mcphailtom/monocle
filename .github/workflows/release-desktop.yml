@@ -38,7 +38,9 @@ jobs:
       - name: Build desktop app
         env:
           CGO_ENABLED: "1"
-        run: wails build -ldflags "-X main.version=${{ steps.version.outputs.version }}"
+        run: |
+          mkdir -p build && cp desktop/appicon.png build/appicon.png
+          wails build -ldflags "-X main.version=${{ steps.version.outputs.version }}"
 
       - name: Import signing certificate
         env:
