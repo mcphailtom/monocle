@@ -62,7 +62,7 @@ jobs:
           wails build -ldflags "-X main.version=ci"
 
       - name: Verify .app bundle exists
-        run: test -f build/bin/monocle.app/Contents/MacOS/monocle
+        run: test -f build/bin/Monocle.app/Contents/MacOS/monocle
 
   goreleaser-check:
     runs-on: ubuntu-latest
