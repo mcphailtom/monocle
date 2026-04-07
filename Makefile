@@ -10,9 +10,11 @@ run: build
 	./bin/monocle
 
 build-desktop: frontend-deps
+	@mkdir -p build && cp desktop/appicon.png build/appicon.png
 	wails build -ldflags "-X main.version=$(VERSION)"
 
 dev-desktop: frontend-dist
+	@mkdir -p build && cp desktop/appicon.png build/appicon.png
 	MONOCLE_DB=$(CURDIR)/.monocle-dev.db wails dev
 
 frontend-deps:
