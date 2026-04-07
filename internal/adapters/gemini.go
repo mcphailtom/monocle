@@ -41,6 +41,9 @@ func (a *GeminiAdapter) Register(global bool) error {
 	_ = unconfigureMCPServersJSON(geminiConfigPath(global))
 
 	if a.Mode == ModeMCPTools {
+		if err := configureMCPServersJSON(geminiConfigPath(global), ResolveCommand(global), []string{"serve-mcp"}); err != nil {
+			return fmt.Errorf("configure mcp: %w", err)
+		}
 		return InstallTOMLCommands(geminiCommandsDir(global))
 	}
 

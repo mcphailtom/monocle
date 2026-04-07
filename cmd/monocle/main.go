@@ -146,6 +146,8 @@ func (cmd *RegisterCmd) Run() error {
 			v.Mode = mode
 		case *adapters.GeminiAdapter:
 			v.Mode = mode
+		case *adapters.CodexAdapter:
+			v.Mode = mode
 		}
 
 		wasRegistered := a.HasConfig(cmd.Global)

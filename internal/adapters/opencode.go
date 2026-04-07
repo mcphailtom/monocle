@@ -42,6 +42,9 @@ func (a *OpenCodeAdapter) Register(global bool) error {
 	removeLegacyOpenCodeMCP(global)
 
 	if a.Mode == ModeMCPTools {
+		if err := configureOpenCodeMCP(openCodeConfigPath(global), ResolveCommand(global)); err != nil {
+			return fmt.Errorf("configure mcp: %w", err)
+		}
 		return InstallMarkdownCommands(openCodeCommandsDir(global))
 	}
 
@@ -100,6 +103,27 @@ func openCodeConfigPath(global bool) string {
 		}
 	}
 	return "opencode.json"
+}
+
+// configureOpenCodeMCP adds the monocle MCP server to opencode.json.
+func configureOpenCodeMCP(path, command string) error {
+	data, err := ReadJSONFile(path)
+	if err != nil {
+		return err
+	}
+
+	mcp, ok := data["mcp"].(map[string]any)
+	if !ok {
+		mcp = map[string]any{}
+		data["mcp"] = mcp
+	}
+
+	mcp["monocle"] = map[string]any{
+		"command": command,
+		"args":    []any{"serve-mcp"},
+	}
+
+	return WriteJSONFile(path, data)
 }
 
 // configureOpenCodePermissions adds monocle to permission.bash in opencode.json.

@@ -9,13 +9,17 @@ import (
 )
 
 // CodexAdapter handles Monocle registration for OpenAI Codex CLI.
-// Installs skill files only — no MCP server needed.
-type CodexAdapter struct{}
+type CodexAdapter struct {
+	Mode IntegrationMode
+}
 
 func (a *CodexAdapter) Name() string  { return "codex" }
 func (a *CodexAdapter) Label() string { return "Codex CLI" }
 
 func (a *CodexAdapter) ConfigPaths(global bool) []string {
+	if a.Mode == ModeMCPTools {
+		return []string{codexConfigPath(global)}
+	}
 	paths := []string{codexRulesPath(global)}
 	paths = append(paths, SkillPaths(codexSkillsDir(global))...)
 	return paths
@@ -37,6 +41,10 @@ func (a *CodexAdapter) Register(global bool) error {
 	// Clean up legacy MCP config if present
 	removeLegacyCodexMCP(global)
 
+	if a.Mode == ModeMCPTools {
+		return configureCodexMCP(codexConfigPath(global), ResolveCommand(global))
+	}
+
 	if err := configureCodexRules(codexRulesPath(global)); err != nil {
 		return fmt.Errorf("configure rules: %w", err)
 	}
@@ -53,6 +61,23 @@ func (a *CodexAdapter) Unregister(global bool) error {
 	RemoveSkills(codexSkillsDir(global))
 
 	return nil
+}
+
+// configureCodexMCP adds the monocle MCP server to .codex/config.toml.
+func configureCodexMCP(path, command string) error {
+	content := ""
+	if data, err := os.ReadFile(path); err == nil {
+		// Remove any existing monocle section first
+		content = removeMonocleTOMLSection(string(data))
+		content = strings.TrimRight(content, "\n")
+		if content != "" {
+			content += "\n\n"
+		}
+	}
+
+	content += fmt.Sprintf("[mcp_servers.monocle]\ncommand = %q\nargs = [\"serve-mcp\"]\n", command)
+
+	return WriteFileAtomic(path, []byte(content))
 }
 
 // Detect returns true if Codex CLI appears to be installed.
