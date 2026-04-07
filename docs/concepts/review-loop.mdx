@@ -7,7 +7,7 @@ The review loop is the core interaction pattern in monocle: your agent writes co
 
 ## Architecture
 
-Monocle connects to your agent over a Unix socket. For Claude Code, a native MCP server sits in between and enables push notifications:
+Monocle connects to your agent over a Unix socket. For Claude Code, a native MCP server sits in between, exposing review tools and enabling push notifications:
 
 ```
 Agent <--stdio/MCP--> monocle serve-mcp (MCP server) <---socket---> monocle (TUI)

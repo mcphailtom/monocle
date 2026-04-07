@@ -64,14 +64,6 @@ See the [CLI reference](/reference/cli#monocle-register) for a full list of flag
       If you start or restart monocle while Claude Code is already running, the MCP channel may need to reconnect. Type `/mcp` in Claude Code and select monocle to reconnect.
     </Tip>
 
-    ### Alternative: plugin marketplace
-
-    You can also install monocle through Claude Code's plugin system:
-
-    ```
-    /plugin marketplace add josephschmitt/monocle
-    /plugin install monocle@monocle
-    ```
   </Tab>
   <Tab title="OpenCode">
     ### Register via CLI
@@ -91,15 +83,6 @@ See the [CLI reference](/reference/cli#monocle-register) for a full list of flag
 
     This installs skills into `.codex/skills/`. Codex uses pull-based feedback — the agent retrieves your reviews by running the `/get-feedback` skill.
 
-    ### Alternative: plugin search
-
-    You can also install monocle through Codex CLI's plugin system:
-
-    ```
-    /plugins
-    ```
-
-    Search for "monocle" and install it from the results.
   </Tab>
   <Tab title="Gemini CLI">
     ### Register via CLI
@@ -110,13 +93,6 @@ See the [CLI reference](/reference/cli#monocle-register) for a full list of flag
 
     This installs skills into `.gemini/skills/`. Gemini CLI uses pull-based feedback — the agent retrieves your reviews by running the `/get-feedback` skill.
 
-    ### Alternative: extensions
-
-    You can also install monocle through Gemini CLI's extension system:
-
-    ```bash
-    gemini extensions install josephschmitt/monocle
-    ```
   </Tab>
   <Tab title="All agents">
     Register monocle for every supported agent at once:
