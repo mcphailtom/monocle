@@ -9,7 +9,7 @@
 
 Monocle is a TUI that runs alongside your AI coding agent. You review diffs in real time as the agent writes code, leave line-level comments — issues, suggestions, notes — and submit a structured review in one batch. The agent receives your feedback and starts fixing things immediately, just like a PR review but live.
 
-Monocle connects to your agent using Unix sockets. But with [Claude Code](https://claude.com/claude-code) and [MCP channels](https://code.claude.com/docs/en/channels-reference), it's able to push feedback directly into the agent's context the moment you submit. Other agents — [OpenCode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google/gemini-cli) — can still use skills or bash tools to retrieve feedback from monocle after it's been submitted and queued. MCP channels just make the process smoother.
+Monocle connects to your agent via MCP tools or CLI commands over a Unix socket. With [Claude Code](https://claude.com/claude-code) and [MCP channels](https://code.claude.com/docs/en/channels-reference), it pushes feedback directly into the agent's context the moment you submit. Other agents — [OpenCode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google/gemini-cli) — retrieve feedback on demand. MCP channels just make the process smoother.
 
 ## Why
 
@@ -19,7 +19,7 @@ Monocle gives you a proper review loop without slowing the agent down. It doesn'
 
 ## Requirements
 
-- A coding agent: [Claude Code](https://claude.com/claude-code), [OpenCode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google/gemini-cli), or any agent that supports [agent skills](https://agentskills.io)
+- A coding agent: [Claude Code](https://claude.com/claude-code), [OpenCode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google/gemini-cli), or any MCP-compatible agent
 - A terminal with 256-color or true color support
 - A [Nerd Font](https://www.nerdfonts.com/) for file icons (optional but recommended)
 
@@ -92,14 +92,7 @@ monocle register          # interactive picker
 monocle register claude   # or: opencode, codex, gemini, all
 ```
 
-This installs skills and, for Claude Code, the MCP channel config for push notifications. Use `--global` to write to the user-level config directory instead of the project.
-
-| Agent       | Skills              | MCP config  |
-|-------------|---------------------|-------------|
-| Claude Code | `.claude/skills/`   | `.mcp.json` |
-| OpenCode    | `.opencode/skills/` | -           |
-| Codex CLI   | `.codex/skills/`    | -           |
-| Gemini CLI  | `.gemini/skills/`   | -           |
+This configures MCP tools or skills depending on the agent. Claude Code gets an MCP server and slash commands; other agents get skill files. Use `--global` to write to the user-level config directory instead of the project. Override the default with `--integration-mode mcp` or `--integration-mode skills`.
 
 #### Other agents
 
@@ -116,7 +109,7 @@ Start your agent and Monocle in separate terminals:
 monocle
 ```
 
-For Claude Code, Monocle registers an MCP server that exposes review tools directly — no bash permissions or skills needed. Other agents get [skills](#skills) that instruct them to run CLI commands.
+For Claude Code, Monocle registers an MCP server that exposes review tools directly — no bash permissions or skills needed. Other agents get [skills](#agent-operations) that instruct them to run CLI commands.
 
 #### Push notifications (Claude Code only)
 
@@ -138,19 +131,19 @@ Navigate with `j`/`k`, add comments with `c`, and use `v` for visual (multi-line
 
 ### Plan review and focus mode
 
-Monocle isn't limited to reviewing file changes. Your agent can submit **plans, architecture decisions, summaries, and other content** directly to Monocle for review using `monocle review send-artifact`. These show up alongside your file diffs in the sidebar, and you can leave line-level comments on them the same way. You can also trigger this yourself with the `/review-plan` or `/review-plan-wait` skills — useful when you want to send the agent's plan to Monocle without waiting for the agent to do it on its own.
+Monocle isn't limited to reviewing file changes. Your agent can submit **plans, architecture decisions, summaries, and other content** directly to Monocle for review using `monocle review send-artifact`. These show up alongside your file diffs in the sidebar, and you can leave line-level comments on them the same way. You can also trigger this yourself with `/review-plan` or `/review-plan-wait` — useful when you want to send the agent's plan to Monocle without waiting for the agent to do it on its own.
 
 This means you can review the agent's *thinking* before it writes code — not just the output. Ask the agent to submit its content first, review it, leave feedback, and only then let it proceed.
 
-The `/review-plan-wait` skill submits content to your TUI **and blocks** until you respond with feedback. If you approve, the agent continues. If you request changes, the agent updates and submits again — iterating across as many rounds as it takes until you're satisfied.
+`/review-plan-wait` submits content to your TUI **and blocks** until you respond with feedback. If you approve, the agent continues. If you request changes, the agent updates and submits again — iterating across as many rounds as it takes until you're satisfied.
 
-> **Note:** Monocle's skills are available to your agent but the agent decides when to use them on its own. If you want the agent to automatically submit plans for review, add instructions to your agent's project configuration. See [Automatic content review](#automatic-content-review) below for a suggested prompt.
+> **Note:** Monocle's operations are available to your agent but the agent decides when to use them on its own. If you want the agent to automatically submit plans for review, add instructions to your agent's project configuration. See [Automatic content review](#automatic-content-review) below for a suggested prompt.
 
 ## Features
 
 - **Works with any coding agent** — Claude Code, OpenCode, Codex CLI, Gemini CLI, or any MCP-compatible agent
 - **Push notifications** — With Claude Code channels, feedback is pushed directly into the agent's context the moment you submit
-- **Pull-based feedback** — Agents without channel support retrieve feedback via the `/get-feedback` skill or `monocle review get-feedback`; multiple reviews queue up and are delivered together
+- **Pull-based feedback** — Agents without channel support retrieve feedback via `/get-feedback` or `monocle review get-feedback`; multiple reviews queue up and are delivered together
 - **Plan & architecture review** — Your agent can submit plans, architecture decisions, and other content for review with markdown rendering. When iterating, Monocle shows diffs between plan versions so you can see exactly what changed. Use focus mode (`F`) for distraction-free reading
 - **Review gating** — `/review-plan-wait` blocks the agent until you approve the submitted content before it proceeds
 - **Pause flow** — Ask your agent to stop and wait while you review, then release it when ready (requires MCP channel support)
@@ -173,17 +166,17 @@ The `/review-plan-wait` skill submits content to your TUI **and blocks** until y
 - **Review tracking** — Mark files as reviewed with `r` (auto-advances to next), filter sidebar to show only unreviewed or reviewed files with `/`, and all reviewed states reset on submit
 - **Session persistence** — Reviews survive restarts via SQLite
 
-## Skills
+## Agent Operations
 
-Monocle ships skills for all supported agents. These are installed by `monocle register` into agent-specific skill directories.
+Monocle exposes review operations via **MCP tools** (default for Claude Code) or **skills** (default for other agents). Both are configured automatically by `monocle register`.
 
-| Skill               | Available for                                | Description                                                                                                    |
-|---------------------|----------------------------------------------|----------------------------------------------------------------------------------------------------------------|
-| `/get-feedback`     | Claude Code, Codex CLI, OpenCode, Gemini CLI | Retrieve pending review feedback                                                                               |
-| `/review-plan`      | Claude Code, Codex CLI, OpenCode, Gemini CLI | Find the active plan file and submit it for review via `monocle review send-artifact`                          |
-| `/review-plan-wait` | Claude Code, Codex CLI, OpenCode, Gemini CLI | Find the active plan file, submit for review, and iterate on feedback until approved                           |
-
-Skills live in agent-specific directories (`.claude/skills/` for Claude Code, `.codex/skills/` for Codex CLI, `.opencode/skills/` for OpenCode, `.gemini/skills/` for Gemini CLI).
+| Operation | MCP tool | Skill | Description |
+|-----------|----------|-------|-------------|
+| Get feedback | `get_feedback` | `/get-feedback` | Retrieve pending review feedback |
+| Send artifact | `send_artifact` | `/review-plan` | Submit content (plans, decisions, summaries) for review |
+| Send artifact (blocking) | `send_artifact` with `wait: true` | `/review-plan-wait` | Submit content and iterate on feedback until approved |
+| Check status | `review_status` | — | Check if feedback is pending or a pause was requested |
+| Add files | `add_files` | — | Add files to the current review session |
 
 ## Keybindings
 
@@ -271,7 +264,7 @@ The `agent` argument is one of `claude`, `opencode`, `codex`, `gemini`, or `all`
 
 ### Agent-Facing Commands
 
-These commands are used by agents (via skills) to interact with a running Monocle session:
+These commands are used by agents (via MCP tools or skills) to interact with a running Monocle session:
 
 ```
 monocle review status [--json]                          Check review status
@@ -281,7 +274,7 @@ monocle review send-artifact --title T [--file F] [--id ID] [--type EXT] [--wait
 monocle review add-files <paths...> [--json]             Add files to review session
 ```
 
-- `--wait` blocks until the reviewer responds (used by `/review-plan-wait` skill)
+- `--wait` blocks until the reviewer responds (used by `/review-plan-wait`)
 - `--json` outputs structured JSON for programmatic use
 - `send-artifact` reads from `--file` or stdin
 
@@ -366,7 +359,7 @@ The help overlay (`?`) dynamically reflects your custom bindings. Modal keys (En
 
 ## Automatic content review
 
-By default, Monocle's skills are available to your agent but the agent decides when to use them on its own. If you want the agent to automatically submit plans or other content for review, add instructions to your agent's project configuration (e.g. `CLAUDE.md`, `AGENTS.md`, etc.):
+By default, Monocle's operations are available to your agent but the agent decides when to use them on its own. If you want the agent to automatically submit plans or other content for review, add instructions to your agent's project configuration (e.g. `CLAUDE.md`, `AGENTS.md`, etc.):
 
 ````markdown
 ## Monocle Integration
@@ -377,13 +370,13 @@ When Monocle is running:
 - In plan mode, use `/review-plan-wait` instead — it blocks until the reviewer responds. If they request changes, update and resubmit until approved.
 ````
 
-You can also use the `/review-plan` and `/review-plan-wait` skills manually at any time.
+You can also invoke `/review-plan` and `/review-plan-wait` manually at any time.
 
 ## How it works
 
 ```
 ┌─────────────┐                ┌───────────────┐              ┌──────────┐
-│   Agent     │<--stdio/MCP--->│  channel.ts   │<---socket--->│ monocle  │
+│   Agent     │<--stdio/MCP--->│  serve-mcp    │<---socket--->│ monocle  │
 │             │                │ (MCP server)  │              │  (TUI)   │
 └─────────────┘                └───────────────┘              └──────────┘
 ```
@@ -397,7 +390,7 @@ You can also use the `/review-plan` and `/review-plan-wait` skills manually at a
 Feedback is always queued for reliability. How the agent learns about it depends on the integration:
 
 - **Claude Code with channels:** A push notification is sent through the MCP channel with a summary of the review (e.g., "Your reviewer requested changes — 2 issues, 1 suggestion"). The agent runs `/get-feedback` to retrieve the full review. If the push fails silently (channels not enabled), the review stays in the queue.
-- **Any agent:** The agent calls `monocle review get-feedback` via a skill or CLI command, either via a `/get-feedback` slash command or on its own. Multiple reviews accumulate in the queue and are delivered together.
+- **Any agent:** The agent calls `get_feedback` (MCP tool) or `monocle review get-feedback` (CLI), either via a `/get-feedback` slash command or on its own. Multiple reviews accumulate in the queue and are delivered together.
 
 If you want the agent to pause and wait for you to finish reviewing, press `P` — the agent receives a pause notification and blocks until your review is ready.
 
