@@ -67,6 +67,12 @@ func (m refPickerModel) Update(msg tea.Msg) (refPickerModel, tea.Cmd) {
 				m.cursor--
 				m.ensureVisible()
 			}
+		case "g":
+			m.cursor = 0
+			m.ensureVisible()
+		case "G":
+			m.cursor = m.maxCursor()
+			m.ensureVisible()
 		case "enter":
 			if m.cursor == 0 {
 				// "Auto (HEAD)" option
