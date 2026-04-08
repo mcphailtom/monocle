@@ -24,6 +24,7 @@ import type {
 } from "react-diff-view";
 import { createHighlighter, type Highlighter } from "shiki";
 import type { DiffResult, ReviewComment, CommentType } from "../types";
+import { fileIcon } from "../devicons";
 
 // --- Language detection ---
 
@@ -856,11 +857,18 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     }, [lineHtml]);
 
     if (isBinary) {
+      const fi = fileIcon(diff.Path);
       return (
         <div className="flex h-full items-center justify-center text-muted-foreground">
-          <div className="text-center space-y-1">
+          <div className="text-center space-y-3">
+            <span
+              className="text-6xl font-[family-name:var(--font-icon)]"
+              style={{ color: fi.color }}
+            >
+              {fi.glyph}
+            </span>
             <p className="text-foreground font-medium">Binary file — preview not available</p>
-            <p className="text-sm">{title || diff.Path}</p>
+            <p className="text-sm font-mono">{title || diff.Path}</p>
           </div>
         </div>
       );
