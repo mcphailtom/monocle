@@ -323,8 +323,17 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
       return rawDiff;
     }, [rawDiff]);
 
+    // Detect binary files: null bytes or excessive control characters in the first few lines
+    const isBinary = useMemo(() => {
+      if (!diff || diff.Hunks.length === 0) return false;
+      const sample = diff.Hunks.slice(0, 2).flatMap((h) => h.Lines.slice(0, 10));
+      // eslint-disable-next-line no-control-regex
+      const controlRe = /[\x00-\x08\x0e-\x1f]/;
+      return sample.some((line) => controlRe.test(line.Content));
+    }, [diff]);
+
     const containerRef = useRef<HTMLDivElement>(null);
-    const lineHtml = useShikiHighlight(diff);
+    const lineHtml = useShikiHighlight(isBinary ? null : diff);
     const [cursorIndex, setCursorIndex] = useState(0);
     const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
     const [visualMode, setVisualMode] = useState(false);
@@ -845,6 +854,17 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
         return defaultRender(token);
       };
     }, [lineHtml]);
+
+    if (isBinary) {
+      return (
+        <div className="flex h-full items-center justify-center text-muted-foreground">
+          <div className="text-center space-y-1">
+            <p className="text-foreground font-medium">Binary file — preview not available</p>
+            <p className="text-sm">{title || diff.Path}</p>
+          </div>
+        </div>
+      );
+    }
 
     if (!file) {
       return (
