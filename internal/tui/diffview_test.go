@@ -7,6 +7,93 @@ import (
 	"github.com/josephschmitt/monocle/internal/types"
 )
 
+func TestIsBinaryContent(t *testing.T) {
+	tests := []struct {
+		name  string
+		hunks []types.DiffHunk
+		want  bool
+	}{
+		{
+			name:  "empty hunks",
+			hunks: nil,
+			want:  false,
+		},
+		{
+			name: "normal text content",
+			hunks: []types.DiffHunk{{
+				Lines: []types.DiffLine{
+					{Content: "func main() {"},
+					{Content: "\tfmt.Println(\"hello\")"},
+					{Content: "}"},
+				},
+			}},
+			want: false,
+		},
+		{
+			name: "null byte in content",
+			hunks: []types.DiffHunk{{
+				Lines: []types.DiffLine{
+					{Content: "hello\x00world"},
+				},
+			}},
+			want: true,
+		},
+		{
+			name: "control character 0x01",
+			hunks: []types.DiffHunk{{
+				Lines: []types.DiffLine{
+					{Content: "binary\x01data"},
+				},
+			}},
+			want: true,
+		},
+		{
+			name: "control character 0x1f",
+			hunks: []types.DiffHunk{{
+				Lines: []types.DiffLine{
+					{Content: "data\x1fmore"},
+				},
+			}},
+			want: true,
+		},
+		{
+			name: "tab and newline are not binary",
+			hunks: []types.DiffHunk{{
+				Lines: []types.DiffLine{
+					{Content: "line\twith\ttabs"},
+				},
+			}},
+			want: false,
+		},
+		{
+			name: "binary in second hunk",
+			hunks: []types.DiffHunk{
+				{Lines: []types.DiffLine{{Content: "normal text"}}},
+				{Lines: []types.DiffLine{{Content: "has\x00null"}}},
+			},
+			want: true,
+		},
+		{
+			name: "binary beyond sampling limit is missed",
+			hunks: []types.DiffHunk{
+				{Lines: []types.DiffLine{{Content: "normal"}}},
+				{Lines: []types.DiffLine{{Content: "normal"}}},
+				{Lines: []types.DiffLine{{Content: "has\x00null"}}},
+			},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isBinaryContent(tt.hunks)
+			if got != tt.want {
+				t.Errorf("isBinaryContent() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestWrapContent(t *testing.T) {
 	tests := []struct {
 		name    string

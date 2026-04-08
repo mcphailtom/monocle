@@ -62,6 +62,7 @@ type diffViewModel struct {
 	style     diffStyle
 	theme     *Theme
 	hl        *highlighter
+	isBinary  bool // true when hunk content contains binary control characters
 
 	hOffset int  // horizontal scroll offset (runes)
 	wrap    bool // soft-wrap long lines
@@ -113,6 +114,7 @@ func (m *diffViewModel) clearFileState() {
 	m.hunks = nil
 	m.lines = nil
 	m.comments = nil
+	m.isBinary = false
 	m.cursor = 0
 	m.offset = 0
 	m.hOffset = 0
@@ -234,6 +236,7 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 		}
 		m.path = msg.path
 		m.comments = msg.comments
+		m.isBinary = isBinaryContent(m.hunks)
 		// If in file view mode, store hunks but fetch file content instead
 		if m.style == diffStyleFile {
 			path := m.path
@@ -242,7 +245,11 @@ func (m diffViewModel) Update(msg tea.Msg) (diffViewModel, tea.Cmd) {
 		}
 		prevCursor := m.cursor
 		prevOffset := m.offset
-		m.buildLines()
+		if m.isBinary {
+			m.lines = nil
+		} else {
+			m.buildLines()
+		}
 		if sameFile && prevCursor < len(m.lines) {
 			m.cursor = prevCursor
 			m.offset = prevOffset
@@ -542,6 +549,16 @@ func (m diffViewModel) View() string {
 		if m.contentMode {
 			return centerBlock([]string{"Empty content"}, m.width, m.height)
 		}
+		if m.isBinary {
+			heading := lipgloss.NewStyle().Bold(true).Render("Binary file — preview not available")
+			dim := lipgloss.NewStyle().Faint(true)
+			icon := fileIcon(m.path)
+			return centerBlock([]string{
+				heading,
+				"",
+				icon + " " + dim.Render(m.path),
+			}, m.width, m.height)
+		}
 		if m.style == diffStyleFile {
 			return centerBlock([]string{"File not available"}, m.width, m.height)
 		}
@@ -590,6 +607,32 @@ func (m diffViewModel) View() string {
 	}
 
 	return b.String()
+}
+
+// isBinaryContent samples the first few hunks/lines for control characters
+// that indicate binary content (matching the desktop app's detection logic).
+func isBinaryContent(hunks []types.DiffHunk) bool {
+	if len(hunks) == 0 {
+		return false
+	}
+	limit := 2
+	if len(hunks) < limit {
+		limit = len(hunks)
+	}
+	for _, hunk := range hunks[:limit] {
+		lineLimit := 10
+		if len(hunk.Lines) < lineLimit {
+			lineLimit = len(hunk.Lines)
+		}
+		for _, line := range hunk.Lines[:lineLimit] {
+			for _, b := range line.Content {
+				if b <= 0x08 || (b >= 0x0e && b <= 0x1f) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func (m *diffViewModel) buildLines() {
