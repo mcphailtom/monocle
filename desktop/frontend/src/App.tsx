@@ -1394,6 +1394,7 @@ function ReviewUI({
                 wrap={wrap}
                 plain={viewMode === "file"}
                 title={contentTitle || undefined}
+                reviewTrackingActive={activeSnapshot !== null}
                 onFocus={() => setFocus("main")}
                 onLineClick={(lineNum) => openCommentEditor(lineNum)}
                 onCommentClick={handleEditComment}

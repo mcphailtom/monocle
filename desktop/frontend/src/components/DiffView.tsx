@@ -97,6 +97,8 @@ interface DiffViewProps {
   wrap?: boolean;
   plain?: boolean;
   title?: string;
+  /** True when diffing against a review snapshot; used for contextual empty states. */
+  reviewTrackingActive?: boolean;
   onFocus?: () => void;
   onLineClick?: (lineNumber: number, side: "old" | "new") => void;
   onCommentClick?: (comment: ReviewComment) => void;
@@ -314,7 +316,19 @@ function changeLineNumber(change: ChangeData): number {
 
 export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
   function DiffView(
-    { diff: rawDiff, comments, viewType, focused, wrap, plain, title, onFocus, onLineClick, onCommentClick },
+    {
+      diff: rawDiff,
+      comments,
+      viewType,
+      focused,
+      wrap,
+      plain,
+      title,
+      reviewTrackingActive,
+      onFocus,
+      onLineClick,
+      onCommentClick,
+    },
     ref,
   ) {
     // Normalize: Go nil slices serialize as JSON null
@@ -875,6 +889,22 @@ export const DiffView = forwardRef<DiffViewHandle, DiffViewProps>(
     }
 
     if (!file) {
+      // Empty diff: contextualize the message when a review snapshot is the
+      // active base (matches TUI internal/tui/diffview.go behavior).
+      if (reviewTrackingActive) {
+        return (
+          <div className="flex h-full items-center justify-center text-muted-foreground">
+            <div className="text-center space-y-2">
+              <p className="text-foreground font-medium">
+                No changes since your last review
+              </p>
+              <p className="text-xs opacity-70">
+                Press <span className="font-mono text-ctp-yellow">b</span> to change your base ref
+              </p>
+            </div>
+          </div>
+        );
+      }
       return (
         <div className="flex h-full items-center justify-center text-muted-foreground">
           <p>No diff to display</p>
