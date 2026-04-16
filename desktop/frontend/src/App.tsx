@@ -15,6 +15,7 @@ import { ProjectPicker } from "./components/ProjectPicker";
 import { SessionPicker } from "./components/SessionPicker";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { VersionPicker } from "./components/VersionPicker";
+import { useToast } from "./components/Toast";
 import { useKeyboard } from "./hooks/useKeyboard";
 import type {
   ReviewSession,
@@ -214,6 +215,7 @@ function ReviewUI({
   const [contentTitle, setContentTitle] = useState("");
   const [wrap, setWrap] = useState(false);
   const [layout, setLayout] = useState<Layout>("auto");
+  const toast = useToast();
   const [windowWidth, setWindowWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1280,
   );
@@ -570,11 +572,23 @@ function ReviewUI({
         await api.refreshChangedFiles();
         refreshStatus();
         reloadCurrentView();
+        toast.show({
+          kind: "success",
+          message:
+            action === "approve"
+              ? "Review submitted — approved"
+              : "Review submitted — changes requested",
+        });
       } catch (err) {
-        console.error("Failed to submit review:", err);
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.show({
+          kind: "error",
+          title: "Submit failed",
+          message: msg,
+        });
       }
     },
-    [refreshStatus, reloadCurrentView],
+    [refreshStatus, reloadCurrentView, toast],
   );
 
   const handleClearReview = useCallback(async () => {
@@ -639,13 +653,23 @@ function ReviewUI({
     try {
       const paths = await api.openAdditionalFilesDialog();
       if (!paths || paths.length === 0) return;
-      await api.addAdditionalPaths(paths);
+      const added = await api.addAdditionalPaths(paths);
       await loadFiles();
       await loadSession();
+      const count = added?.length ?? paths.length;
+      toast.show({
+        kind: "success",
+        message: `Added ${count} file${count === 1 ? "" : "s"} to the review`,
+      });
     } catch (err) {
-      console.error("Failed to add additional files:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.show({
+        kind: "error",
+        title: "Failed to add files",
+        message: msg,
+      });
     }
-  }, [loadFiles, loadSession]);
+  }, [loadFiles, loadSession, toast]);
 
   const handleSnapshotSelect = useCallback(
     async (snapshotID: number) => {

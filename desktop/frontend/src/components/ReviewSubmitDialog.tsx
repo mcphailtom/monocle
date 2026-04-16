@@ -9,6 +9,7 @@ import {
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { api } from "../api";
+import { useToast } from "./Toast";
 import type { ReviewSummary, SubmitAction } from "../types";
 
 interface ReviewSubmitDialogProps {
@@ -41,8 +42,8 @@ export function ReviewSubmitDialog({
 }: ReviewSubmitDialogProps) {
   const [action, setAction] = useState<SubmitAction>("request_changes");
   const [body, setBody] = useState("");
-  const [editorError, setEditorError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const toast = useToast();
 
   useEffect(() => {
     if (open) {
@@ -64,16 +65,15 @@ export function ReviewSubmitDialog({
   }, [action, body, onCopyToClipboard, onClose]);
 
   const openInExternalEditor = useCallback(async () => {
-    setEditorError(null);
     try {
       const edited = await api.openExternalEditor(body);
       setBody(edited.replace(/\n$/, ""));
       setTimeout(() => textareaRef.current?.focus(), 50);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      setEditorError(msg);
+      toast.show({ kind: "error", title: "External editor failed", message: msg });
     }
-  }, [body]);
+  }, [body, toast]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -165,10 +165,6 @@ export function ReviewSubmitDialog({
           placeholder="Additional comments (optional)..."
           className="min-h-[80px] text-sm font-mono"
         />
-
-        {editorError && (
-          <div className="text-xs text-destructive">{editorError}</div>
-        )}
 
         <DialogFooter>
           <div className="flex items-center justify-between w-full">
