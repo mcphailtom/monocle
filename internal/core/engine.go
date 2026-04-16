@@ -150,6 +150,7 @@ type EngineAPI interface {
 	// Config
 	GetConfig() *types.Config
 	SaveConfig() error
+	UpdateConfig(cfg *types.Config) error
 
 	// Lifecycle
 	Shutdown()

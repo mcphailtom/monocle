@@ -93,6 +93,15 @@ Matches the TUI splash (`internal/tui/splash.go`):
 - **Non-macOS**: `traffic_lights_other.go` is a no-op stub, keyboard hints show `Ctrl+`
 - **Font stack**: JetBrains Mono for logotype, Plus Jakarta Sans for UI text, system monospace for code
 
+## Settings Dialog
+
+- Accessed via **File → Settings…** in the native menu bar (⌘, / Ctrl+,), the Command Palette ("Settings…"), or any future in-app entry
+- A modal dialog (`sm:max-w-2xl`) containing scrollable sections: Appearance, Diff rendering, Review workflow, Review formatting, Ignore patterns
+- Uses native HTML `<select>`, `<textarea>`, and `<input type="number">` — styled with Tailwind to match the app theme. Toggle switches are custom for the boolean fields
+- Save writes the entire config (including untouched fields) via `SaveConfig` so TUI-only fields like `mouse` and `comment_expand` are preserved on round-trip
+- Saved settings are applied live (keymap rebuilt, view mode / layout / wrap updated) without requiring a restart
+- **Intentionally excluded from the dialog:** `mouse`, `comment_expand`, `comment_expand_delay` (TUI-only per the section below). Keybindings are edited in `~/.config/monocle/config.json` directly — a keybinding editor is a potential follow-up
+
 ## Config Fields Not Honored on Desktop
 
 Some `types.Config` fields are TUI-only and intentionally ignored by the desktop app:

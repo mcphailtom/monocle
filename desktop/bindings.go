@@ -134,6 +134,20 @@ func (a *App) openProjectFromMenu() {
 	a.emitProjectChanged(root, nil)
 }
 
+// openSettingsFromMenu is called from the native File > Settings… menu item.
+// Dispatches a DOM event the frontend listens for to open the Settings dialog.
+// WindowExecJS is used because Wails EventsEmit can be unreliable from menu
+// goroutines.
+func (a *App) openSettingsFromMenu() {
+	if a.ctx == nil {
+		return
+	}
+	wailsRuntime.WindowExecJS(
+		a.ctx,
+		`window.dispatchEvent(new CustomEvent("monocle:open-settings"))`,
+	)
+}
+
 func (a *App) emitProjectChanged(path string, err error) {
 	var js string
 	if err != nil {
@@ -690,4 +704,14 @@ func (a *App) GetConfig() *types.Config {
 		return nil
 	}
 	return a.engine.GetConfig()
+}
+
+// SaveConfig replaces the engine's live config with cfg and writes it to the
+// user's global config file (XDG path). Returning any IO error back to the
+// frontend so the Settings dialog can surface it via a toast.
+func (a *App) SaveConfig(cfg *types.Config) error {
+	if a.engine == nil {
+		return errNoEngine
+	}
+	return a.engine.UpdateConfig(cfg)
 }

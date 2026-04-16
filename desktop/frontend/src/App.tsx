@@ -16,6 +16,7 @@ import { SessionPicker } from "./components/SessionPicker";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { VersionPicker } from "./components/VersionPicker";
 import { RegisterMCPDialog } from "./components/RegisterMCPDialog";
+import { SettingsDialog } from "./components/SettingsDialog";
 import { useToast } from "./components/Toast";
 import { DEFAULT_KEYMAP, resolveKeymap } from "./lib/keymap";
 import { useKeyboard } from "./hooks/useKeyboard";
@@ -255,6 +256,10 @@ function ReviewUI({
 
   // MCP registration prompt (first-run or on demand via palette)
   const [registerMCPOpen, setRegisterMCPOpen] = useState(false);
+
+  // Settings dialog (opened via ⌘, menu item, palette, or shortcut)
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [currentConfig, setCurrentConfig] = useState<Config | null>(null);
 
   // Artifact version picker: tracks from/to versions per content item
   const [versionPickerOpen, setVersionPickerOpen] = useState(false);
@@ -741,6 +746,60 @@ function ReviewUI({
     [loadSession, reloadCurrentView],
   );
 
+  // Apply a config to live UI state. Mirrors the init path and is reused
+  // after saving from the Settings dialog so edits take effect immediately.
+  //
+  // Fields that are NOT honored on desktop (by design):
+  //   - mouse: a desktop GUI always has mouse input — the field is TUI-only.
+  //   - comment_expand / comment_expand_delay: desktop always renders comments
+  //     fully expanded; there's enough screen real estate.
+  const applyConfig = useCallback((cfg: Config) => {
+    configRef.current = cfg;
+    setCurrentConfig(cfg);
+    setTreeMode(cfg.sidebar_style === "tree");
+    setViewMode(
+      cfg.diff_style === "split"
+        ? "split"
+        : cfg.diff_style === "file"
+          ? "file"
+          : "unified",
+    );
+    setWrap(!!cfg.wrap);
+    setLayout(
+      cfg.layout === "side-by-side"
+        ? "side-by-side"
+        : cfg.layout === "stacked"
+          ? "stacked"
+          : "auto",
+    );
+    setKeymap(resolveKeymap(cfg));
+  }, []);
+
+  const handleSaveConfig = useCallback(
+    async (cfg: Config) => {
+      try {
+        await api.saveConfig(cfg);
+        applyConfig(cfg);
+        toast.show({ kind: "success", message: "Settings saved" });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.show({ kind: "error", title: "Save failed", message: msg });
+        throw err;
+      }
+    },
+    [applyConfig, toast],
+  );
+
+  const openSettings = useCallback(async () => {
+    try {
+      const cfg = await api.getConfig();
+      if (cfg) setCurrentConfig(cfg);
+    } catch {
+      // ignore — dialog handles the null/loading state
+    }
+    setSettingsOpen(true);
+  }, []);
+
   const toggleFocusMode = useCallback(() => {
     if (!sidebarHidden) {
       preFocusWrap.current = wrap;
@@ -826,6 +885,9 @@ function ReviewUI({
         case "history":
           setHistoryOpen(true);
           break;
+        case "settings":
+          await openSettings();
+          break;
       }
     },
     [
@@ -838,6 +900,7 @@ function ReviewUI({
       loadFiles,
       openVersionPicker,
       handleAddAdditionalFiles,
+      openSettings,
     ],
   );
 
@@ -848,23 +911,26 @@ function ReviewUI({
     loadFiles();
     refreshStatus();
 
-    // Load config and apply to initial state.
-    // Fields that are NOT honored on desktop (by design):
-    //   - mouse: a desktop GUI always has mouse input — the field is TUI-only.
-    //   - comment_expand / comment_expand_delay: desktop always renders
-    //     comments fully expanded; there's enough screen real estate.
-    api.getConfig().then((cfg) => {
-      if (!cfg) return;
-      configRef.current = cfg;
-      if (cfg.sidebar_style === "tree") setTreeMode(true);
-      if (cfg.diff_style === "split") setViewMode("split");
-      else if (cfg.diff_style === "file") setViewMode("file");
-      if (cfg.wrap) setWrap(true);
-      if (cfg.layout === "side-by-side") setLayout("side-by-side");
-      else if (cfg.layout === "stacked") setLayout("stacked");
-      setKeymap(resolveKeymap(cfg));
-    }).catch(() => {});
+    api
+      .getConfig()
+      .then((cfg) => {
+        if (cfg) applyConfig(cfg);
+      })
+      .catch(() => {});
+    // applyConfig is stable (empty deps); leaving it out of this effect's deps
+    // avoids a reload loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadSession, loadFiles, refreshStatus]);
+
+  // Listen for File > Settings… menu clicks (Go dispatches DOM event).
+  useEffect(() => {
+    const handler = () => {
+      void openSettings();
+    };
+    window.addEventListener("monocle:open-settings", handler);
+    return () => window.removeEventListener("monocle:open-settings", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // --- Events ---
 
@@ -1710,6 +1776,14 @@ function ReviewUI({
         open={registerMCPOpen}
         onClose={() => setRegisterMCPOpen(false)}
         onRegister={handleRegisterClaude}
+      />
+
+      {/* Settings */}
+      <SettingsDialog
+        open={settingsOpen}
+        config={currentConfig}
+        onClose={() => setSettingsOpen(false)}
+        onSave={handleSaveConfig}
       />
 
       {/* Destructive confirmation dialog */}

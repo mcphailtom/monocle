@@ -24,11 +24,17 @@ func Run() error {
 
 	// Native menu bar
 	appMenu := menu.NewMenu()
-	appMenu.Append(menu.AppMenu()) // macOS standard app menu (About, Preferences, Quit, etc.)
+	appMenu.Append(menu.AppMenu()) // macOS standard app menu (About, Services, Hide, Quit, etc.)
 
 	fileMenu := appMenu.AddSubmenu("File")
 	fileMenu.AddText("Open Project...", keys.CmdOrCtrl("o"), func(_ *menu.CallbackData) {
 		go app.openProjectFromMenu()
+	})
+	fileMenu.AddSeparator()
+	// Settings uses the standard macOS Preferences shortcut (⌘,). Placed under
+	// File so it's discoverable via the menu bar in addition to the shortcut.
+	fileMenu.AddText("Settings…", keys.CmdOrCtrl(","), func(_ *menu.CallbackData) {
+		app.openSettingsFromMenu()
 	})
 
 	appMenu.Append(menu.EditMenu()) // Standard Edit menu (Undo, Cut, Copy, Paste, etc.)
