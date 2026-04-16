@@ -22,9 +22,10 @@ var errNoEngine = errors.New("no project selected")
 // App exposes EngineAPI methods to the Wails frontend via auto-generated bindings.
 // Engine init is deferred until the user picks a project via SelectProject().
 type App struct {
-	ctx      context.Context
-	engine   core.EngineAPI
-	database *db.DB
+	ctx        context.Context
+	engine     core.EngineAPI
+	database   *db.DB
+	nonGitMode bool
 }
 
 // startup is called by Wails when the application starts.
@@ -168,6 +169,7 @@ func (a *App) SelectProject(projectPath string) (string, error) {
 		return "", fmt.Errorf("create engine: %w", err)
 	}
 	a.engine = engine
+	a.nonGitMode = nonGitMode
 
 	// Start socket server for agent communication
 	socketPath := adapters.DefaultSocketPath(repoRoot)
@@ -568,6 +570,13 @@ func (a *App) GetSocketPath() string {
 		return ""
 	}
 	return a.engine.GetSocketPath()
+}
+
+// IsNonGitMode reports whether the currently prepared project directory is
+// outside a git repo. In that case the UI renders file contents instead of
+// diffs and hides the base-ref picker.
+func (a *App) IsNonGitMode() bool {
+	return a.nonGitMode
 }
 
 // --- External editor ---

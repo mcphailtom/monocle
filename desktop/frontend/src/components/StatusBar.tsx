@@ -8,6 +8,7 @@ interface StatusBarProps {
   baseRef: string;
   activeSnapshot: ReviewSnapshot | null;
   versionDiff: { from: number; to: number } | null;
+  nonGitMode: boolean;
 }
 
 export function StatusBar({
@@ -17,14 +18,18 @@ export function StatusBar({
   baseRef,
   activeSnapshot,
   versionDiff,
+  nonGitMode,
 }: StatusBarProps) {
   const fileCount = session?.ChangedFiles?.length ?? 0;
   const contentCount = session?.ContentItems?.length ?? 0;
   const commentCount = session?.Comments?.length ?? 0;
 
   // Prefer snapshot display over the raw ref when tracking "Since Review".
+  // In directory mode there is no git ref to show.
   let refDisplay = "";
-  if (activeSnapshot) {
+  if (nonGitMode) {
+    refDisplay = "directory mode";
+  } else if (activeSnapshot) {
     refDisplay = `R${activeSnapshot.ReviewRound} (${humanizeAgo(activeSnapshot.CreatedAt)})`;
   } else if (baseRef) {
     refDisplay = baseRef.slice(0, 7);
