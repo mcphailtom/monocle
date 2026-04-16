@@ -16,6 +16,7 @@ interface CommandPaletteProps {
 
 const COMMANDS = [
   { value: "submit", label: "Submit review", group: "Review" },
+  { value: "submit-auto", label: "Submit review (auto — skip dialog)", group: "Review" },
   { value: "pause", label: "Request pause", group: "Review" },
   { value: "unpause", label: "Cancel pause", group: "Review" },
   { value: "clear", label: "Clear all comments", group: "Review" },

@@ -666,6 +666,15 @@ function ReviewUI({
         case "submit":
           openReviewDialog();
           break;
+        case "submit-auto": {
+          // Matches TUI :submit! — auto-pick action, no dialog.
+          const summary = await api.getReviewSummary();
+          const hasIssues =
+            (summary?.IssueCt ?? 0) + (summary?.SuggestionCt ?? 0) > 0;
+          const action = hasIssues ? "request_changes" : "approve";
+          await handleSubmitReview(action, "");
+          break;
+        }
         case "pause":
           handleRequestPause();
           break;
@@ -723,6 +732,7 @@ function ReviewUI({
     },
     [
       openReviewDialog,
+      handleSubmitReview,
       handleRequestPause,
       refreshStatus,
       handleClearReview,
