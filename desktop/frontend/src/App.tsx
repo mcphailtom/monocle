@@ -681,7 +681,8 @@ function ReviewUI({
 
   // On first session load, offer MCP registration if Claude is installed and
   // monocle isn't already wired in. Keyed on the session so re-running doesn't
-  // nag on every render.
+  // nag on every render. Also surface a one-time "directory mode" notice when
+  // the selected project isn't a git repo (mirrors the TUI info banner).
   const registerCheckedRef = useRef(false);
   useEffect(() => {
     if (registerCheckedRef.current) return;
@@ -693,7 +694,16 @@ function ReviewUI({
         if (needs) setRegisterMCPOpen(true);
       })
       .catch(() => {});
-  }, [session]);
+    if (nonGitMode) {
+      toast.show({
+        kind: "info",
+        title: "Directory mode",
+        message:
+          "This directory is not a Git repository. Monocle will display file contents instead of diffs.",
+        duration: 8000,
+      });
+    }
+  }, [session, nonGitMode, toast]);
 
   const handleAddAdditionalFiles = useCallback(async () => {
     try {
