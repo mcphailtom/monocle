@@ -12,6 +12,7 @@ import { ConnectionInfoDialog } from "./components/ConnectionInfoDialog";
 import { HistoryDialog } from "./components/HistoryDialog";
 import { BaseRefPicker } from "./components/BaseRefPicker";
 import { ProjectPicker } from "./components/ProjectPicker";
+import { SessionPicker } from "./components/SessionPicker";
 import { useKeyboard } from "./hooks/useKeyboard";
 import type {
   ReviewSession,
@@ -25,6 +26,7 @@ import type {
   TargetType,
   Config,
   DiffLine,
+  SessionSummary,
 } from "./types";
 
 type FocusTarget = "sidebar" | "main";
@@ -49,18 +51,76 @@ function textToDiffResult(content: string, path: string): DiffResult {
 }
 
 function App() {
+  // projectPath is set once the engine is prepared for a directory.
+  // sessionKey is set once a session has been started or resumed — and is what
+  // keys the ReviewUI subtree so switching sessions remounts cleanly.
   const [projectPath, setProjectPath] = useState<string | null>(null);
   const [projectError, setProjectError] = useState<string | null>(null);
+  const [sessionKey, setSessionKey] = useState<string | null>(null);
+  const [pendingSessions, setPendingSessions] = useState<SessionSummary[] | null>(
+    null,
+  );
 
-  const handleSelectProject = useCallback(async (path: string) => {
-    setProjectError(null);
+  // Decide what to do once the engine is prepared for a project:
+  // if there are existing sessions, show the picker; otherwise start fresh.
+  const afterProjectPrepared = useCallback(async (resolvedPath: string) => {
     try {
-      await api.selectProject(path);
-      setProjectPath(path);
+      const sessions = (await api.listSessions(resolvedPath, 20)) ?? [];
+      if (sessions.length === 0) {
+        const s = await api.startSessionForProject("claude");
+        setSessionKey(s?.ID ?? `new-${Date.now()}`);
+        setPendingSessions(null);
+      } else {
+        setPendingSessions(sessions);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("Failed to select project:", msg);
+      console.error("Failed to prepare session:", msg);
       setProjectError(msg);
+    }
+  }, []);
+
+  const handleSelectProject = useCallback(
+    async (path: string) => {
+      setProjectError(null);
+      setSessionKey(null);
+      setPendingSessions(null);
+      try {
+        const resolved = await api.selectProject(path);
+        setProjectPath(resolved || path);
+        await afterProjectPrepared(resolved || path);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("Failed to select project:", msg);
+        setProjectError(msg);
+      }
+    },
+    [afterProjectPrepared],
+  );
+
+  const handleResumeSession = useCallback(async (sessionID: string) => {
+    try {
+      const s = await api.resumeSession(sessionID);
+      setSessionKey(s?.ID ?? sessionID);
+      setPendingSessions(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Failed to resume session:", msg);
+      setProjectError(msg);
+      setPendingSessions(null);
+    }
+  }, []);
+
+  const handleNewSession = useCallback(async () => {
+    try {
+      const s = await api.startSessionForProject("claude");
+      setSessionKey(s?.ID ?? `new-${Date.now()}`);
+      setPendingSessions(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Failed to start session:", msg);
+      setProjectError(msg);
+      setPendingSessions(null);
     }
   }, []);
 
@@ -71,20 +131,45 @@ function App() {
       if (detail.error) {
         setProjectError(detail.error);
         setProjectPath(null);
+        setSessionKey(null);
+        setPendingSessions(null);
       } else if (detail.path) {
         setProjectError(null);
         setProjectPath(detail.path);
+        setSessionKey(null);
+        setPendingSessions(null);
+        void afterProjectPrepared(detail.path);
       }
     };
     window.addEventListener("monocle:project-changed", handler);
     return () => window.removeEventListener("monocle:project-changed", handler);
-  }, []);
+  }, [afterProjectPrepared]);
 
   if (!projectPath) {
     return <ProjectPicker onSelect={handleSelectProject} error={projectError} />;
   }
 
-  return <ReviewUI key={projectPath} projectPath={projectPath} onSelectProject={handleSelectProject} />;
+  if (!sessionKey) {
+    return (
+      <>
+        <ProjectPicker onSelect={handleSelectProject} error={projectError} />
+        <SessionPicker
+          open={pendingSessions !== null}
+          sessions={pendingSessions ?? []}
+          onResume={handleResumeSession}
+          onNew={handleNewSession}
+        />
+      </>
+    );
+  }
+
+  return (
+    <ReviewUI
+      key={sessionKey}
+      projectPath={projectPath}
+      onSelectProject={handleSelectProject}
+    />
+  );
 }
 
 function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSelectProject: (path: string) => void }) {
