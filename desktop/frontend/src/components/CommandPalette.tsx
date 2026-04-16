@@ -17,6 +17,7 @@ interface CommandPaletteProps {
 const COMMANDS = [
   { value: "submit", label: "Submit review", group: "Review" },
   { value: "pause", label: "Request pause", group: "Review" },
+  { value: "unpause", label: "Cancel pause", group: "Review" },
   { value: "clear", label: "Clear all comments", group: "Review" },
   { value: "mark-all-reviewed", label: "Mark all files reviewed", group: "Review" },
   { value: "mark-all-unreviewed", label: "Mark all files unreviewed", group: "Review" },
