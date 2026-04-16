@@ -17,6 +17,7 @@ import { ConfirmDialog } from "./components/ConfirmDialog";
 import { VersionPicker } from "./components/VersionPicker";
 import { RegisterMCPDialog } from "./components/RegisterMCPDialog";
 import { useToast } from "./components/Toast";
+import { DEFAULT_KEYMAP, resolveKeymap } from "./lib/keymap";
 import { useKeyboard } from "./hooks/useKeyboard";
 import type {
   ReviewSession,
@@ -216,6 +217,7 @@ function ReviewUI({
   const [contentTitle, setContentTitle] = useState("");
   const [wrap, setWrap] = useState(false);
   const [layout, setLayout] = useState<Layout>("auto");
+  const [keymap, setKeymap] = useState(DEFAULT_KEYMAP);
   const toast = useToast();
   const [windowWidth, setWindowWidth] = useState(
     typeof window !== "undefined" ? window.innerWidth : 1280,
@@ -846,6 +848,7 @@ function ReviewUI({
       if (cfg.wrap) setWrap(true);
       if (cfg.layout === "side-by-side") setLayout("side-by-side");
       else if (cfg.layout === "stacked") setLayout("stacked");
+      setKeymap(resolveKeymap(cfg));
     }).catch(() => {});
   }, [loadSession, loadFiles, refreshStatus]);
 
@@ -1007,40 +1010,40 @@ function ReviewUI({
   useKeyboard([
     // Focus
     {
-      key: "Tab",
+      key: keymap.focus_swap,
       handler: () => setFocus((f) => (f === "sidebar" ? "main" : "sidebar")),
     },
     {
-      key: "\\",
+      key: keymap.toggle_sidebar,
       handler: () => setSidebarHidden((h) => !h),
     },
     {
-      key: "1",
+      key: keymap.focus_sidebar,
       handler: () => { setFocus("sidebar"); setSidebarHidden(false); },
     },
     {
-      key: "2",
+      key: keymap.focus_main,
       handler: () => setFocus("main"),
     },
 
     // Sidebar navigation (when sidebar focused)
     {
-      key: "j",
+      key: keymap.down,
       handler: () => moveSidebarCursor(1),
       when: () => focus === "sidebar",
     },
     {
-      key: "k",
+      key: keymap.up,
       handler: () => moveSidebarCursor(-1),
       when: () => focus === "sidebar",
     },
     {
-      key: "g",
+      key: keymap.top,
       handler: () => moveSidebarCursorTo(0),
       when: () => focus === "sidebar",
     },
     {
-      key: "shift+g",
+      key: keymap.bottom,
       handler: () => moveSidebarCursorTo(sidebarItemsRef.current.length - 1),
       when: () => focus === "sidebar",
     },
@@ -1062,25 +1065,25 @@ function ReviewUI({
 
     // Sidebar toggles
     {
-      key: "f",
+      key: keymap.tree_mode,
       handler: () => setTreeMode((t) => !t),
       when: () => focus === "sidebar",
     },
 
-    // Collapse all tree dirs (z key)
+    // Collapse all tree dirs
     {
-      key: "z",
+      key: keymap.collapse_all,
       handler: () => sidebarRef.current?.collapseAll(),
       when: () => focus === "sidebar" && treeMode,
     },
-    // Expand all tree dirs (e key)
+    // Expand all tree dirs
     {
-      key: "e",
+      key: keymap.expand_all,
       handler: () => sidebarRef.current?.expandAll(),
       when: () => focus === "sidebar" && treeMode,
     },
     {
-      key: "/",
+      key: keymap.filter_reviewed,
       handler: () =>
         setReviewFilter((f) =>
           f === "" ? "reviewed" : f === "reviewed" ? "unreviewed" : "",
@@ -1090,7 +1093,7 @@ function ReviewUI({
 
     // File navigation (global — skips sections and dirs)
     {
-      key: "[",
+      key: keymap.prev_file,
       handler: () => {
         const items = sidebarItemsRef.current;
         for (let i = sidebarCursor - 1; i >= 0; i--) {
@@ -1102,7 +1105,7 @@ function ReviewUI({
       },
     },
     {
-      key: "]",
+      key: keymap.next_file,
       handler: () => {
         const items = sidebarItemsRef.current;
         for (let i = sidebarCursor + 1; i < items.length; i++) {
@@ -1116,7 +1119,7 @@ function ReviewUI({
 
     // Diff view controls (when main pane focused)
     {
-      key: "t",
+      key: keymap.toggle_diff,
       handler: () => {
         const next: ViewMode = viewMode === "unified" ? "split" : viewMode === "split" ? "file" : "unified";
         setViewMode(next);
@@ -1148,35 +1151,35 @@ function ReviewUI({
 
     // Diff line navigation (when main pane focused)
     {
-      key: "j",
+      key: keymap.down,
       handler: () => diffViewRef.current?.moveCursor(1),
       when: () => focus === "main",
     },
     {
-      key: "k",
+      key: keymap.up,
       handler: () => diffViewRef.current?.moveCursor(-1),
       when: () => focus === "main",
     },
     // Diff scrolling (Shift+J/K — works from any pane)
     {
-      key: "shift+j",
+      key: keymap.scroll_down,
       handler: () => diffViewRef.current?.scroll(1),
     },
     {
-      key: "shift+k",
+      key: keymap.scroll_up,
       handler: () => diffViewRef.current?.scroll(-1),
     },
 
     // Visual selection mode
     {
-      key: "v",
+      key: keymap.visual,
       handler: () => diffViewRef.current?.toggleVisualMode(),
       when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
     },
 
     // Commenting (when main pane focused, no dialog open)
     {
-      key: "c",
+      key: keymap.comment,
       handler: () => {
         // If a comment is focused (cursor is on the comment widget), edit it
         const focusedComment = diffViewRef.current?.getFocusedComment();
@@ -1197,24 +1200,24 @@ function ReviewUI({
 
     // Review actions (global, no dialog open)
     {
-      key: "r",
+      key: keymap.reviewed,
       handler: handleMarkReviewed,
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
     {
-      key: "shift+s",
+      key: keymap.submit,
       handler: openReviewDialog,
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
     {
-      key: "shift+p",
+      key: keymap.pause,
       handler: handleRequestPause,
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Suggestion editing (s key — like c but pre-sets suggestion type with line content)
+    // Suggestion editing — like c but pre-sets suggestion type with line content
     {
-      key: "s",
+      key: keymap.suggest,
       handler: () => {
         const content = diffViewRef.current?.getSelectedContent() ?? "";
         const range = diffViewRef.current?.getSelectionRange();
@@ -1228,16 +1231,16 @@ function ReviewUI({
       when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // File-level comment (Shift+C)
+    // File-level comment
     {
-      key: "shift+c",
+      key: keymap.file_comment,
       handler: () => openCommentEditor(0, 0),
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Delete comment at cursor (d key)
+    // Delete comment at cursor
     {
-      key: "d",
+      key: keymap.delete_comment,
       handler: () => {
         const comment = diffViewRef.current?.getCommentAtCursor();
         if (comment) handleDeleteComment(comment);
@@ -1245,9 +1248,9 @@ function ReviewUI({
       when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Toggle comment resolved (x key)
+    // Toggle comment resolved
     {
-      key: "x",
+      key: keymap.resolve_comment,
       handler: () => {
         const comment = diffViewRef.current?.getCommentAtCursor();
         if (comment) handleResolveComment(comment);
@@ -1255,16 +1258,16 @@ function ReviewUI({
       when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Force reload (Shift+R)
+    // Force reload
     {
-      key: "shift+r",
+      key: keymap.refresh,
       handler: handleForceReload,
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Clear review (Shift+D)
+    // Clear review
     {
-      key: "shift+d",
+      key: keymap.clear_review,
       handler: () => {
         setConfirmState({
           title: "Discard review",
@@ -1277,23 +1280,23 @@ function ReviewUI({
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Line wrap toggle (w key — works from any pane)
+    // Line wrap toggle — works from any pane
     {
-      key: "w",
+      key: keymap.wrap,
       handler: () => setWrap((w) => !w),
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Focus mode (Shift+F)
+    // Focus mode
     {
-      key: "shift+f",
+      key: keymap.toggle_focus_mode,
       handler: toggleFocusMode,
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Cycle layout (Shift+T): auto → side-by-side → stacked → auto
+    // Cycle layout: auto → side-by-side → stacked → auto
     {
-      key: "shift+t",
+      key: keymap.cycle_layout,
       handler: () => {
         setLayout((l) =>
           l === "auto" ? "side-by-side" : l === "side-by-side" ? "stacked" : "auto",
@@ -1303,19 +1306,19 @@ function ReviewUI({
         !commentEditorOpen && !reviewDialogOpen && !helpOpen && !commandPaletteOpen,
     },
 
-    // Half-page scroll (Ctrl+D / Ctrl+U — works from any pane)
+    // Half-page scroll — works from any pane
     {
-      key: "ctrl+d",
+      key: keymap.half_down,
       handler: () => diffViewRef.current?.scrollHalfPage(1),
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
     {
-      key: "ctrl+u",
+      key: keymap.half_up,
       handler: () => diffViewRef.current?.scrollHalfPage(-1),
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Horizontal scroll (h/l when main focused, H/L from any pane)
+    // Horizontal scroll (main-pane-only flips; shift variants work globally)
     {
       key: "h",
       handler: () => diffViewRef.current?.scrollHorizontal(-1),
@@ -1327,36 +1330,36 @@ function ReviewUI({
       when: () => focus === "main" && !commentEditorOpen && !reviewDialogOpen,
     },
     {
-      key: "shift+h",
+      key: keymap.scroll_left,
       handler: () => diffViewRef.current?.scrollHorizontal(-1),
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
     {
-      key: "shift+l",
+      key: keymap.scroll_right,
       handler: () => diffViewRef.current?.scrollHorizontal(1),
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Scroll position keys (0, ^, $ — works from any pane)
+    // Scroll position — works from any pane
     {
-      key: "0",
+      key: keymap.scroll_home,
       handler: () => diffViewRef.current?.scrollToColumn("start"),
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
     {
-      key: "^",
+      key: keymap.scroll_first_char,
       handler: () => diffViewRef.current?.scrollToColumn("start"),
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
     {
-      key: "$",
+      key: keymap.scroll_end,
       handler: () => diffViewRef.current?.scrollToColumn("end"),
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // {/} — jump between comments (main pane) or sidebar sections (sidebar)
+    // { / } — jump between comments (main pane) or sidebar sections (sidebar)
     {
-      key: "{",
+      key: keymap.prev_section,
       handler: () => {
         if (focus === "main") {
           diffViewRef.current?.jumpToComment(-1);
@@ -1375,7 +1378,7 @@ function ReviewUI({
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
     {
-      key: "}",
+      key: keymap.next_section,
       handler: () => {
         if (focus === "main") {
           diffViewRef.current?.jumpToComment(1);
@@ -1394,9 +1397,9 @@ function ReviewUI({
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
-    // Base ref picker (b key)
+    // Base ref picker
     {
-      key: "b",
+      key: keymap.base_ref,
       handler: () => setBaseRefPickerOpen(true),
       when: () =>
         !nonGitMode &&
@@ -1407,9 +1410,9 @@ function ReviewUI({
         !baseRefPickerOpen,
     },
 
-    // Artifact version picker (Shift+B) — only when a content item is selected
+    // Artifact version picker — only when a content item is selected
     {
-      key: "shift+b",
+      key: keymap.artifact_versions,
       handler: openVersionPicker,
       when: () =>
         !!selectedContentId &&
@@ -1420,21 +1423,21 @@ function ReviewUI({
         !versionPickerOpen,
     },
 
-    // Connection info (Shift+I)
+    // Connection info
     {
-      key: "shift+i",
+      key: keymap.connection_info,
       handler: () => setConnectionInfoOpen(true),
       when: () => !commentEditorOpen && !reviewDialogOpen && !helpOpen && !commandPaletteOpen,
     },
 
     // Help and command palette
     {
-      key: "?",
+      key: keymap.help,
       handler: () => setHelpOpen(true),
       when: () => !commentEditorOpen && !reviewDialogOpen && !helpOpen && !commandPaletteOpen,
     },
     {
-      key: ":",
+      key: keymap.command_mode,
       handler: () => setCommandPaletteOpen(true),
       when: () => !commentEditorOpen && !reviewDialogOpen && !helpOpen && !commandPaletteOpen,
     },
