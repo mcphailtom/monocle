@@ -92,3 +92,12 @@ Matches the TUI splash (`internal/tui/splash.go`):
 - **macOS**: Traffic light repositioning via CGO, `⌘` in keyboard hints, `NSAppearanceNameDarkAqua`
 - **Non-macOS**: `traffic_lights_other.go` is a no-op stub, keyboard hints show `Ctrl+`
 - **Font stack**: JetBrains Mono for logotype, Plus Jakarta Sans for UI text, system monospace for code
+
+## Config Fields Not Honored on Desktop
+
+Some `types.Config` fields are TUI-only and intentionally ignored by the desktop app:
+
+- **`mouse`** — a GUI always has mouse input; disabling it doesn't make sense in this context.
+- **`comment_expand` / `comment_expand_delay`** — desktop always renders inline comments fully expanded. There's enough screen real estate that hover-to-expand adds friction without benefit.
+
+All other config fields (`sidebar_style`, `diff_style`, `layout`, `wrap`, `tab_size`, `context_lines`, `auto_focus_mode`, `min_diff_width`, `mark_reviewed_on_submit`, `review_format`, `keybindings`) are honored.

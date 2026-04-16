@@ -838,7 +838,11 @@ function ReviewUI({
     loadFiles();
     refreshStatus();
 
-    // Load config and apply to initial state
+    // Load config and apply to initial state.
+    // Fields that are NOT honored on desktop (by design):
+    //   - mouse: a desktop GUI always has mouse input — the field is TUI-only.
+    //   - comment_expand / comment_expand_delay: desktop always renders
+    //     comments fully expanded; there's enough screen real estate.
     api.getConfig().then((cfg) => {
       if (!cfg) return;
       configRef.current = cfg;
