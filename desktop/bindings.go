@@ -136,7 +136,10 @@ func (a *App) emitProjectChanged(path string, err error) {
 	wailsRuntime.WindowExecJS(a.ctx, js)
 }
 
-// SelectProject initializes the engine for the given project directory.
+// SelectProject initializes the engine for the given project directory without
+// starting a session. The frontend is expected to follow up with either
+// StartSessionForProject (fresh session) or ResumeSession (existing session) —
+// typically driven by a session picker when ListSessions returns non-empty.
 // Returns the resolved repo root path on success.
 func (a *App) SelectProject(projectPath string) (string, error) {
 	if a.database == nil {
@@ -163,14 +166,6 @@ func (a *App) SelectProject(projectPath string) (string, error) {
 	}
 	a.engine = engine
 
-	// Start a new session
-	if _, err := engine.StartSession(core.SessionOptions{
-		Agent:    "claude",
-		RepoRoot: repoRoot,
-	}); err != nil {
-		return "", fmt.Errorf("start session: %w", err)
-	}
-
 	// Start socket server for agent communication
 	socketPath := adapters.DefaultSocketPath(repoRoot)
 	if override := os.Getenv("MONOCLE_SOCKET"); override != "" {
@@ -187,6 +182,31 @@ func (a *App) SelectProject(projectPath string) (string, error) {
 }
 
 // --- Session lifecycle ---
+
+// StartSessionForProject starts a fresh review session on the currently
+// prepared engine. The frontend calls this after SelectProject when there are
+// no existing sessions or when the user picks "New session" in the picker.
+func (a *App) StartSessionForProject(agent string) (*types.ReviewSession, error) {
+	if a.engine == nil {
+		return nil, errNoEngine
+	}
+	if agent == "" {
+		agent = "claude"
+	}
+	return a.engine.StartSession(core.SessionOptions{
+		Agent:    agent,
+		RepoRoot: "", // engine already knows its repo root
+	})
+}
+
+// ResumeSession resumes an existing session by ID. Used by the session picker
+// when the user picks a prior session.
+func (a *App) ResumeSession(sessionID string) (*types.ReviewSession, error) {
+	if a.engine == nil {
+		return nil, errNoEngine
+	}
+	return a.engine.ResumeSession(sessionID)
+}
 
 func (a *App) GetSession() *types.ReviewSession {
 	if a.engine == nil {

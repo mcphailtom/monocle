@@ -38,6 +38,8 @@ declare global {
           SelectProject(projectPath: string): Promise<string>;
 
           // Session
+          StartSessionForProject(agent: string): Promise<ReviewSession | null>;
+          ResumeSession(sessionID: string): Promise<ReviewSession | null>;
           GetSession(): Promise<ReviewSession | null>;
           ListSessions(repoRoot: string, limit: number): Promise<SessionSummary[]>;
 
@@ -130,6 +132,9 @@ export const api = {
   selectProject: (path: string) => app().SelectProject(path),
 
   // Session
+  startSessionForProject: (agent: string = "claude") =>
+    app().StartSessionForProject(agent),
+  resumeSession: (sessionID: string) => app().ResumeSession(sessionID),
   getSession: () => app().GetSession(),
   listSessions: (repoRoot: string, limit: number) =>
     app().ListSessions(repoRoot, limit),
