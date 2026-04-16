@@ -124,6 +124,9 @@ declare global {
           // External editor
           OpenExternalEditor(initialText: string): Promise<string>;
 
+          // Mode
+          IsNonGitMode(): Promise<boolean>;
+
           // Config
           GetConfig(): Promise<Config | null>;
         };
@@ -234,6 +237,9 @@ export const api = {
 
   // External editor
   openExternalEditor: (initialText: string) => app().OpenExternalEditor(initialText),
+
+  // Mode
+  isNonGitMode: () => app().IsNonGitMode(),
 
   // Config
   getConfig: () => app().GetConfig(),

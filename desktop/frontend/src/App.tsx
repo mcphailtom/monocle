@@ -63,11 +63,14 @@ function App() {
   const [pendingSessions, setPendingSessions] = useState<SessionSummary[] | null>(
     null,
   );
+  const [nonGitMode, setNonGitMode] = useState(false);
 
   // Decide what to do once the engine is prepared for a project:
   // if there are existing sessions, show the picker; otherwise start fresh.
   const afterProjectPrepared = useCallback(async (resolvedPath: string) => {
     try {
+      const isNonGit = await api.isNonGitMode();
+      setNonGitMode(isNonGit);
       const sessions = (await api.listSessions(resolvedPath, 20)) ?? [];
       if (sessions.length === 0) {
         const s = await api.startSessionForProject("claude");
@@ -170,12 +173,21 @@ function App() {
     <ReviewUI
       key={sessionKey}
       projectPath={projectPath}
+      nonGitMode={nonGitMode}
       onSelectProject={handleSelectProject}
     />
   );
 }
 
-function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSelectProject: (path: string) => void }) {
+function ReviewUI({
+  projectPath,
+  nonGitMode,
+  onSelectProject,
+}: {
+  projectPath: string;
+  nonGitMode: boolean;
+  onSelectProject: (path: string) => void;
+}) {
   // --- State ---
   const [session, setSession] = useState<ReviewSession | null>(null);
   const [files, setFiles] = useState<ChangedFile[]>([]);
@@ -280,15 +292,25 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     }
   }, []);
 
-  const loadDiff = useCallback(async (path: string) => {
-    setDiff(null);
-    try {
-      const d = await api.getFileDiff(path);
-      setDiff(d);
-    } catch {
+  const loadDiff = useCallback(
+    async (path: string) => {
       setDiff(null);
-    }
-  }, []);
+      try {
+        if (nonGitMode) {
+          // Directory mode: render file contents, no git diff.
+          const content = await api.getFileContent(path);
+          setDiff(textToDiffResult(content, path));
+          setViewMode("file");
+          return;
+        }
+        const d = await api.getFileDiff(path);
+        setDiff(d);
+      } catch {
+        setDiff(null);
+      }
+    },
+    [nonGitMode],
+  );
 
   const loadContentItem = useCallback(
     async (id: string) => {
@@ -1193,7 +1215,13 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     {
       key: "b",
       handler: () => setBaseRefPickerOpen(true),
-      when: () => !commentEditorOpen && !reviewDialogOpen && !helpOpen && !commandPaletteOpen && !baseRefPickerOpen,
+      when: () =>
+        !nonGitMode &&
+        !commentEditorOpen &&
+        !reviewDialogOpen &&
+        !helpOpen &&
+        !commandPaletteOpen &&
+        !baseRefPickerOpen,
     },
 
     // Artifact version picker (Shift+B) — only when a content item is selected
@@ -1375,6 +1403,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
                   }
                 : null
             }
+            nonGitMode={nonGitMode}
           />
         </div>
 
