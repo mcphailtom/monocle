@@ -25,6 +25,7 @@ const COMMANDS = [
   { value: "discard", label: "Discard review", group: "Review" },
   { value: "pick-version", label: "Select base version (content item)", group: "Content" },
   { value: "add-additional-files", label: "Add additional files…", group: "Files" },
+  { value: "register-mcp", label: "Register MCP with Claude Code…", group: "Session" },
   { value: "cycle-layout", label: "Cycle layout (auto / side-by-side / stacked)", group: "View" },
   { value: "history", label: "View submission history", group: "Session" },
 ];

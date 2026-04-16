@@ -129,6 +129,10 @@ declare global {
           // Mode
           IsNonGitMode(): Promise<boolean>;
 
+          // Claude MCP registration
+          ClaudeNeedsRegister(): Promise<boolean>;
+          RegisterClaude(global: boolean): Promise<void>;
+
           // Config
           GetConfig(): Promise<Config | null>;
         };
@@ -244,6 +248,10 @@ export const api = {
 
   // Mode
   isNonGitMode: () => app().IsNonGitMode(),
+
+  // Claude MCP registration
+  claudeNeedsRegister: () => app().ClaudeNeedsRegister(),
+  registerClaude: (global: boolean) => app().RegisterClaude(global),
 
   // Config
   getConfig: () => app().GetConfig(),
