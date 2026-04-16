@@ -37,6 +37,7 @@ declare global {
           // Project selection
           GetRecentProjects(): Promise<RecentProject[]>;
           OpenDirectoryDialog(): Promise<string>;
+          OpenAdditionalFilesDialog(): Promise<string[] | null>;
           SelectProject(projectPath: string): Promise<string>;
 
           // Session
@@ -63,6 +64,7 @@ declare global {
           // Additional files
           GetAdditionalFiles(): Promise<AdditionalFile[]>;
           GetAdditionalFileContent(absPath: string): Promise<string>;
+          AddAdditionalPaths(paths: string[]): Promise<AdditionalFile[] | null>;
 
           // Comments
           AddComment(
@@ -150,6 +152,7 @@ export const api = {
   // Project selection
   getRecentProjects: () => app().GetRecentProjects(),
   openDirectoryDialog: () => app().OpenDirectoryDialog(),
+  openAdditionalFilesDialog: () => app().OpenAdditionalFilesDialog(),
   selectProject: (path: string) => app().SelectProject(path),
 
   // Session
@@ -177,6 +180,7 @@ export const api = {
 
   // Additional files
   getAdditionalFiles: () => app().GetAdditionalFiles(),
+  addAdditionalPaths: (paths: string[]) => app().AddAdditionalPaths(paths),
   getAdditionalFileContent: (absPath: string) =>
     app().GetAdditionalFileContent(absPath),
 
