@@ -552,6 +552,14 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
         case "pause":
           handleRequestPause();
           break;
+        case "unpause":
+          try {
+            await api.cancelPause();
+            refreshStatus();
+          } catch (err) {
+            console.error("Failed to cancel pause:", err);
+          }
+          break;
         case "clear":
           await api.clearComments();
           loadSession();
@@ -574,7 +582,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
           break;
       }
     },
-    [openReviewDialog, handleRequestPause, loadSession, loadFiles],
+    [openReviewDialog, handleRequestPause, refreshStatus, handleClearReview, loadSession, loadFiles],
   );
 
   // --- Initial load ---
