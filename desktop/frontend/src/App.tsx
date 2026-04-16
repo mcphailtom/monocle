@@ -13,6 +13,7 @@ import { HistoryDialog } from "./components/HistoryDialog";
 import { BaseRefPicker } from "./components/BaseRefPicker";
 import { ProjectPicker } from "./components/ProjectPicker";
 import { SessionPicker } from "./components/SessionPicker";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { useKeyboard } from "./hooks/useKeyboard";
 import type {
   ReviewSession,
@@ -218,6 +219,14 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
   const [connectionInfoOpen, setConnectionInfoOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [baseRefPickerOpen, setBaseRefPickerOpen] = useState(false);
+
+  // Confirm dialog (for destructive actions like clear and discard)
+  const [confirmState, setConfirmState] = useState<{
+    title: string;
+    message: string;
+    destructiveLabel: string;
+    action: () => void | Promise<void>;
+  } | null>(null);
 
   // Component refs for keyboard navigation
   const diffViewRef = useRef<DiffViewHandle>(null);
@@ -561,8 +570,16 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
           }
           break;
         case "clear":
-          await api.clearComments();
-          loadSession();
+          setConfirmState({
+            title: "Clear comments",
+            message:
+              "Remove every pending comment? This cannot be undone.",
+            destructiveLabel: "Clear",
+            action: async () => {
+              await api.clearComments();
+              loadSession();
+            },
+          });
           break;
         case "mark-all-reviewed":
           await api.markAllReviewed();
@@ -570,7 +587,13 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
           loadFiles();
           break;
         case "discard":
-          await handleClearReview();
+          setConfirmState({
+            title: "Discard review",
+            message:
+              "Clear all comments, plans, and reviewed states? This cannot be undone.",
+            destructiveLabel: "Discard",
+            action: handleClearReview,
+          });
           break;
         case "mark-all-unreviewed":
           await api.resetAllReviewed();
@@ -989,7 +1012,15 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     // Clear review (Shift+D)
     {
       key: "shift+d",
-      handler: handleClearReview,
+      handler: () => {
+        setConfirmState({
+          title: "Discard review",
+          message:
+            "Clear all comments, plans, and reviewed states? This cannot be undone.",
+          destructiveLabel: "Discard",
+          action: handleClearReview,
+        });
+      },
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
@@ -1322,6 +1353,20 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
         onSelect={handleBaseRefSelect}
         onAutoSelect={handleAutoRefSelect}
         onSelectSnapshot={handleSnapshotSelect}
+      />
+
+      {/* Destructive confirmation dialog */}
+      <ConfirmDialog
+        open={confirmState !== null}
+        title={confirmState?.title ?? ""}
+        message={confirmState?.message ?? ""}
+        destructiveLabel={confirmState?.destructiveLabel ?? "Confirm"}
+        onConfirm={async () => {
+          const s = confirmState;
+          setConfirmState(null);
+          if (s) await s.action();
+        }}
+        onCancel={() => setConfirmState(null)}
       />
     </div>
   );
