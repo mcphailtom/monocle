@@ -114,7 +114,22 @@ function buildTree(files: ChangedFile[]): FileTreeNode[] {
   }
 
   sortTree(root);
+  // Merge single-child directory chains so a/b/c (where a only contains b and
+  // b only contains c) renders as one node named "a/b/c". Mirrors the TUI's
+  // compressTree in internal/tui/filetree.go.
+  for (const node of root) compressTree(node);
   return root;
+}
+
+function compressTree(node: FileTreeNode) {
+  if (!node.isDir) return;
+  for (const child of node.children) compressTree(child);
+  while (node.children.length === 1 && node.children[0].isDir) {
+    const child = node.children[0];
+    node.name = node.name + "/" + child.name;
+    node.path = child.path;
+    node.children = child.children;
+  }
 }
 
 function flattenTree(
