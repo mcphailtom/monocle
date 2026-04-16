@@ -15,6 +15,7 @@ import { ProjectPicker } from "./components/ProjectPicker";
 import { SessionPicker } from "./components/SessionPicker";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { VersionPicker } from "./components/VersionPicker";
+import { RegisterMCPDialog } from "./components/RegisterMCPDialog";
 import { useToast } from "./components/Toast";
 import { useKeyboard } from "./hooks/useKeyboard";
 import type {
@@ -249,6 +250,9 @@ function ReviewUI({
   const [connectionInfoOpen, setConnectionInfoOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [baseRefPickerOpen, setBaseRefPickerOpen] = useState(false);
+
+  // MCP registration prompt (first-run or on demand via palette)
+  const [registerMCPOpen, setRegisterMCPOpen] = useState(false);
 
   // Artifact version picker: tracks from/to versions per content item
   const [versionPickerOpen, setVersionPickerOpen] = useState(false);
@@ -649,6 +653,46 @@ function ReviewUI({
     setVersionPickerOpen(true);
   }, [selectedContentId]);
 
+  const handleRegisterClaude = useCallback(
+    async (global: boolean) => {
+      try {
+        await api.registerClaude(global);
+        setRegisterMCPOpen(false);
+        toast.show({
+          kind: "success",
+          title: "Monocle registered",
+          message: global
+            ? "Added monocle to ~/.mcp.json. Restart Claude Code to pick it up."
+            : "Added monocle to ./.mcp.json. Restart Claude Code to pick it up.",
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        toast.show({
+          kind: "error",
+          title: "Registration failed",
+          message: msg,
+        });
+      }
+    },
+    [toast],
+  );
+
+  // On first session load, offer MCP registration if Claude is installed and
+  // monocle isn't already wired in. Keyed on the session so re-running doesn't
+  // nag on every render.
+  const registerCheckedRef = useRef(false);
+  useEffect(() => {
+    if (registerCheckedRef.current) return;
+    if (!session) return;
+    registerCheckedRef.current = true;
+    api
+      .claudeNeedsRegister()
+      .then((needs) => {
+        if (needs) setRegisterMCPOpen(true);
+      })
+      .catch(() => {});
+  }, [session]);
+
   const handleAddAdditionalFiles = useCallback(async () => {
     try {
       const paths = await api.openAdditionalFilesDialog();
@@ -758,6 +802,9 @@ function ReviewUI({
           break;
         case "add-additional-files":
           await handleAddAdditionalFiles();
+          break;
+        case "register-mcp":
+          setRegisterMCPOpen(true);
           break;
         case "cycle-layout":
           setLayout((l) =>
@@ -1639,6 +1686,13 @@ function ReviewUI({
         }
         onClose={() => setVersionPickerOpen(false)}
         onSelect={handleVersionSelect}
+      />
+
+      {/* Claude MCP registration */}
+      <RegisterMCPDialog
+        open={registerMCPOpen}
+        onClose={() => setRegisterMCPOpen(false)}
+        onRegister={handleRegisterClaude}
       />
 
       {/* Destructive confirmation dialog */}

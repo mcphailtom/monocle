@@ -596,6 +596,28 @@ func (a *App) IsNonGitMode() bool {
 	return a.nonGitMode
 }
 
+// --- Claude MCP registration ---
+
+// ClaudeNeedsRegister reports whether Claude Code is detected on the system
+// but monocle hasn't been registered as an MCP server yet. Used by the
+// frontend to decide whether to show a first-run registration prompt.
+func (a *App) ClaudeNeedsRegister() bool {
+	adapter := &adapters.ClaudeAdapter{}
+	if !adapter.Detect() {
+		return false
+	}
+	return adapter.NeedsRegister()
+}
+
+// RegisterClaude adds monocle to Claude Code's MCP configuration. When
+// global=true the registration lands in ~/.mcp.json; otherwise it lands in
+// ./.mcp.json in the current working directory. MCP tools mode is used
+// (the desktop app's default flow).
+func (a *App) RegisterClaude(global bool) error {
+	adapter := &adapters.ClaudeAdapter{Mode: adapters.ModeMCPTools}
+	return adapter.Register(global)
+}
+
 // --- External editor ---
 
 // OpenExternalEditor writes initialText to a temp markdown file, launches the
