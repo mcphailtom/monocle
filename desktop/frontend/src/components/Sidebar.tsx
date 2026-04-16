@@ -42,6 +42,8 @@ interface SidebarProps {
   cursor: number;
   reviewFilter: string;
   treeMode: boolean;
+  /** "column" = 260px wide on left; "row" = full-width on top (stacked layout) */
+  orientation?: "column" | "row";
   onSelect: (item: SidebarItem) => void;
   onCursorChange: (cursor: number) => void;
   onItemsChange?: (items: SidebarItem[]) => void;
@@ -154,6 +156,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
   cursor,
   reviewFilter,
   treeMode,
+  orientation = "column",
   onSelect,
   onCursorChange,
   onItemsChange,
@@ -308,10 +311,19 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
   const cursorItem = items[cursor];
   const cursorOnNonFile = focused && (cursorItem?.kind === "dir" || cursorItem?.kind === "section");
 
+  const asideStyle =
+    orientation === "row"
+      ? { width: "100%", maxHeight: "40vh" }
+      : { width: 260 };
+
   return (
     <aside
-      className="flex flex-col border-r border-border overflow-hidden bg-card"
-      style={{ width: 260 }}
+      className={`flex flex-col ${
+        orientation === "row"
+          ? "border-b border-border"
+          : "border-r border-border"
+      } overflow-hidden bg-card`}
+      style={asideStyle}
       onClick={onFocus}
     >
       {/* Drag region for traffic lights + logotype */}
