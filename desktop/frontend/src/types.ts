@@ -61,6 +61,14 @@ export interface ContentItem {
   UpdatedAt: string;
 }
 
+export interface ContentVersion {
+  ContentItemID: string;
+  Version: number;
+  Title: string;
+  Content: string;
+  CreatedAt: string;
+}
+
 export interface ReviewComment {
   ID: string;
   TargetType: TargetType;

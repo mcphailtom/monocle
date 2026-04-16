@@ -14,6 +14,7 @@ import { BaseRefPicker } from "./components/BaseRefPicker";
 import { ProjectPicker } from "./components/ProjectPicker";
 import { SessionPicker } from "./components/SessionPicker";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { VersionPicker } from "./components/VersionPicker";
 import { useKeyboard } from "./hooks/useKeyboard";
 import type {
   ReviewSession,
@@ -220,6 +221,15 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
   const [historyOpen, setHistoryOpen] = useState(false);
   const [baseRefPickerOpen, setBaseRefPickerOpen] = useState(false);
 
+  // Artifact version picker: tracks from/to versions per content item
+  const [versionPickerOpen, setVersionPickerOpen] = useState(false);
+  const [contentFromVersion, setContentFromVersion] = useState<
+    Record<string, number>
+  >({});
+  const [contentToVersion, setContentToVersion] = useState<
+    Record<string, number>
+  >({});
+
   // Confirm dialog (for destructive actions like clear and discard)
   const [confirmState, setConfirmState] = useState<{
     title: string;
@@ -280,30 +290,51 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     }
   }, []);
 
-  const loadContentItem = useCallback(async (id: string) => {
-    setDiff(null);
-    try {
-      const item = await api.getContentItem(id);
-      const contentPath = `content.${item?.ContentType || "md"}`;
-      setContentTitle(item?.Title ?? "");
-      if (item?.PreviousContent) {
-        const d = await api.getContentDiff(id);
-        if (d?.Hunks?.length) {
-          setDiff(d);
-          setViewMode("unified");
+  const loadContentItem = useCallback(
+    async (id: string) => {
+      setDiff(null);
+      try {
+        const item = await api.getContentItem(id);
+        const contentPath = `content.${item?.ContentType || "md"}`;
+        setContentTitle(item?.Title ?? "");
+
+        // If the user has picked a base version for this content item, always
+        // use the version-diff path.
+        const fromV = contentFromVersion[id];
+        const toV = contentToVersion[id];
+        if (fromV && toV) {
+          const d = await api.getContentDiffBetweenVersions(id, fromV, toV);
+          if (d?.Hunks?.length) {
+            setDiff(d);
+            setViewMode("unified");
+            return;
+          }
+          // Fall through if diff is empty (identical versions).
+          setDiff(textToDiffResult(item?.Content ?? "", contentPath));
+          setViewMode("file");
+          return;
+        }
+
+        if (item?.PreviousContent) {
+          const d = await api.getContentDiff(id);
+          if (d?.Hunks?.length) {
+            setDiff(d);
+            setViewMode("unified");
+          } else {
+            setDiff(textToDiffResult(item?.Content ?? "", contentPath));
+            setViewMode("file");
+          }
         } else {
           setDiff(textToDiffResult(item?.Content ?? "", contentPath));
           setViewMode("file");
         }
-      } else {
-        setDiff(textToDiffResult(item?.Content ?? "", contentPath));
-        setViewMode("file");
+      } catch {
+        setDiff(null);
+        setContentTitle("");
       }
-    } catch {
-      setDiff(null);
-      setContentTitle("");
-    }
-  }, []);
+    },
+    [contentFromVersion, contentToVersion],
+  );
 
   const loadAdditionalFile = useCallback(async (path: string) => {
     setDiff(null);
@@ -492,7 +523,9 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
       await api.clearReview();
       // ClearReview doesn't touch the active snapshot in the engine, but
       // if a clear is invoked mid-review we still want the UI in a clean
-      // state — rebuild from scratch.
+      // state — rebuild from scratch and drop any stale version-diff picks.
+      setContentFromVersion({});
+      setContentToVersion({});
       reloadCurrentView();
     } catch (err) {
       console.error("Failed to clear review:", err);
@@ -526,6 +559,22 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
       console.error("Failed to set auto ref:", err);
     }
   }, [loadSession, reloadCurrentView]);
+
+  const handleVersionSelect = useCallback(
+    (fromVersion: number, toVersion: number) => {
+      if (!selectedContentId) return;
+      setContentFromVersion((m) => ({ ...m, [selectedContentId]: fromVersion }));
+      setContentToVersion((m) => ({ ...m, [selectedContentId]: toVersion }));
+      // Reload with the new diff base.
+      loadContentItem(selectedContentId);
+    },
+    [selectedContentId, loadContentItem],
+  );
+
+  const openVersionPicker = useCallback(() => {
+    if (!selectedContentId) return;
+    setVersionPickerOpen(true);
+  }, [selectedContentId]);
 
   const handleSnapshotSelect = useCallback(
     async (snapshotID: number) => {
@@ -600,12 +649,23 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
           loadSession();
           loadFiles();
           break;
+        case "pick-version":
+          openVersionPicker();
+          break;
         case "history":
           setHistoryOpen(true);
           break;
       }
     },
-    [openReviewDialog, handleRequestPause, refreshStatus, handleClearReview, loadSession, loadFiles],
+    [
+      openReviewDialog,
+      handleRequestPause,
+      refreshStatus,
+      handleClearReview,
+      loadSession,
+      loadFiles,
+      openVersionPicker,
+    ],
   );
 
   // --- Initial load ---
@@ -1136,6 +1196,19 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
       when: () => !commentEditorOpen && !reviewDialogOpen && !helpOpen && !commandPaletteOpen && !baseRefPickerOpen,
     },
 
+    // Artifact version picker (Shift+B) — only when a content item is selected
+    {
+      key: "shift+b",
+      handler: openVersionPicker,
+      when: () =>
+        !!selectedContentId &&
+        !commentEditorOpen &&
+        !reviewDialogOpen &&
+        !helpOpen &&
+        !commandPaletteOpen &&
+        !versionPickerOpen,
+    },
+
     // Connection info (Shift+I)
     {
       key: "shift+i",
@@ -1292,6 +1365,16 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
             selectedFile={selectedPath || selectedContentId}
             baseRef={baseRef}
             activeSnapshot={activeSnapshot}
+            versionDiff={
+              selectedContentId &&
+              contentFromVersion[selectedContentId] &&
+              contentToVersion[selectedContentId]
+                ? {
+                    from: contentFromVersion[selectedContentId],
+                    to: contentToVersion[selectedContentId],
+                  }
+                : null
+            }
           />
         </div>
 
@@ -1353,6 +1436,17 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
         onSelect={handleBaseRefSelect}
         onAutoSelect={handleAutoRefSelect}
         onSelectSnapshot={handleSnapshotSelect}
+      />
+
+      {/* Artifact version picker */}
+      <VersionPicker
+        open={versionPickerOpen}
+        contentID={selectedContentId}
+        currentFromVersion={
+          selectedContentId ? (contentFromVersion[selectedContentId] ?? null) : null
+        }
+        onClose={() => setVersionPickerOpen(false)}
+        onSelect={handleVersionSelect}
       />
 
       {/* Destructive confirmation dialog */}

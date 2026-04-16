@@ -22,6 +22,7 @@ const COMMANDS = [
   { value: "mark-all-reviewed", label: "Mark all files reviewed", group: "Review" },
   { value: "mark-all-unreviewed", label: "Mark all files unreviewed", group: "Review" },
   { value: "discard", label: "Discard review", group: "Review" },
+  { value: "pick-version", label: "Select base version (content item)", group: "Content" },
   { value: "history", label: "View submission history", group: "Session" },
 ];
 
