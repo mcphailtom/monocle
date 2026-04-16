@@ -8,11 +8,51 @@ interface ToolbarProps {
   subscriberCount: number;
   connectionMode: string;
   feedbackStatus: string;
+  socketStarted: boolean;
+  waitingForReview: boolean;
+  agentName: string;
   sidebarHidden: boolean;
   onSelectProject: (path: string) => void;
 }
 
-export function Toolbar({ projectPath, subscriberCount, connectionMode, feedbackStatus, sidebarHidden, onSelectProject }: ToolbarProps) {
+type ConnState =
+  | { kind: "disconnected" }
+  | { kind: "waiting" } // socket ready, no agent
+  | { kind: "connected"; agent: string }
+  | { kind: "waiting_for_review"; connected: boolean };
+
+function deriveConnState(p: {
+  subscriberCount: number;
+  connectionMode: string;
+  feedbackStatus: string;
+  socketStarted: boolean;
+  waitingForReview: boolean;
+  agentName: string;
+}): ConnState {
+  const connected = p.subscriberCount > 0 || p.connectionMode === "queue";
+  if (p.waitingForReview || p.feedbackStatus === "waiting") {
+    return { kind: "waiting_for_review", connected };
+  }
+  if (connected) {
+    return { kind: "connected", agent: p.agentName };
+  }
+  if (p.socketStarted) {
+    return { kind: "waiting" };
+  }
+  return { kind: "disconnected" };
+}
+
+export function Toolbar({
+  projectPath,
+  subscriberCount,
+  connectionMode,
+  feedbackStatus,
+  socketStarted,
+  waitingForReview,
+  agentName,
+  sidebarHidden,
+  onSelectProject,
+}: ToolbarProps) {
   const projectName = projectPath.split("/").pop() || "Monocle";
   const [open, setOpen] = useState(false);
   const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
@@ -67,6 +107,15 @@ export function Toolbar({ projectPath, subscriberCount, connectionMode, feedback
       console.error("Failed to open directory dialog:", err);
     }
   }, [onSelectProject]);
+
+  const conn = deriveConnState({
+    subscriberCount,
+    connectionMode,
+    feedbackStatus,
+    socketStarted,
+    waitingForReview,
+    agentName,
+  });
 
   return (
     <div
@@ -142,32 +191,42 @@ export function Toolbar({ projectPath, subscriberCount, connectionMode, feedback
         )}
       </div>
 
-      {/* Right side: connection status (matches TUI statusbar.go) */}
-      {(() => {
-        const isConnected = subscriberCount > 0 || connectionMode === "queue";
-        return (
-          <div className="ml-auto flex items-center gap-1.5 no-drag text-[12px]">
-            {feedbackStatus === "waiting" ? (
-              <>
-                <span className={isConnected ? "text-ctp-yellow" : "text-ctp-yellow/60"}>
-                  {isConnected ? "●" : "○"}
-                </span>
-                <span className="text-ctp-yellow">Waiting for Review</span>
-              </>
-            ) : isConnected ? (
-              <>
-                <span className="text-ctp-green">●</span>
-                <span className="text-ctp-green">Connected</span>
-              </>
-            ) : (
-              <>
-                <span className="text-muted-foreground">○</span>
-                <span className="text-muted-foreground">Waiting</span>
-              </>
+      {/* Connection status — 4-state matrix matching TUI statusbar.go */}
+      <div className="ml-auto flex items-center gap-1.5 no-drag text-[12px]">
+        {conn.kind === "disconnected" && (
+          <>
+            <span className="text-ctp-red">●</span>
+            <span className="text-ctp-red">Disconnected</span>
+          </>
+        )}
+        {conn.kind === "waiting" && (
+          <>
+            <span className="text-muted-foreground">○</span>
+            <span className="text-muted-foreground">Waiting</span>
+          </>
+        )}
+        {conn.kind === "connected" && (
+          <>
+            <span className="text-ctp-green">●</span>
+            <span className="text-ctp-green">Connected</span>
+            {conn.agent && (
+              <span className="text-ctp-green/80">&middot; {conn.agent}</span>
             )}
-          </div>
-        );
-      })()}
+          </>
+        )}
+        {conn.kind === "waiting_for_review" && (
+          <>
+            <span
+              className={
+                conn.connected ? "text-ctp-yellow" : "text-ctp-yellow/60"
+              }
+            >
+              {conn.connected ? "●" : "○"}
+            </span>
+            <span className="text-ctp-yellow">Waiting for Review</span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
