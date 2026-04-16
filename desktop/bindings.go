@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/josephschmitt/monocle/internal/adapters"
 	"github.com/josephschmitt/monocle/internal/core"
@@ -551,6 +554,71 @@ func (a *App) GetSocketPath() string {
 		return ""
 	}
 	return a.engine.GetSocketPath()
+}
+
+// --- External editor ---
+
+// OpenExternalEditor writes initialText to a temp markdown file, launches the
+// user's preferred editor, and returns the edited content after the editor
+// exits. Prefers $VISUAL/$EDITOR (which must be a GUI editor with a wait
+// flag, e.g. `code --wait`); falls back to `open -t -W` on macOS (default text
+// editor) so the feature works out of the box without configuration.
+func (a *App) OpenExternalEditor(initialText string) (string, error) {
+	tmp, err := os.CreateTemp("", "monocle-edit-*.md")
+	if err != nil {
+		return "", fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+
+	if _, err := tmp.WriteString(initialText); err != nil {
+		tmp.Close()
+		return "", fmt.Errorf("write temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return "", fmt.Errorf("close temp file: %w", err)
+	}
+
+	name, args, err := resolveExternalEditor()
+	if err != nil {
+		return "", err
+	}
+	args = append(args, tmpPath)
+
+	cmd := exec.Command(name, args...)
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("editor exited: %w", err)
+	}
+
+	content, err := os.ReadFile(tmpPath)
+	if err != nil {
+		return "", fmt.Errorf("read edited file: %w", err)
+	}
+	return string(content), nil
+}
+
+// resolveExternalEditor returns the editor command + args for the desktop app.
+// Order of preference:
+//  1. $VISUAL — should be a GUI editor that blocks (e.g. `code --wait`).
+//  2. $EDITOR — same requirement.
+//  3. macOS: `open -t -W` (default text editor, blocks until it exits).
+//
+// Terminal editors (vim/nano) don't work here because the desktop app has no
+// TTY; setting $VISUAL to `vim` will fail to run.
+func resolveExternalEditor() (string, []string, error) {
+	for _, env := range []string{"VISUAL", "EDITOR"} {
+		if val := os.Getenv(env); val != "" {
+			parts := strings.Fields(val)
+			if len(parts) == 0 {
+				continue
+			}
+			return parts[0], parts[1:], nil
+		}
+	}
+	if runtime.GOOS == "darwin" {
+		return "open", []string{"-t", "-W"}, nil
+	}
+	return "", nil, fmt.Errorf("no editor configured: set $VISUAL or $EDITOR to a GUI editor with a wait flag (e.g. 'code --wait')")
 }
 
 // --- Config ---

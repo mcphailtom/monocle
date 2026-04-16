@@ -8,6 +8,7 @@ import {
 } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
+import { api } from "../api";
 import type { CommentType, ReviewComment } from "../types";
 
 const COMMENT_TYPES: {
@@ -91,6 +92,22 @@ export function CommentEditor({
     });
   }, []);
 
+  const [editorError, setEditorError] = useState<string | null>(null);
+
+  const openInExternalEditor = useCallback(async () => {
+    setEditorError(null);
+    try {
+      const edited = await api.openExternalEditor(body);
+      // Strip a trailing newline appended by most editors on save.
+      setBody(edited.replace(/\n$/, ""));
+      // Refocus the dialog textarea so keyboard shortcuts continue to work.
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setEditorError(msg);
+    }
+  }, [body]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Tab" && !e.shiftKey) {
@@ -101,12 +118,16 @@ export function CommentEditor({
         e.preventDefault();
         handleSave();
       }
+      if (e.key === "g" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        void openInExternalEditor();
+      }
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
       }
     },
-    [cycleType, handleSave, onClose],
+    [cycleType, handleSave, onClose, openInExternalEditor],
   );
 
   const lineLabel =
@@ -158,12 +179,27 @@ export function CommentEditor({
           className="min-h-[120px] text-sm font-mono"
         />
 
+        {editorError && (
+          <div className="text-xs text-destructive">{editorError}</div>
+        )}
+
         <DialogFooter>
           <div className="flex items-center justify-between w-full">
             <span className="text-[10px] text-muted-foreground">
-              {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}Enter to save<span className="mx-2">&middot;</span>Esc to cancel
+              {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}Enter to save
+              <span className="mx-2">&middot;</span>
+              {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}G for external editor
+              <span className="mx-2">&middot;</span>Esc to cancel
             </span>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void openInExternalEditor()}
+                title="Open in $VISUAL/$EDITOR"
+              >
+                Editor
+              </Button>
               <Button variant="outline" size="sm" onClick={onClose}>
                 Cancel
               </Button>

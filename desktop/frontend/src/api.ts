@@ -114,6 +114,9 @@ declare global {
           GetSubscriberCount(): Promise<number>;
           GetSocketPath(): Promise<string>;
 
+          // External editor
+          OpenExternalEditor(initialText: string): Promise<string>;
+
           // Config
           GetConfig(): Promise<Config | null>;
         };
@@ -215,6 +218,9 @@ export const api = {
   // Connection
   getSubscriberCount: () => app().GetSubscriberCount(),
   getSocketPath: () => app().GetSocketPath(),
+
+  // External editor
+  openExternalEditor: (initialText: string) => app().OpenExternalEditor(initialText),
 
   // Config
   getConfig: () => app().GetConfig(),

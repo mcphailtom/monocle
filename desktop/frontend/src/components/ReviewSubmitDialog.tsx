@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,6 +8,7 @@ import {
 } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
+import { api } from "../api";
 import type { ReviewSummary, SubmitAction } from "../types";
 
 interface ReviewSubmitDialogProps {
@@ -40,6 +41,8 @@ export function ReviewSubmitDialog({
 }: ReviewSubmitDialogProps) {
   const [action, setAction] = useState<SubmitAction>("request_changes");
   const [body, setBody] = useState("");
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -60,6 +63,18 @@ export function ReviewSubmitDialog({
     onClose();
   }, [action, body, onCopyToClipboard, onClose]);
 
+  const openInExternalEditor = useCallback(async () => {
+    setEditorError(null);
+    try {
+      const edited = await api.openExternalEditor(body);
+      setBody(edited.replace(/\n$/, ""));
+      setTimeout(() => textareaRef.current?.focus(), 50);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setEditorError(msg);
+    }
+  }, [body]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -70,12 +85,16 @@ export function ReviewSubmitDialog({
         e.preventDefault();
         handleCopy();
       }
+      if (e.key === "g" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        void openInExternalEditor();
+      }
       if (e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
         setAction((a) => (a === "approve" ? "request_changes" : "approve"));
       }
     },
-    [handleSubmit, handleCopy],
+    [handleSubmit, handleCopy, openInExternalEditor],
   );
 
   const totalComments =
@@ -140,18 +159,37 @@ export function ReviewSubmitDialog({
 
         {/* Optional body */}
         <Textarea
+          ref={textareaRef}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           placeholder="Additional comments (optional)..."
           className="min-h-[80px] text-sm font-mono"
         />
 
+        {editorError && (
+          <div className="text-xs text-destructive">{editorError}</div>
+        )}
+
         <DialogFooter>
           <div className="flex items-center justify-between w-full">
             <span className="text-[10px] text-muted-foreground">
-              Tab to toggle &middot; {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}Enter to submit &middot; {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}Y to copy
+              Tab to toggle
+              <span className="mx-2">&middot;</span>
+              {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}Enter to submit
+              <span className="mx-2">&middot;</span>
+              {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}Y to copy
+              <span className="mx-2">&middot;</span>
+              {navigator.platform?.includes("Mac") ? "⌘" : "Ctrl+"}G for editor
             </span>
             <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void openInExternalEditor()}
+                title="Open in $VISUAL/$EDITOR"
+              >
+                Editor
+              </Button>
               <Button variant="outline" size="sm" onClick={onClose}>
                 Cancel
               </Button>
