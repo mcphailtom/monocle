@@ -27,6 +27,7 @@ import type {
   Config,
   DiffLine,
   SessionSummary,
+  ReviewSnapshot,
 } from "./types";
 
 type FocusTarget = "sidebar" | "main";
@@ -190,6 +191,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
   const [connectionMode, setConnectionMode] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState("");
   const [baseRef, setBaseRef] = useState("");
+  const [activeSnapshot, setActiveSnapshot] = useState<ReviewSnapshot | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("unified");
   const [contentTitle, setContentTitle] = useState("");
   const [wrap, setWrap] = useState(false);
@@ -228,12 +230,16 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
 
   const loadSession = useCallback(async () => {
     try {
-      const [s, isAuto, ref] = await Promise.all([
+      const [s, isAuto, ref, snap] = await Promise.all([
         api.getSession(),
         api.isAutoAdvanceRef(),
         api.selectedBaseRef(),
+        api.getActiveSnapshot(),
       ]);
       setSession(s);
+      setActiveSnapshot(snap);
+      // When a snapshot is active, it wins over the ref display — the status
+      // bar uses activeSnapshot directly.
       setBaseRef(isAuto ? "HEAD" : ref || s?.BaseRef || "");
     } catch {
       // Bindings not ready
@@ -481,25 +487,44 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
   const handleBaseRefSelect = useCallback(
     async (ref: string) => {
       try {
+        // Selecting a git ref clears snapshot-based diffing.
+        await api.clearSnapshotBase();
         await api.setBaseRef(ref);
         await api.refreshChangedFiles();
+        await loadSession();
         reloadCurrentView();
       } catch (err) {
         console.error("Failed to set base ref:", err);
       }
     },
-    [reloadCurrentView],
+    [loadSession, reloadCurrentView],
   );
 
   const handleAutoRefSelect = useCallback(async () => {
     try {
+      await api.clearSnapshotBase();
       await api.setAutoAdvanceRef(true);
       await api.refreshChangedFiles();
+      await loadSession();
       reloadCurrentView();
     } catch (err) {
       console.error("Failed to set auto ref:", err);
     }
-  }, [reloadCurrentView]);
+  }, [loadSession, reloadCurrentView]);
+
+  const handleSnapshotSelect = useCallback(
+    async (snapshotID: number) => {
+      try {
+        await api.setSnapshotBase(snapshotID);
+        await api.refreshChangedFiles();
+        await loadSession();
+        reloadCurrentView();
+      } catch (err) {
+        console.error("Failed to set snapshot base:", err);
+      }
+    },
+    [loadSession, reloadCurrentView],
+  );
 
   const toggleFocusMode = useCallback(() => {
     if (!sidebarHidden) {
@@ -1221,6 +1246,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
             feedbackStatus={feedbackStatus}
             selectedFile={selectedPath || selectedContentId}
             baseRef={baseRef}
+            activeSnapshot={activeSnapshot}
           />
         </div>
 
@@ -1281,6 +1307,7 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
         onClose={() => setBaseRefPickerOpen(false)}
         onSelect={handleBaseRefSelect}
         onAutoSelect={handleAutoRefSelect}
+        onSelectSnapshot={handleSnapshotSelect}
       />
     </div>
   );

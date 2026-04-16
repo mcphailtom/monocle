@@ -9,36 +9,13 @@ import {
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
 import type { SessionSummary } from "../types";
+import { humanizeAgo } from "../lib/time";
 
 interface SessionPickerProps {
   open: boolean;
   sessions: SessionSummary[];
   onResume: (sessionID: string) => void;
   onNew: () => void;
-}
-
-function relativeTime(iso: string): string {
-  try {
-    const t = new Date(iso).getTime();
-    const now = Date.now();
-    const diff = now - t;
-    const min = 60_000;
-    const hour = 60 * min;
-    const day = 24 * hour;
-    if (diff < min) return "just now";
-    if (diff < hour) {
-      const m = Math.floor(diff / min);
-      return m === 1 ? "1m ago" : `${m}m ago`;
-    }
-    if (diff < day) {
-      const h = Math.floor(diff / hour);
-      return h === 1 ? "1h ago" : `${h}h ago`;
-    }
-    const d = Math.floor(diff / day);
-    return d === 1 ? "1d ago" : `${d}d ago`;
-  } catch {
-    return "";
-  }
 }
 
 export function SessionPicker({ open, sessions, onResume, onNew }: SessionPickerProps) {
@@ -117,7 +94,7 @@ export function SessionPicker({ open, sessions, onResume, onNew }: SessionPicker
                   <span className="truncate">
                     R{s.ReviewRound} · {s.FileCount} file{s.FileCount !== 1 ? "s" : ""} ·{" "}
                     {s.CommentCount} comment{s.CommentCount !== 1 ? "s" : ""} ·{" "}
-                    {relativeTime(s.UpdatedAt)}
+                    {humanizeAgo(s.UpdatedAt)}
                   </span>
                 </button>
               );

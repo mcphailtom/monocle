@@ -119,6 +119,26 @@ export interface ReviewSummary {
   PraiseCt: number;
 }
 
+export interface SnapshotFile {
+  Path: string;
+  Status: FileChangeStatus;
+  Reviewed: boolean;
+  BlobSHA: string;
+  Content: string;
+}
+
+export interface ReviewSnapshot {
+  ID: number;
+  SessionID: string;
+  SubmissionID: string;
+  ReviewRound: number;
+  HeadRef: string;
+  BaseRef: string;
+  Files: SnapshotFile[];
+  FilesByPath: Record<string, SnapshotFile | null>;
+  CreatedAt: string;
+}
+
 export interface SessionSummary {
   ID: string;
   Agent: string;

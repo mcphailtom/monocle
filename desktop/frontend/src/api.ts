@@ -15,6 +15,7 @@ import type {
   SubmitResult,
   Config,
   RecentProject,
+  ReviewSnapshot,
   TargetType,
   CommentType,
   FileChangedEvent,
@@ -95,6 +96,13 @@ declare global {
           IsAutoAdvanceRef(): Promise<boolean>;
           SelectedBaseRef(): Promise<string>;
           RecentCommits(n: number): Promise<LogEntry[]>;
+
+          // Snapshots
+          GetSnapshots(): Promise<ReviewSnapshot[] | null>;
+          SetSnapshotBase(snapshotID: number): Promise<void>;
+          ClearSnapshotBase(): Promise<void>;
+          GetActiveSnapshot(): Promise<ReviewSnapshot | null>;
+          HasSnapshots(): Promise<boolean>;
 
           // Feedback
           GetFeedbackStatus(): Promise<string>;
@@ -190,6 +198,13 @@ export const api = {
   isAutoAdvanceRef: () => app().IsAutoAdvanceRef(),
   selectedBaseRef: () => app().SelectedBaseRef(),
   recentCommits: (n: number) => app().RecentCommits(n),
+
+  // Snapshots
+  getSnapshots: () => app().GetSnapshots(),
+  setSnapshotBase: (snapshotID: number) => app().SetSnapshotBase(snapshotID),
+  clearSnapshotBase: () => app().ClearSnapshotBase(),
+  getActiveSnapshot: () => app().GetActiveSnapshot(),
+  hasSnapshots: () => app().HasSnapshots(),
 
   // Feedback
   getFeedbackStatus: () => app().GetFeedbackStatus(),

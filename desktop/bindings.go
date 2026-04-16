@@ -455,6 +455,43 @@ type LogEntry struct {
 	Subject string `json:"subject"`
 }
 
+// --- Review snapshots ---
+
+func (a *App) GetSnapshots() ([]types.ReviewSnapshot, error) {
+	if a.engine == nil {
+		return nil, nil
+	}
+	return a.engine.GetSnapshots()
+}
+
+func (a *App) SetSnapshotBase(snapshotID int) error {
+	if a.engine == nil {
+		return errNoEngine
+	}
+	return a.engine.SetSnapshotBase(snapshotID)
+}
+
+func (a *App) ClearSnapshotBase() {
+	if a.engine == nil {
+		return
+	}
+	a.engine.ClearSnapshotBase()
+}
+
+func (a *App) GetActiveSnapshot() *types.ReviewSnapshot {
+	if a.engine == nil {
+		return nil
+	}
+	return a.engine.GetActiveSnapshot()
+}
+
+func (a *App) HasSnapshots() (bool, error) {
+	if a.engine == nil {
+		return false, nil
+	}
+	return a.engine.HasSnapshots()
+}
+
 func (a *App) RecentCommits(n int) ([]LogEntry, error) {
 	if a.engine == nil {
 		return nil, nil
