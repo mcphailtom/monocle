@@ -28,6 +28,7 @@ const COMMANDS = [
   { value: "register-mcp", label: "Register MCP with Claude Code…", group: "Session" },
   { value: "cycle-layout", label: "Cycle layout (auto / side-by-side / stacked)", group: "View" },
   { value: "history", label: "View submission history", group: "Session" },
+  { value: "settings", label: "Settings…", group: "Session" },
 ];
 
 export function CommandPalette({

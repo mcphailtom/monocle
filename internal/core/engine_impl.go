@@ -1763,6 +1763,21 @@ func (e *Engine) SaveConfig() error {
 	return SaveConfig(e.cfg)
 }
 
+// UpdateConfig replaces the live configuration in-place and persists it.
+// Fields are copied into the existing *types.Config so any callers that
+// retained a pointer from GetConfig continue to see the updated values.
+func (e *Engine) UpdateConfig(cfg *types.Config) error {
+	if cfg == nil {
+		return fmt.Errorf("update config: nil config")
+	}
+	if e.cfg == nil {
+		e.cfg = cfg
+	} else {
+		*e.cfg = *cfg
+	}
+	return SaveConfig(e.cfg)
+}
+
 func (e *Engine) Shutdown() {
 	_ = e.server.Shutdown()
 }

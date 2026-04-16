@@ -151,6 +151,7 @@ type EngineAPI interface {
 	// Config
 	GetConfig() *types.Config
 	SaveConfig() error
+	UpdateConfig(cfg *types.Config) error
 	IsReviewTrackingEnabled() bool
 
 	// Lifecycle

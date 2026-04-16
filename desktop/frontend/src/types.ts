@@ -179,6 +179,11 @@ export interface Config {
   auto_focus_mode: boolean;
   mouse: boolean | null;
   min_diff_width: number;
+  // TUI-only fields — present here to preserve on round-trip saves, but the
+  // Settings dialog intentionally does not surface them (documented in DESIGN.md).
+  comment_expand: boolean | null;
+  comment_expand_delay: number;
+  mark_reviewed_on_submit: string; // "all" | "commented" | "manual"
 }
 
 // --- Desktop-only types (from desktop/bindings.go, has json tags) ---

@@ -135,6 +135,7 @@ declare global {
 
           // Config
           GetConfig(): Promise<Config | null>;
+          SaveConfig(cfg: Config): Promise<void>;
         };
       };
     };
@@ -255,6 +256,7 @@ export const api = {
 
   // Config
   getConfig: () => app().GetConfig(),
+  saveConfig: (cfg: Config) => app().SaveConfig(cfg),
 } as const;
 
 // --- Events ---
