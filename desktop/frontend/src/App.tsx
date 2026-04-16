@@ -405,19 +405,6 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     }
   }, []);
 
-  const handleSubmitReview = useCallback(
-    async (action: string, body: string) => {
-      try {
-        await api.submit(action, body);
-        loadSession();
-        refreshStatus();
-      } catch (err) {
-        console.error("Failed to submit review:", err);
-      }
-    },
-    [loadSession, refreshStatus],
-  );
-
   const handleRequestPause = useCallback(async () => {
     try {
       await api.requestPause();
@@ -474,15 +461,34 @@ function ReviewUI({ projectPath, onSelectProject }: { projectPath: string; onSel
     }
   }, [reloadCurrentView]);
 
+  const handleSubmitReview = useCallback(
+    async (action: string, body: string) => {
+      try {
+        await api.submit(action, body);
+        // The engine auto-activates the new snapshot on request_changes.
+        // Refresh files + session so the UI picks up the snapshot-based diff,
+        // then reload the current view to replace any stale diff.
+        await api.refreshChangedFiles();
+        refreshStatus();
+        reloadCurrentView();
+      } catch (err) {
+        console.error("Failed to submit review:", err);
+      }
+    },
+    [refreshStatus, reloadCurrentView],
+  );
+
   const handleClearReview = useCallback(async () => {
     try {
       await api.clearReview();
-      loadSession();
-      loadFiles();
+      // ClearReview doesn't touch the active snapshot in the engine, but
+      // if a clear is invoked mid-review we still want the UI in a clean
+      // state — rebuild from scratch.
+      reloadCurrentView();
     } catch (err) {
       console.error("Failed to clear review:", err);
     }
-  }, [loadSession, loadFiles]);
+  }, [reloadCurrentView]);
 
   const handleBaseRefSelect = useCallback(
     async (ref: string) => {
