@@ -204,6 +204,9 @@ function ReviewUI({
   const [subscriberCount, setSubscriberCount] = useState(0);
   const [connectionMode, setConnectionMode] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState("");
+  const [socketStarted, setSocketStarted] = useState(false);
+  const [waitStatus, setWaitStatus] = useState("");
+  const [pauseStatus, setPauseStatus] = useState("");
   const [baseRef, setBaseRef] = useState("");
   const [activeSnapshot, setActiveSnapshot] = useState<ReviewSnapshot | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("unified");
@@ -370,12 +373,14 @@ function ReviewUI({
 
   const refreshStatus = useCallback(async () => {
     try {
-      const [count, status] = await Promise.all([
+      const [count, status, sockPath] = await Promise.all([
         api.getSubscriberCount(),
         api.getFeedbackStatus(),
+        api.getSocketPath(),
       ]);
       setSubscriberCount(count);
       setFeedbackStatus(status);
+      setSocketStarted(sockPath !== "");
     } catch {
       // ignore
     }
@@ -733,6 +738,12 @@ function ReviewUI({
       }),
       onEvent("feedback_picked_up", () => {
         setFeedbackStatus("none");
+      }),
+      onEvent("pause_changed", (data) => {
+        setPauseStatus(data.status ?? "");
+      }),
+      onEvent("wait_status_changed", (data) => {
+        setWaitStatus(data.status ?? "");
       }),
     ];
     return () => unsubs.forEach((u) => u());
@@ -1298,6 +1309,13 @@ function ReviewUI({
             subscriberCount={subscriberCount}
             connectionMode={connectionMode}
             feedbackStatus={feedbackStatus}
+            socketStarted={socketStarted}
+            waitingForReview={
+              waitStatus === "waiting" ||
+              feedbackStatus === "waiting" ||
+              pauseStatus === "paused"
+            }
+            agentName={session?.Agent ?? ""}
             sidebarHidden={sidebarHidden}
             onSelectProject={onSelectProject}
           />
@@ -1390,6 +1408,7 @@ function ReviewUI({
           <StatusBar
             session={session}
             feedbackStatus={feedbackStatus}
+            pauseStatus={pauseStatus}
             selectedFile={selectedPath || selectedContentId}
             baseRef={baseRef}
             activeSnapshot={activeSnapshot}
@@ -1403,6 +1422,8 @@ function ReviewUI({
                   }
                 : null
             }
+            viewMode={viewMode}
+            selectedContentId={selectedContentId}
             nonGitMode={nonGitMode}
           />
         </div>
