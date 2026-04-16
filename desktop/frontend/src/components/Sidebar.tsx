@@ -48,6 +48,8 @@ interface SidebarProps {
   onCursorChange: (cursor: number) => void;
   onItemsChange?: (items: SidebarItem[]) => void;
   onFocus?: () => void;
+  /** Called when the user clicks the "+" button in the Additional Files header. */
+  onAddAdditionalFiles?: () => void;
 }
 
 // --- Helpers ---
@@ -161,6 +163,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
   onCursorChange,
   onItemsChange,
   onFocus,
+  onAddAdditionalFiles,
 }, ref) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -359,6 +362,7 @@ export const Sidebar = forwardRef<SidebarHandle, SidebarProps>(function Sidebar(
                 if (el) itemRefs.current.set(index, el);
                 else itemRefs.current.delete(index);
               }}
+              onAddAdditionalFiles={onAddAdditionalFiles}
             />
           ))}
           {selectableCount === 0 && (
@@ -399,6 +403,7 @@ interface SidebarRowProps {
   isCursor: boolean;
   onClick: (index: number) => void;
   setRef: (el: HTMLDivElement | null) => void;
+  onAddAdditionalFiles?: () => void;
 }
 
 function SidebarRow({
@@ -408,12 +413,27 @@ function SidebarRow({
   isCursor,
   onClick,
   setRef,
+  onAddAdditionalFiles,
 }: SidebarRowProps) {
   if (item.kind === "section") {
+    const isAdditional = item.label === "Additional Files";
     return (
-      <div className="px-4 pt-3 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-        {item.label}
+      <div className="px-4 pt-3 pb-1 flex items-center text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+        <span>{item.label}</span>
         <span className="ml-1.5 text-muted-foreground/50">{item.count}</span>
+        {isAdditional && onAddAdditionalFiles && (
+          <button
+            className="ml-auto text-muted-foreground/60 hover:text-foreground transition-colors px-1 rounded hover:bg-secondary/50"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddAdditionalFiles();
+            }}
+            title="Add additional files"
+            aria-label="Add additional files"
+          >
+            +
+          </button>
+        )}
       </div>
     );
   }

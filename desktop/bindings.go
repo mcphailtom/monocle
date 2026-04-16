@@ -103,6 +103,16 @@ func (a *App) OpenDirectoryDialog() (string, error) {
 	})
 }
 
+// OpenAdditionalFilesDialog opens a native OS multi-file picker and returns
+// the selected absolute paths. Used by the "Add additional files" action to
+// let reviewers pull supplemental files (design docs, specs, etc.) into the
+// review without an agent push.
+func (a *App) OpenAdditionalFilesDialog() ([]string, error) {
+	return wailsRuntime.OpenMultipleFilesDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		Title: "Add Additional Files",
+	})
+}
+
 // openProjectFromMenu is called from the native File > Open Project menu item.
 // Opens the OS directory picker, initializes the engine, and notifies the
 // frontend via WindowExecJS (Wails EventsEmit is unreliable from menu goroutines).
@@ -309,6 +319,13 @@ func (a *App) GetAdditionalFileContent(absPath string) (string, error) {
 		return "", nil
 	}
 	return a.engine.GetAdditionalFileContent(absPath)
+}
+
+func (a *App) AddAdditionalPaths(paths []string) ([]types.AdditionalFile, error) {
+	if a.engine == nil {
+		return nil, errNoEngine
+	}
+	return a.engine.AddAdditionalPaths(paths)
 }
 
 // --- Commenting ---

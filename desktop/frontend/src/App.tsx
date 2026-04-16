@@ -635,6 +635,18 @@ function ReviewUI({
     setVersionPickerOpen(true);
   }, [selectedContentId]);
 
+  const handleAddAdditionalFiles = useCallback(async () => {
+    try {
+      const paths = await api.openAdditionalFilesDialog();
+      if (!paths || paths.length === 0) return;
+      await api.addAdditionalPaths(paths);
+      await loadFiles();
+      await loadSession();
+    } catch (err) {
+      console.error("Failed to add additional files:", err);
+    }
+  }, [loadFiles, loadSession]);
+
   const handleSnapshotSelect = useCallback(
     async (snapshotID: number) => {
       try {
@@ -720,6 +732,9 @@ function ReviewUI({
         case "pick-version":
           openVersionPicker();
           break;
+        case "add-additional-files":
+          await handleAddAdditionalFiles();
+          break;
         case "cycle-layout":
           setLayout((l) =>
             l === "auto" ? "side-by-side" : l === "side-by-side" ? "stacked" : "auto",
@@ -739,6 +754,7 @@ function ReviewUI({
       loadSession,
       loadFiles,
       openVersionPicker,
+      handleAddAdditionalFiles,
     ],
   );
 
@@ -1398,6 +1414,7 @@ function ReviewUI({
             onCursorChange={setSidebarCursor}
             onItemsChange={handleSidebarItems}
             onFocus={() => setFocus("sidebar")}
+            onAddAdditionalFiles={handleAddAdditionalFiles}
           />
       )}
 
