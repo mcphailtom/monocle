@@ -47,6 +47,7 @@ const SECTIONS = [
     title: "Diff View",
     bindings: [
       ["t", "Toggle unified/split diff view"],
+      ["T", "Cycle layout (auto / side-by-side / stacked)"],
       ["w", "Toggle line wrapping"],
       ["b", "Change base ref"],
       ["B", "Pick base version (content items)"],

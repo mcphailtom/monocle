@@ -34,6 +34,7 @@ import type {
 
 type FocusTarget = "sidebar" | "main";
 type ViewMode = "unified" | "split" | "file";
+type Layout = "auto" | "side-by-side" | "stacked";
 
 /** Convert plain text into a synthetic DiffResult with all-added lines. */
 function textToDiffResult(content: string, path: string): DiffResult {
@@ -212,7 +213,18 @@ function ReviewUI({
   const [viewMode, setViewMode] = useState<ViewMode>("unified");
   const [contentTitle, setContentTitle] = useState("");
   const [wrap, setWrap] = useState(false);
+  const [layout, setLayout] = useState<Layout>("auto");
+  const [windowWidth, setWindowWidth] = useState(
+    typeof window !== "undefined" ? window.innerWidth : 1280,
+  );
   const preFocusWrap = useRef(false);
+
+  // Track window width for auto-layout's min_diff_width threshold.
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Comment editor state
   const [commentEditorOpen, setCommentEditorOpen] = useState(false);
@@ -679,6 +691,11 @@ function ReviewUI({
         case "pick-version":
           openVersionPicker();
           break;
+        case "cycle-layout":
+          setLayout((l) =>
+            l === "auto" ? "side-by-side" : l === "side-by-side" ? "stacked" : "auto",
+          );
+          break;
         case "history":
           setHistoryOpen(true);
           break;
@@ -710,6 +727,8 @@ function ReviewUI({
       if (cfg.diff_style === "split") setViewMode("split");
       else if (cfg.diff_style === "file") setViewMode("file");
       if (cfg.wrap) setWrap(true);
+      if (cfg.layout === "side-by-side") setLayout("side-by-side");
+      else if (cfg.layout === "stacked") setLayout("stacked");
     }).catch(() => {});
   }, [loadSession, loadFiles, refreshStatus]);
 
@@ -1131,6 +1150,18 @@ function ReviewUI({
       when: () => !commentEditorOpen && !reviewDialogOpen,
     },
 
+    // Cycle layout (Shift+T): auto → side-by-side → stacked → auto
+    {
+      key: "shift+t",
+      handler: () => {
+        setLayout((l) =>
+          l === "auto" ? "side-by-side" : l === "side-by-side" ? "stacked" : "auto",
+        );
+      },
+      when: () =>
+        !commentEditorOpen && !reviewDialogOpen && !helpOpen && !commandPaletteOpen,
+    },
+
     // Half-page scroll (Ctrl+D / Ctrl+U — works from any pane)
     {
       key: "ctrl+d",
@@ -1279,9 +1310,23 @@ function ReviewUI({
 
   // --- Render ---
 
+  // Resolve the effective layout. In auto mode, fall back to stacked when the
+  // window is narrower than config.min_diff_width (default 80 cols ≈ 800px on
+  // desktop; the config field is in cols so scale by ~10px/col as a heuristic).
+  const minWidthCols = configRef.current?.min_diff_width ?? 80;
+  const minWidthPx = minWidthCols * 10;
+  const effectiveLayout: "horizontal" | "stacked" =
+    layout === "stacked"
+      ? "stacked"
+      : layout === "side-by-side"
+        ? "horizontal"
+        : windowWidth < minWidthPx
+          ? "stacked"
+          : "horizontal";
+
   return (
-    <div className="flex h-full">
-      {/* Sidebar — extends full height, behind traffic lights */}
+    <div className={effectiveLayout === "horizontal" ? "flex h-full" : "flex flex-col h-full"}>
+      {/* Sidebar — extends full height in horizontal, fixed top in stacked */}
       {!sidebarHidden && (
           <Sidebar
             ref={sidebarRef}
@@ -1294,6 +1339,7 @@ function ReviewUI({
             cursor={sidebarCursor}
             reviewFilter={reviewFilter}
             treeMode={treeMode}
+            orientation={effectiveLayout === "stacked" ? "row" : "column"}
             onSelect={handleSidebarSelect}
             onCursorChange={setSidebarCursor}
             onItemsChange={handleSidebarItems}
