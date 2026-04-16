@@ -450,14 +450,23 @@ function ReviewUI({
     setCommentEditorOpen(true);
   }, []);
 
+  // Held in a ref because handleMarkReviewed runs before advanceToNextUnreviewed
+  // is declared (they live in different sections of this component). The ref
+  // always points at the latest closure with up-to-date sidebar state.
+  const advanceToNextUnreviewedRef = useRef<() => boolean>(() => false);
+
   const handleMarkReviewed = useCallback(async () => {
     try {
+      // Track whether this keypress marks-as-reviewed vs. un-marks so we can
+      // decide whether to advance the cursor afterward.
+      let didMarkReviewed = false;
       if (selectedContentId) {
         const item = contentItems.find((c) => c.ID === selectedContentId);
         if (item?.Reviewed) {
           await api.unmarkContentReviewed(selectedContentId);
         } else {
           await api.markContentReviewed(selectedContentId);
+          didMarkReviewed = true;
         }
       } else if (selectedPath) {
         const file = files.find((f) => f.Path === selectedPath);
@@ -465,14 +474,25 @@ function ReviewUI({
           await api.unmarkReviewed(selectedPath);
         } else {
           await api.markReviewed(selectedPath);
+          didMarkReviewed = true;
         }
       }
-      loadSession();
-      loadFiles();
+      await loadSession();
+      await loadFiles();
+      if (didMarkReviewed) {
+        advanceToNextUnreviewedRef.current();
+      }
     } catch (err) {
       console.error("Failed to toggle reviewed:", err);
     }
-  }, [selectedPath, selectedContentId, files, contentItems, loadSession, loadFiles]);
+  }, [
+    selectedPath,
+    selectedContentId,
+    files,
+    contentItems,
+    loadSession,
+    loadFiles,
+  ]);
 
   const openReviewDialog = useCallback(async () => {
     try {
@@ -860,6 +880,30 @@ function ReviewUI({
     },
     [selectSidebarItemAt],
   );
+
+  // advanceToNextUnreviewed walks the current sidebar items forward from the
+  // cursor, looking for a file/content/additional item that isn't marked
+  // reviewed. Used after marking the current item reviewed — matches the TUI's
+  // nextUnreviewed() behavior (no wraparound, skip sections/dirs). Stored in
+  // the ref set up near handleMarkReviewed so earlier callbacks can invoke it.
+  advanceToNextUnreviewedRef.current = () => {
+    const items = sidebarItemsRef.current;
+    const start = sidebarCursor + 1;
+    for (let i = start; i < items.length; i++) {
+      const it = items[i];
+      if (it.kind === "section" || it.kind === "dir") continue;
+      const reviewed =
+        (it.kind === "file" && it.file.Reviewed) ||
+        (it.kind === "tree-file" && it.file.Reviewed) ||
+        (it.kind === "content" && it.item.Reviewed) ||
+        (it.kind === "additional" && it.file.Reviewed);
+      if (!reviewed) {
+        moveSidebarCursorTo(i);
+        return true;
+      }
+    }
+    return false;
+  };
 
   // --- Keyboard ---
 
