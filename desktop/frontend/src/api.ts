@@ -16,6 +16,7 @@ import type {
   Config,
   RecentProject,
   ReviewSnapshot,
+  ContentVersion,
   TargetType,
   CommentType,
   FileChangedEvent,
@@ -52,6 +53,12 @@ declare global {
           GetFileContent(path: string): Promise<string>;
           GetContentItem(id: string): Promise<ContentItem | null>;
           GetContentDiff(id: string): Promise<DiffResult | null>;
+          GetContentVersions(id: string): Promise<ContentVersion[] | null>;
+          GetContentDiffBetweenVersions(
+            id: string,
+            fromVersion: number,
+            toVersion: number,
+          ): Promise<DiffResult | null>;
 
           // Additional files
           GetAdditionalFiles(): Promise<AdditionalFile[]>;
@@ -158,6 +165,12 @@ export const api = {
   getFileContent: (path: string) => app().GetFileContent(path),
   getContentItem: (id: string) => app().GetContentItem(id),
   getContentDiff: (id: string) => app().GetContentDiff(id),
+  getContentVersions: (id: string) => app().GetContentVersions(id),
+  getContentDiffBetweenVersions: (
+    id: string,
+    fromVersion: number,
+    toVersion: number,
+  ) => app().GetContentDiffBetweenVersions(id, fromVersion, toVersion),
 
   // Additional files
   getAdditionalFiles: () => app().GetAdditionalFiles(),

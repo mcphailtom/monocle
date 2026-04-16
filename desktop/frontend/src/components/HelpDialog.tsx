@@ -49,6 +49,7 @@ const SECTIONS = [
       ["t", "Toggle unified/split diff view"],
       ["w", "Toggle line wrapping"],
       ["b", "Change base ref"],
+      ["B", "Pick base version (content items)"],
       ["F", "Toggle focus mode (hide sidebar, enable wrap)"],
       ["R", "Force reload files"],
     ],
@@ -76,6 +77,7 @@ const SECTIONS = [
       ["Tab", "Toggle action (approve / request changes)"],
       ["Ctrl+Enter", "Submit review"],
       ["Ctrl+Y", "Copy review to clipboard"],
+      ["Ctrl+G", "Edit body in $VISUAL/$EDITOR"],
       ["Escape", "Cancel"],
     ],
   },
@@ -84,6 +86,7 @@ const SECTIONS = [
     bindings: [
       ["Tab", "Cycle comment type"],
       ["Ctrl+Enter", "Save comment"],
+      ["Ctrl+G", "Edit body in $VISUAL/$EDITOR"],
       ["Escape", "Cancel"],
     ],
   },

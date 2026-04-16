@@ -279,6 +279,20 @@ func (a *App) GetContentDiff(id string) (*types.DiffResult, error) {
 	return a.engine.GetContentDiff(id)
 }
 
+func (a *App) GetContentVersions(id string) ([]types.ContentVersion, error) {
+	if a.engine == nil {
+		return nil, nil
+	}
+	return a.engine.GetContentVersions(id)
+}
+
+func (a *App) GetContentDiffBetweenVersions(id string, fromVersion, toVersion int) (*types.DiffResult, error) {
+	if a.engine == nil {
+		return nil, nil
+	}
+	return a.engine.GetContentDiffBetweenVersions(id, fromVersion, toVersion)
+}
+
 // --- Additional files ---
 
 func (a *App) GetAdditionalFiles() []types.AdditionalFile {

@@ -7,6 +7,7 @@ interface StatusBarProps {
   selectedFile: string;
   baseRef: string;
   activeSnapshot: ReviewSnapshot | null;
+  versionDiff: { from: number; to: number } | null;
 }
 
 export function StatusBar({
@@ -15,6 +16,7 @@ export function StatusBar({
   selectedFile,
   baseRef,
   activeSnapshot,
+  versionDiff,
 }: StatusBarProps) {
   const fileCount = session?.ChangedFiles?.length ?? 0;
   const contentCount = session?.ContentItems?.length ?? 0;
@@ -34,6 +36,11 @@ export function StatusBar({
         <span className="text-foreground font-mono">
           {selectedFile || "No file selected"}
         </span>
+        {versionDiff && (
+          <span className="text-ctp-mauve font-mono">
+            [v{versionDiff.from}→v{versionDiff.to} DIFF]
+          </span>
+        )}
         {feedbackStatus && feedbackStatus !== "none" && (
           <span className="text-ctp-yellow">{feedbackStatus}</span>
         )}
