@@ -30,6 +30,9 @@ type sidebarModel struct {
 
 	// Filter state: "" = show all, "unreviewed" = hide reviewed, "reviewed" = hide unreviewed
 	reviewFilter string
+
+	// reviewTracking: when false, hide all review indicators/counts/filters
+	reviewTracking bool
 }
 
 func newSidebarModel(keys *KeyMap) sidebarModel {
@@ -164,15 +167,20 @@ func (m sidebarModel) View() string {
 
 	linesUsed := 0
 
-	// Review Items section header (if any content items exist)
+	// Artifacts section header (if any content items exist)
 	if contentItemCt > 0 {
-		contentReviewed := 0
-		for _, item := range m.contentItems {
-			if item.Reviewed {
-				contentReviewed++
+		var header string
+		if m.reviewTracking {
+			contentReviewed := 0
+			for _, item := range m.contentItems {
+				if item.Reviewed {
+					contentReviewed++
+				}
 			}
+			header = fmt.Sprintf(" Artifacts  %d / %d", contentReviewed, contentItemCt)
+		} else {
+			header = fmt.Sprintf(" Artifacts  %d", contentItemCt)
 		}
-		header := fmt.Sprintf(" Review Items  %d / %d", contentReviewed, contentItemCt)
 		b.WriteString(sectionStyle.Render(header))
 		b.WriteString("\n")
 		linesUsed++
@@ -194,18 +202,23 @@ func (m sidebarModel) View() string {
 			}
 
 			fileCount := len(m.files)
-			reviewedCount := 0
-			for _, f := range m.files {
-				if f.Reviewed {
-					reviewedCount++
-				}
-			}
 			modeIndicator := ""
 			if m.treeMode {
 				modeIndicator = " "
 			}
-			filterIndicator := m.reviewFilterLabel()
-			header := fmt.Sprintf(" Files%s%s  %d / %d", modeIndicator, filterIndicator, reviewedCount, fileCount)
+			var header string
+			if m.reviewTracking {
+				reviewedCount := 0
+				for _, f := range m.files {
+					if f.Reviewed {
+						reviewedCount++
+					}
+				}
+				filterIndicator := m.reviewFilterLabel()
+				header = fmt.Sprintf(" Files%s%s  %d / %d", modeIndicator, filterIndicator, reviewedCount, fileCount)
+			} else {
+				header = fmt.Sprintf(" Files%s  %d", modeIndicator, fileCount)
+			}
 			b.WriteString(sectionStyle.Render(header))
 			b.WriteString("\n")
 			linesUsed++
@@ -224,14 +237,19 @@ func (m sidebarModel) View() string {
 				linesUsed++
 			}
 
-			reviewedCount := 0
-			for _, af := range m.additionalFiles {
-				if af.Reviewed {
-					reviewedCount++
+			var header string
+			if m.reviewTracking {
+				reviewedCount := 0
+				for _, af := range m.additionalFiles {
+					if af.Reviewed {
+						reviewedCount++
+					}
 				}
+				filterIndicator := m.reviewFilterLabel()
+				header = fmt.Sprintf(" Additional Files%s  %d / %d", filterIndicator, reviewedCount, additionalCt)
+			} else {
+				header = fmt.Sprintf(" Additional Files  %d", additionalCt)
 			}
-			filterIndicator := m.reviewFilterLabel()
-			header := fmt.Sprintf(" Additional Files%s  %d / %d", filterIndicator, reviewedCount, additionalCt)
 			b.WriteString(sectionStyle.Render(header))
 			b.WriteString("\n")
 			linesUsed++
@@ -269,18 +287,23 @@ func (m sidebarModel) View() string {
 	if contentItemCt == 0 {
 		var header strings.Builder
 		fileCount := len(m.files)
-		reviewedCount := 0
-		for _, f := range m.files {
-			if f.Reviewed {
-				reviewedCount++
-			}
-		}
 		modeIndicator := ""
 		if m.treeMode {
 			modeIndicator = " "
 		}
-		filterIndicator := m.reviewFilterLabel()
-		headerStr := fmt.Sprintf(" Files%s%s  %d / %d", modeIndicator, filterIndicator, reviewedCount, fileCount)
+		var headerStr string
+		if m.reviewTracking {
+			reviewedCount := 0
+			for _, f := range m.files {
+				if f.Reviewed {
+					reviewedCount++
+				}
+			}
+			filterIndicator := m.reviewFilterLabel()
+			headerStr = fmt.Sprintf(" Files%s%s  %d / %d", modeIndicator, filterIndicator, reviewedCount, fileCount)
+		} else {
+			headerStr = fmt.Sprintf(" Files%s  %d", modeIndicator, fileCount)
+		}
 		header.WriteString(sectionStyle.Render(headerStr))
 		header.WriteString("\n")
 		header.WriteString(b.String())
@@ -316,9 +339,12 @@ func (m sidebarModel) renderFileItem(f types.ChangedFile, selected bool) string 
 	styledStatus := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor)).Bold(true).Render(statusChar)
 
 	// Review status
-	reviewChar := "○"
-	if f.Reviewed {
-		reviewChar = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ea043")).Render("✓")
+	reviewChar := ""
+	if m.reviewTracking {
+		reviewChar = "○"
+		if f.Reviewed {
+			reviewChar = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ea043")).Render("✓")
+		}
 	}
 
 	// Recent indicator
@@ -336,11 +362,14 @@ func (m sidebarModel) renderFileItem(f types.ChangedFile, selected bool) string 
 	const iconSlack = 2
 
 	if selected && m.focused {
-		plainReview := "○"
-		if f.Reviewed {
-			plainReview = "✓"
+		right := " "
+		if m.reviewTracking {
+			plainReview := "○"
+			if f.Reviewed {
+				plainReview = "✓"
+			}
+			right = " " + plainReview + " "
 		}
-		right := " " + plainReview + " "
 		prefix := fmt.Sprintf(" %s %s%s ", statusChar, recentChar, glyph)
 		nameW := m.width - lipgloss.Width(prefix) - lipgloss.Width(right) - iconSlack
 		if nameW < 1 {
@@ -356,7 +385,10 @@ func (m sidebarModel) renderFileItem(f types.ChangedFile, selected bool) string 
 		leftPad = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render("▎")
 	}
 
-	right := " " + reviewChar + " "
+	right := " "
+	if m.reviewTracking {
+		right = " " + reviewChar + " "
+	}
 	prefix := fmt.Sprintf("%s%s %s%s ", leftPad, styledStatus, recentChar, icon)
 	nameW := m.width - lipgloss.Width(prefix) - lipgloss.Width(right) - iconSlack
 	if nameW < 1 {
@@ -434,9 +466,12 @@ func (m sidebarModel) renderTreeFileItem(item visibleItem, selected bool) string
 		statusColor = "7"
 	}
 
-	reviewChar := "○"
-	if f.Reviewed {
-		reviewChar = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ea043")).Render("✓")
+	reviewChar := ""
+	if m.reviewTracking {
+		reviewChar = "○"
+		if f.Reviewed {
+			reviewChar = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ea043")).Render("✓")
+		}
 	}
 
 	recentChar := " "
@@ -449,11 +484,14 @@ func (m sidebarModel) renderTreeFileItem(item visibleItem, selected bool) string
 	const iconSlack = 2
 
 	if selected && m.focused {
-		plainReview := "○"
-		if f.Reviewed {
-			plainReview = "✓"
+		right := " "
+		if m.reviewTracking {
+			plainReview := "○"
+			if f.Reviewed {
+				plainReview = "✓"
+			}
+			right = " " + plainReview + " "
 		}
-		right := " " + plainReview + " "
 		prefix := fmt.Sprintf(" %s%s %s%s ", indent, statusChar, recentChar, glyph)
 		nameW := m.width - lipgloss.Width(prefix) - lipgloss.Width(right) - iconSlack
 		if nameW < 1 {
@@ -470,7 +508,10 @@ func (m sidebarModel) renderTreeFileItem(item visibleItem, selected bool) string
 	}
 
 	styledStatus := lipgloss.NewStyle().Foreground(lipgloss.Color(statusColor)).Bold(true).Render(statusChar)
-	right := " " + reviewChar + " "
+	right := " "
+	if m.reviewTracking {
+		right = " " + reviewChar + " "
+	}
 	prefix := fmt.Sprintf("%s%s%s %s%s ", leftPad, indent, styledStatus, recentChar, icon)
 	nameW := m.width - lipgloss.Width(prefix) - lipgloss.Width(right) - iconSlack
 	if nameW < 1 {
@@ -481,9 +522,12 @@ func (m sidebarModel) renderTreeFileItem(item visibleItem, selected bool) string
 }
 
 func (m sidebarModel) renderContentItem(item types.ContentItem, selected bool) string {
-	reviewChar := "○"
-	if item.Reviewed {
-		reviewChar = "✓"
+	reviewChar := ""
+	if m.reviewTracking {
+		reviewChar = "○"
+		if item.Reviewed {
+			reviewChar = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ea043")).Render("✓")
+		}
 	}
 
 	// Build icon path from content type (e.g. "md" → "content.md")
@@ -500,11 +544,14 @@ func (m sidebarModel) renderContentItem(item types.ContentItem, selected bool) s
 	const iconSlack = 2
 
 	if selected && m.focused {
-		plainReview := reviewChar
-		if item.Reviewed {
-			plainReview = "+"
+		right := " "
+		if m.reviewTracking {
+			plainReview := "○"
+			if item.Reviewed {
+				plainReview = "✓"
+			}
+			right = " " + plainReview + " "
 		}
-		right := " " + plainReview + " "
 		prefix := fmt.Sprintf("  %s ", glyph)
 		nameW := m.width - lipgloss.Width(prefix) - lipgloss.Width(right) - iconSlack
 		if nameW < 1 {
@@ -519,7 +566,10 @@ func (m sidebarModel) renderContentItem(item types.ContentItem, selected bool) s
 	if selected {
 		leftPad = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render("▎")
 	}
-	right := " " + reviewChar + " "
+	right := " "
+	if m.reviewTracking {
+		right = " " + reviewChar + " "
+	}
 	prefix := fmt.Sprintf("%s %s ", leftPad, icon)
 	nameW := m.width - lipgloss.Width(prefix) - lipgloss.Width(right) - iconSlack
 	if nameW < 1 {
@@ -530,9 +580,12 @@ func (m sidebarModel) renderContentItem(item types.ContentItem, selected bool) s
 }
 
 func (m sidebarModel) renderAdditionalFileItem(af types.AdditionalFile, selected bool) string {
-	reviewChar := "○"
-	if af.Reviewed {
-		reviewChar = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ea043")).Render("✓")
+	reviewChar := ""
+	if m.reviewTracking {
+		reviewChar = "○"
+		if af.Reviewed {
+			reviewChar = lipgloss.NewStyle().Foreground(lipgloss.Color("#2ea043")).Render("✓")
+		}
 	}
 
 	icon := fileIcon(af.Path)
@@ -540,11 +593,14 @@ func (m sidebarModel) renderAdditionalFileItem(af types.AdditionalFile, selected
 	const iconSlack = 2
 
 	if selected && m.focused {
-		plainReview := "○"
-		if af.Reviewed {
-			plainReview = "✓"
+		right := " "
+		if m.reviewTracking {
+			plainReview := "○"
+			if af.Reviewed {
+				plainReview = "✓"
+			}
+			right = " " + plainReview + " "
 		}
-		right := " " + plainReview + " "
 		prefix := fmt.Sprintf("  %s ", glyph)
 		nameW := m.width - lipgloss.Width(prefix) - lipgloss.Width(right) - iconSlack
 		if nameW < 1 {
@@ -560,7 +616,10 @@ func (m sidebarModel) renderAdditionalFileItem(af types.AdditionalFile, selected
 		leftPad = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render("▎")
 	}
 
-	right := " " + reviewChar + " "
+	right := " "
+	if m.reviewTracking {
+		right = " " + reviewChar + " "
+	}
 	prefix := fmt.Sprintf("%s %s ", leftPad, icon)
 	nameW := m.width - lipgloss.Width(prefix) - lipgloss.Width(right) - iconSlack
 	if nameW < 1 {
@@ -701,6 +760,9 @@ func (m *sidebarModel) navigateFile(dir int) tea.Cmd {
 // mode. Returns a selectCurrent() command if found, or nil if there are no
 // unreviewed items ahead.
 func (m *sidebarModel) nextUnreviewed() tea.Cmd {
+	if !m.reviewTracking {
+		return nil
+	}
 	total := m.totalItems()
 	if total == 0 {
 		return nil
@@ -844,6 +906,89 @@ func (m *sidebarModel) selectPath(path string) {
 	}
 }
 
+// currentItemKey returns a (kind, id) pair identifying the cursor's item.
+// Kinds: "content", "dir", "file", "additional", or "" if none.
+func (m sidebarModel) currentItemKey() (kind, id string) {
+	contentCount := len(m.contentItems)
+	if m.cursor < contentCount {
+		if m.cursor >= 0 {
+			return "content", m.contentItems[m.cursor].ID
+		}
+		return "", ""
+	}
+	fileIdx := m.cursor - contentCount
+	if fileIdx < m.fileItemCount() {
+		if m.treeMode {
+			item := m.visibleItems[fileIdx]
+			if item.isDir {
+				return "dir", item.node.Path
+			}
+			if item.node.File != nil {
+				return "file", item.node.File.Path
+			}
+			return "", ""
+		}
+		return "file", m.files[fileIdx].Path
+	}
+	if af := m.selectedAdditionalFile(); af != nil {
+		return "additional", af.Path
+	}
+	return "", ""
+}
+
+// selectByKey moves the cursor to the item identified by (kind, id).
+// Returns false if no match.
+func (m *sidebarModel) selectByKey(kind, id string) bool {
+	if kind == "" || id == "" {
+		return false
+	}
+	contentCount := len(m.contentItems)
+	switch kind {
+	case "content":
+		for i, item := range m.contentItems {
+			if item.ID == id {
+				m.cursor = i
+				return true
+			}
+		}
+	case "dir":
+		if !m.treeMode {
+			return false
+		}
+		for i, item := range m.visibleItems {
+			if item.isDir && item.node.Path == id {
+				m.cursor = i + contentCount
+				return true
+			}
+		}
+	case "file":
+		if m.treeMode {
+			for i, item := range m.visibleItems {
+				if !item.isDir && item.node.File != nil && item.node.File.Path == id {
+					m.cursor = i + contentCount
+					return true
+				}
+			}
+		} else {
+			for i, f := range m.files {
+				if f.Path == id {
+					m.cursor = i + contentCount
+					return true
+				}
+			}
+		}
+	case "additional":
+		fileCount := m.fileItemCount()
+		for i, af := range m.additionalFiles {
+			if af.Path == id {
+				m.cursor = contentCount + fileCount + i
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // collapseAll collapses all directory nodes in the tree.
 func (m *sidebarModel) collapseAll() {
 	currentPath := ""
@@ -890,7 +1035,7 @@ func (m *sidebarModel) ensureVisible() {
 func sidebarHeaderLines(contentItemCount, additionalFileCount int) int {
 	h := 1 // "Files" header is always present
 	if contentItemCount > 0 {
-		h += 2 // "Review Items" header + blank separator before "Files"
+		h += 2 // "Artifacts" header + blank separator before "Files"
 	}
 	if additionalFileCount > 0 {
 		h += 2 // blank separator + "Additional Files" header
@@ -929,7 +1074,7 @@ func (m sidebarModel) itemAtLine(lineY int) int {
 		line++
 	}
 
-	// "Review Items" header (when content items exist)
+	// "Artifacts" header (when content items exist)
 	if contentItemCt > 0 {
 		if lineY == line {
 			return -1
@@ -1031,6 +1176,9 @@ func (m *sidebarModel) applyReviewedFilter() {
 
 // cycleReviewFilter advances the filter: "" → "unreviewed" → "reviewed" → "".
 func (m *sidebarModel) cycleReviewFilter() {
+	if !m.reviewTracking {
+		return
+	}
 	switch m.reviewFilter {
 	case "":
 		m.reviewFilter = "unreviewed"

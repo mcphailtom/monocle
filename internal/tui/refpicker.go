@@ -14,17 +14,19 @@ import (
 const refPickerPageSize = 20
 
 type refPickerModel struct {
-	entries    []core.LogEntry
-	snapshots  []types.ReviewSnapshot
-	cursor     int
-	offset     int // scroll offset for visible entries
-	width      int
-	height     int
-	active     bool
-	autoActive bool // whether auto-advance is currently on
-	hasMore    bool // true if last fetch returned a full page
-	loading    bool // true while loading more entries
-	theme      Theme
+	entries        []core.LogEntry
+	snapshots      []types.ReviewSnapshot
+	cursor         int
+	offset         int // scroll offset for visible entries
+	width          int
+	height         int
+	active         bool
+	autoActive     bool // whether auto-advance is currently on
+	snapshotActive   bool // whether a snapshot is the current diff base
+	activeSnapshotID int  // ID of the active snapshot (for checkmark)
+	hasMore        bool // true if last fetch returned a full page
+	loading        bool // true while loading more entries
+	theme          Theme
 }
 
 func newRefPickerModel(theme Theme) refPickerModel {
@@ -58,9 +60,15 @@ func (m refPickerModel) snapshotCount() int {
 	return len(m.snapshots)
 }
 
+// workingTreeCursor returns the cursor position of the "Working Tree" entry.
+// Layout: snapshots (0..N-1), working tree (N), commits (N+1..).
+func (m refPickerModel) workingTreeCursor() int {
+	return m.snapshotCount()
+}
+
 // commitStartCursor returns the cursor position of the first commit entry.
 func (m refPickerModel) commitStartCursor() int {
-	return 1 + m.snapshotCount() // 0=auto, then snapshots
+	return m.workingTreeCursor() + 1
 }
 
 func (m refPickerModel) maxCursor() int {
@@ -92,15 +100,14 @@ func (m refPickerModel) Update(msg tea.Msg) (refPickerModel, tea.Cmd) {
 			m.cursor = m.maxCursor()
 			m.ensureVisible()
 		case "enter":
-			if m.cursor == 0 {
-				// "Latest Changes" option
-				return m, func() tea.Msg { return selectRefMsg{auto: true} }
-			}
-			// Snapshot entries
-			if m.cursor >= 1 && m.cursor <= m.snapshotCount() {
-				snapIdx := m.cursor - 1
-				id := m.snapshots[snapIdx].ID
+			// Snapshot entries (top of list)
+			if m.cursor < m.snapshotCount() {
+				id := m.snapshots[m.cursor].ID
 				return m, func() tea.Msg { return selectSnapshotMsg{snapshotID: id} }
+			}
+			// "Working Tree" option
+			if m.cursor == m.workingTreeCursor() {
+				return m, func() tea.Msg { return selectRefMsg{auto: true} }
 			}
 			// "Load more..." option
 			commitStart := m.commitStartCursor()
@@ -138,35 +145,36 @@ func (m refPickerModel) View() string {
 	title := lipgloss.NewStyle().Bold(true).Render("Select Base Ref")
 	b.WriteString(title + "\n\n")
 
-	// "Latest Changes" option (was "Auto (follow HEAD)")
-	autoLabel := "  Latest Changes"
-	if m.autoActive {
-		autoLabel = "  Latest Changes ✓"
-	}
-	if m.cursor == 0 {
-		b.WriteString(lipgloss.NewStyle().Reverse(true).Render(autoLabel))
-	} else {
-		b.WriteString(autoLabel)
-	}
-	b.WriteString("\n")
-
-	// Snapshot entries
+	// Snapshot entries (listed first when they exist)
 	if len(m.snapshots) > 0 {
-		b.WriteString("\n")
 		faintSep := lipgloss.NewStyle().Faint(true)
 		b.WriteString(faintSep.Render("  Since Review") + "\n")
 		for i, snap := range m.snapshots {
 			label := fmt.Sprintf("  Round %d (%s)", snap.ReviewRound, relativeTime(snap.CreatedAt))
-			cursorPos := 1 + i
-			if m.cursor == cursorPos {
+			if m.snapshotActive && m.activeSnapshotID == snap.ID {
+				label += " ✓"
+			}
+			if m.cursor == i {
 				b.WriteString(lipgloss.NewStyle().Reverse(true).Render(label))
 			} else {
 				b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Render(label))
 			}
 			b.WriteString("\n")
 		}
+		b.WriteString("\n")
 	}
-	b.WriteString("\n")
+
+	// "Working Tree" option — shows git diff against base ref
+	wtLabel := "  Working Tree"
+	if m.autoActive && !m.snapshotActive {
+		wtLabel = "  Working Tree ✓"
+	}
+	if m.cursor == m.workingTreeCursor() {
+		b.WriteString(lipgloss.NewStyle().Reverse(true).Render(wtLabel))
+	} else {
+		b.WriteString(wtLabel)
+	}
+	b.WriteString("\n\n")
 
 	// Commit entries with scrolling
 	vh := m.viewportHeight()
@@ -252,35 +260,36 @@ func (m *refPickerModel) handleClick(contentY int) (tea.Cmd, bool) {
 	// Content layout:
 	// Line 0: "Select Base Ref"
 	// Line 1: blank
-	// Line 2: Latest Changes option
-	// Line 3: blank (or snapshot header if snapshots exist)
-	// Then: snapshot entries, blank, commit entries
+	// If snapshots: "Since Review" header, snapshot entries, blank
+	// "Working Tree" option, blank
+	// Commit entries
 
-	// Latest Changes option
-	if contentY == 2 {
-		m.cursor = 0
-		return func() tea.Msg { return selectRefMsg{auto: true} }, true
-	}
+	nextLine := 2 // after title + blank
 
 	// Snapshot entries (if any)
 	if len(m.snapshots) > 0 {
-		// Line 3: blank, Line 4: "Since Review" header, Lines 5+: snapshot entries
-		snapStartLine := 5
+		// "Since Review" header
+		nextLine++ // header line
+		snapStartLine := nextLine
 		for i := range m.snapshots {
 			if contentY == snapStartLine+i {
-				m.cursor = 1 + i
+				m.cursor = i
 				id := m.snapshots[i].ID
 				return func() tea.Msg { return selectSnapshotMsg{snapshotID: id} }, true
 			}
 		}
+		nextLine += len(m.snapshots) + 1 // entries + blank
 	}
 
-	// Commit entries
-	commitHeaderLines := 4 // title + blank + auto + blank
-	if len(m.snapshots) > 0 {
-		commitHeaderLines += 1 + len(m.snapshots) + 1 // header + entries + blank
+	// Working Tree option
+	if contentY == nextLine {
+		m.cursor = m.workingTreeCursor()
+		return func() tea.Msg { return selectRefMsg{auto: true} }, true
 	}
-	entryStartLine := commitHeaderLines
+	nextLine += 2 // option + blank
+
+	// Commit entries
+	entryStartLine := nextLine
 	if m.offset > 0 {
 		entryStartLine++ // "▲ more" indicator line
 	}
@@ -317,8 +326,7 @@ func (m refPickerModel) viewportHeight() int {
 // ensureVisible adjusts the scroll offset so the cursor stays within the
 // visible viewport.
 func (m *refPickerModel) ensureVisible() {
-	// cursor 0 is the "Latest Changes" option which is always visible above the list
-	// Snapshot entries are also always visible (not scrollable)
+	// Snapshot entries and "Working Tree" option are always visible above the list
 	commitStart := m.commitStartCursor()
 	if m.cursor < commitStart {
 		m.offset = 0
