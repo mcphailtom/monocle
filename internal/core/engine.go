@@ -82,6 +82,7 @@ type EngineAPI interface {
 	GetContentDiff(id string) (*types.DiffResult, error)
 	GetContentVersions(id string) ([]types.ContentVersion, error)
 	GetContentDiffBetweenVersions(id string, fromVersion, toVersion int) (*types.DiffResult, error)
+	DismissArtifact(id string) error
 
 	// Additional files
 	GetAdditionalFiles() []types.AdditionalFile
@@ -117,6 +118,13 @@ type EngineAPI interface {
 	SelectedBaseRef() string
 	RecentCommits(n int) ([]LogEntry, error)
 
+	// Review snapshots
+	GetSnapshots() ([]types.ReviewSnapshot, error)
+	SetSnapshotBase(snapshotID int) error
+	ClearSnapshotBase()
+	GetActiveSnapshot() *types.ReviewSnapshot
+	HasSnapshots() (bool, error)
+
 	// Server (socket for MCP channel)
 	StartServer(socketPath string) error
 
@@ -143,6 +151,7 @@ type EngineAPI interface {
 	// Config
 	GetConfig() *types.Config
 	SaveConfig() error
+	IsReviewTrackingEnabled() bool
 
 	// Lifecycle
 	Shutdown()

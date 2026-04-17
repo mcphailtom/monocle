@@ -227,13 +227,14 @@ func TestAdvanceRound(t *testing.T) {
 		t.Errorf("expected comment to still exist, got %d", len(comments))
 	}
 
-	// Content items should be cleared in memory and DB
-	if session.ContentItems != nil {
-		t.Errorf("expected ContentItems to be nil")
+	// Artifacts persist across rounds — reviewed/unreviewed state is managed
+	// by the submit-time mark/reset logic and periodic refresh.
+	if len(session.ContentItems) != 1 {
+		t.Errorf("expected ContentItems to be preserved across rounds, got %d", len(session.ContentItems))
 	}
 	dbItems, _ := sm.db.GetContentItems(session.ID)
-	if len(dbItems) != 0 {
-		t.Errorf("expected 0 content items in DB after advance, got %d", len(dbItems))
+	if len(dbItems) != 1 {
+		t.Errorf("expected artifact to remain in DB after advance, got %d", len(dbItems))
 	}
 }
 
