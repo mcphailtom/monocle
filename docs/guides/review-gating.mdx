@@ -3,29 +3,61 @@ title: "Review Gating"
 description: "Block your agent until you approve its plan or current work."
 ---
 
-Review gating lets you pause your agent's progress until you've had a chance to review. monocle provides two mechanisms: plan gating, which holds the agent at a specific content submission, and pause flow, which stops the agent mid-session at any point.
+Review gating lets you pause your agent's progress until you've had a chance to review. monocle provides three mechanisms: plan-mode hooks that gate plans before they execute, a turn-end review gate that pauses the agent after file edits, and pause flow that stops the agent mid-session at any point.
 
-## Plan gating with `/review-plan-wait`
+## Plan-mode hooks (Claude Code)
 
-The `/review-plan-wait` skill submits a plan to your TUI and blocks the agent until you respond.
+When you register Claude Code with monocle, it installs hook entries that intercept `ExitPlanMode`. Every time Claude produces a plan, monocle routes it through your TUI for approval before Claude executes it.
 
 <Steps>
-  <Step title="Agent submits a plan">
-    Your agent runs `/review-plan-wait`, which calls `monocle review send-artifact --wait` under the hood. The plan appears in the monocle sidebar.
+  <Step title="Claude enters plan mode">
+    The `PreToolUse` hook fires and injects context telling Claude its plan will be reviewed. Any pending feedback from prior rounds is included.
+  </Step>
+  <Step title="Claude finishes the plan">
+    The `PermissionRequest` hook fires on `ExitPlanMode`. monocle sends the plan to your TUI and blocks until you respond.
   </Step>
   <Step title="You review and respond">
-    Read the plan, leave any line-level comments (issues, suggestions, notes), and press `S` to submit your review. An empty review with no comments counts as an approval.
-  </Step>
-  <Step title="Agent receives your feedback">
-    If you approve, the agent unblocks and continues. If you request changes, the agent updates the plan and resubmits — the loop repeats until you're satisfied.
+    Read the plan, leave any comments, and press `S` to submit. **Approve** lets Claude proceed; **Request Changes** denies the exit and sends your feedback back to Claude.
   </Step>
 </Steps>
 
-This is content-level gating: you're reviewing a specific piece of content (the plan) before the agent acts on it.
+Plan-mode hooks are installed by default during `monocle register claude`. Opt out with `--no-plan-hook` or uncheck the toggle in the register wizard.
+
+### Plan gating with `/review-plan-wait`
+
+The `/review-plan-wait` skill provides an alternative plan gating mechanism that works with all agents, not just Claude Code. It calls `monocle review send-artifact --wait` under the hood — the plan appears in your sidebar and the agent blocks until you submit a review.
+
+Use `/review-plan-wait` when you want plan gating on agents other than Claude Code, or when you prefer skill-based gating over hooks.
+
+## Turn-end review gate (Claude Code)
+
+The turn-end review gate automatically pauses Claude at the end of any turn that included file edits. This gives you a chance to review every batch of changes before the next turn starts.
+
+<Steps>
+  <Step title="Claude edits files during a turn">
+    Each time Claude calls a write tool (`Edit`, `Write`, `NotebookEdit`, `MultiEdit`), the `PostToolUse` hook marks the session as having unreviewed changes.
+  </Step>
+  <Step title="Claude's turn ends">
+    The `Stop` hook fires. If the turn included file edits, monocle blocks and waits for your review. If it was a pure-chat turn with no edits, the hook exits immediately and Claude proceeds normally.
+  </Step>
+  <Step title="You review and respond">
+    Review the diffs, leave comments, and submit. **Approve** unblocks Claude for the next turn. **Request Changes** sends your feedback back to Claude.
+  </Step>
+</Steps>
+
+The turn-end review gate is installed by default during `monocle register claude`. Opt out with `--no-review-gate` or uncheck the toggle in the register wizard.
+
+<Note>
+  If monocle isn't running when a hook fires, the hook exits silently and Claude falls back to its default behavior. The hooks never hard-block the agent.
+</Note>
+
+<Warning>
+  Hooks don't fire when Claude is launched with `--dangerously-load-development-channels`. If you rely on MCP channels for push notifications, the hook toggles are no-ops at runtime.
+</Warning>
 
 ## Pause flow with `P`
 
-Pause flow lets you stop the agent at any point during a session — not just at a plan submission.
+Pause flow lets you stop the agent at any point during a session — not just at a plan submission or turn boundary.
 
 Press `P` in the monocle TUI to send a pause notification. The agent receives it, runs `monocle review get-feedback --wait`, and blocks until you submit your review.
 
@@ -42,9 +74,9 @@ Once you've reviewed and pressed `S` to submit, the agent unblocks and receives 
 
 ## Choosing the right mechanism
 
-| | Plan gating | Pause flow |
-|---|---|---|
-| **What it gates** | A specific plan or artifact | The agent's entire session |
-| **When it triggers** | Agent calls `/review-plan-wait` | You press `P` in the TUI |
-| **Agent support** | All agents | Claude Code only |
-| **Use when** | You want to review the plan before the agent writes code | You want to pause everything while you catch up |
+| | Plan-mode hooks | Turn-end review gate | Plan gating (`/review-plan-wait`) | Pause flow |
+|---|---|---|---|---|
+| **What it gates** | Plans before they execute | Every turn that edits files | A specific plan or artifact | The agent's entire session |
+| **When it triggers** | Claude exits plan mode | Claude's turn ends after file edits | Agent calls `/review-plan-wait` | You press `P` in the TUI |
+| **Agent support** | Claude Code only | Claude Code only | All agents | Claude Code only |
+| **Use when** | You want automatic plan review | You want to review every batch of edits | You want plan gating on any agent | You want to pause everything while you catch up |
