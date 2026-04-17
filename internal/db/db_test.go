@@ -279,6 +279,53 @@ func TestContentItems(t *testing.T) {
 	}
 }
 
+func TestDeleteContentItem(t *testing.T) {
+	d := testDB(t)
+	now := time.Now()
+	d.CreateSession(&types.ReviewSession{ID: "sess-1", Agent: "claude", RepoRoot: "/tmp", BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now})
+
+	a1 := &types.ContentItem{ID: "a", Title: "A v1", Content: "a1", ContentType: "markdown", CreatedAt: now, UpdatedAt: now}
+	a2 := &types.ContentItem{ID: "a", Title: "A v2", Content: "a2", ContentType: "markdown", CreatedAt: now, UpdatedAt: now}
+	b := &types.ContentItem{ID: "b", Title: "B", Content: "b1", ContentType: "markdown", CreatedAt: now, UpdatedAt: now}
+	if err := d.UpsertContentItem("sess-1", a1); err != nil {
+		t.Fatalf("upsert a v1: %v", err)
+	}
+	if err := d.UpsertContentItem("sess-1", a2); err != nil {
+		t.Fatalf("upsert a v2: %v", err)
+	}
+	if err := d.UpsertContentItem("sess-1", b); err != nil {
+		t.Fatalf("upsert b: %v", err)
+	}
+
+	if err := d.DeleteContentItem("sess-1", "a"); err != nil {
+		t.Fatalf("delete content item: %v", err)
+	}
+
+	items, err := d.GetContentItems("sess-1")
+	if err != nil {
+		t.Fatalf("get items: %v", err)
+	}
+	if len(items) != 1 || items[0].ID != "b" {
+		t.Fatalf("expected only b to remain, got %+v", items)
+	}
+
+	aVersions, err := d.GetContentVersions("sess-1", "a")
+	if err != nil {
+		t.Fatalf("get versions a: %v", err)
+	}
+	if len(aVersions) != 0 {
+		t.Errorf("expected 0 versions for deleted item a, got %d", len(aVersions))
+	}
+
+	bVersions, err := d.GetContentVersions("sess-1", "b")
+	if err != nil {
+		t.Fatalf("get versions b: %v", err)
+	}
+	if len(bVersions) != 1 {
+		t.Errorf("expected b's version to remain, got %d", len(bVersions))
+	}
+}
+
 func TestContentItems_CrossSession(t *testing.T) {
 	d := testDB(t)
 	now := time.Now()
@@ -566,5 +613,122 @@ func TestListSessions_WithLimit(t *testing.T) {
 	}
 	if len(summaries) != 2 {
 		t.Errorf("expected 2 sessions with limit, got %d", len(summaries))
+	}
+}
+
+func TestSnapshotCRUD(t *testing.T) {
+	d := testDB(t)
+	now := time.Now()
+
+	// Create a session and submission
+	d.CreateSession(&types.ReviewSession{
+		ID: "sess-1", Agent: "claude", RepoRoot: "/tmp",
+		BaseRef: "abc123", ReviewRound: 1, CreatedAt: now, UpdatedAt: now,
+	})
+	d.CreateSubmission("sess-1", &types.ReviewSubmission{
+		ID: "sub-1", SessionID: "sess-1", Action: types.ActionRequestChanges,
+		FormattedReview: "review", ReviewRound: 1, SubmittedAt: now,
+	})
+
+	// Create a snapshot with files
+	files := []types.SnapshotFile{
+		{Path: "main.go", Status: types.FileModified, Reviewed: true, BlobSHA: "abc123def"},
+		{Path: "utils.go", Status: types.FileAdded, Reviewed: false, BlobSHA: "def456abc"},
+	}
+	snapID, err := d.CreateSnapshot("sess-1", "sub-1", 1, "headabc", "baseabc", files)
+	if err != nil {
+		t.Fatalf("create snapshot: %v", err)
+	}
+	if snapID == 0 {
+		t.Fatal("expected non-zero snapshot ID")
+	}
+
+	// List snapshots
+	snapshots, err := d.GetSnapshots("sess-1")
+	if err != nil {
+		t.Fatalf("get snapshots: %v", err)
+	}
+	if len(snapshots) != 1 {
+		t.Fatalf("expected 1 snapshot, got %d", len(snapshots))
+	}
+	if snapshots[0].ReviewRound != 1 {
+		t.Errorf("expected round 1, got %d", snapshots[0].ReviewRound)
+	}
+	if snapshots[0].HeadRef != "headabc" {
+		t.Errorf("expected head ref headabc, got %q", snapshots[0].HeadRef)
+	}
+
+	// Get snapshot with files
+	snap, err := d.GetSnapshot(int(snapID))
+	if err != nil {
+		t.Fatalf("get snapshot: %v", err)
+	}
+	if len(snap.Files) != 2 {
+		t.Fatalf("expected 2 files, got %d", len(snap.Files))
+	}
+	if snap.Files[0].Path != "main.go" {
+		t.Errorf("expected main.go, got %q", snap.Files[0].Path)
+	}
+	if !snap.Files[0].Reviewed {
+		t.Error("expected main.go to be reviewed")
+	}
+	if snap.Files[0].BlobSHA != "abc123def" {
+		t.Errorf("expected blob SHA abc123def, got %q", snap.Files[0].BlobSHA)
+	}
+
+	// HasSnapshots
+	has, err := d.HasSnapshots("sess-1")
+	if err != nil {
+		t.Fatalf("has snapshots: %v", err)
+	}
+	if !has {
+		t.Error("expected HasSnapshots to return true")
+	}
+
+	// Delete snapshots
+	if err := d.DeleteSnapshots("sess-1"); err != nil {
+		t.Fatalf("delete snapshots: %v", err)
+	}
+	has, _ = d.HasSnapshots("sess-1")
+	if has {
+		t.Error("expected HasSnapshots to return false after delete")
+	}
+}
+
+func TestSnapshotMultipleRounds(t *testing.T) {
+	d := testDB(t)
+	now := time.Now()
+
+	d.CreateSession(&types.ReviewSession{
+		ID: "sess-1", Agent: "claude", RepoRoot: "/tmp",
+		BaseRef: "abc", ReviewRound: 1, CreatedAt: now, UpdatedAt: now,
+	})
+	d.CreateSubmission("sess-1", &types.ReviewSubmission{
+		ID: "sub-1", SessionID: "sess-1", Action: types.ActionRequestChanges,
+		FormattedReview: "r1", ReviewRound: 1, SubmittedAt: now,
+	})
+	d.CreateSubmission("sess-1", &types.ReviewSubmission{
+		ID: "sub-2", SessionID: "sess-1", Action: types.ActionRequestChanges,
+		FormattedReview: "r2", ReviewRound: 2, SubmittedAt: now,
+	})
+
+	// Create snapshots for two rounds
+	d.CreateSnapshot("sess-1", "sub-1", 1, "head1", "base1", []types.SnapshotFile{
+		{Path: "main.go", Status: types.FileModified, BlobSHA: "sha1"},
+	})
+	d.CreateSnapshot("sess-1", "sub-2", 2, "head2", "base2", []types.SnapshotFile{
+		{Path: "main.go", Status: types.FileModified, BlobSHA: "sha2"},
+	})
+
+	// GetSnapshots returns most recent first
+	snapshots, _ := d.GetSnapshots("sess-1")
+	if len(snapshots) != 2 {
+		t.Fatalf("expected 2 snapshots, got %d", len(snapshots))
+	}
+	if snapshots[0].ReviewRound != 2 {
+		t.Errorf("expected round 2 first (most recent), got %d", snapshots[0].ReviewRound)
+	}
+	if snapshots[1].ReviewRound != 1 {
+		t.Errorf("expected round 1 second, got %d", snapshots[1].ReviewRound)
 	}
 }

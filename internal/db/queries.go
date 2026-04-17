@@ -60,6 +60,15 @@ func (d *DB) DeleteContentItems(sessionID string) error {
 	return err
 }
 
+// DeleteContentItem removes a single content item and its versions.
+func (d *DB) DeleteContentItem(sessionID, id string) error {
+	if _, err := d.Exec(`DELETE FROM content_versions WHERE session_id = ? AND content_item_id = ?`, sessionID, id); err != nil {
+		return err
+	}
+	_, err := d.Exec(`DELETE FROM content_items WHERE session_id = ? AND id = ?`, sessionID, id)
+	return err
+}
+
 // ListSessions returns session summaries, optionally filtered by repo root.
 func (d *DB) ListSessions(repoRoot string, limit int) ([]types.SessionSummary, error) {
 	query := `SELECT s.id, s.agent, s.repo_root, s.review_round, s.created_at, s.updated_at,
@@ -281,6 +290,15 @@ func (d *DB) DeleteComment(id string) error {
 	return err
 }
 
+// DeleteCommentsByTarget removes all comments attached to the given target in a session.
+func (d *DB) DeleteCommentsByTarget(sessionID string, targetType types.TargetType, targetRef string) error {
+	_, err := d.Exec(
+		`DELETE FROM comments WHERE session_id = ? AND target_type = ? AND target_ref = ?`,
+		sessionID, string(targetType), targetRef,
+	)
+	return err
+}
+
 // GetComments returns all comments for a session, optionally filtered.
 func (d *DB) GetComments(sessionID string) ([]types.ReviewComment, error) {
 	rows, err := d.Query(
@@ -466,6 +484,132 @@ func (d *DB) ResetAllReviewed(sessionID string) error {
 		}
 	}
 	return nil
+}
+
+// CreateSnapshot inserts a review snapshot with its file records.
+func (d *DB) CreateSnapshot(sessionID, submissionID string, reviewRound int, headRef, baseRef string, files []types.SnapshotFile) (int64, error) {
+	res, err := d.Exec(
+		`INSERT INTO review_snapshots (session_id, submission_id, review_round, head_ref, base_ref)
+		 VALUES (?, ?, ?, ?, ?)`,
+		sessionID, submissionID, reviewRound, headRef, baseRef,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("insert snapshot: %w", err)
+	}
+
+	snapshotID, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("get snapshot id: %w", err)
+	}
+
+	for _, f := range files {
+		_, err := d.Exec(
+			`INSERT INTO review_snapshot_files (snapshot_id, path, status, reviewed, blob_sha, content)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
+			snapshotID, f.Path, string(f.Status), boolToInt(f.Reviewed), f.BlobSHA, f.Content,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("insert snapshot file %s: %w", f.Path, err)
+		}
+	}
+
+	return snapshotID, nil
+}
+
+// GetSnapshots returns all snapshots for a session, ordered by round descending (most recent first).
+// Files are not loaded — use GetSnapshot to load a snapshot with its files.
+func (d *DB) GetSnapshots(sessionID string) ([]types.ReviewSnapshot, error) {
+	rows, err := d.Query(
+		`SELECT id, session_id, submission_id, review_round, head_ref, base_ref, created_at
+		 FROM review_snapshots WHERE session_id = ? ORDER BY review_round DESC`, sessionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var snapshots []types.ReviewSnapshot
+	for rows.Next() {
+		var s types.ReviewSnapshot
+		if err := rows.Scan(&s.ID, &s.SessionID, &s.SubmissionID, &s.ReviewRound, &s.HeadRef, &s.BaseRef, &s.CreatedAt); err != nil {
+			return nil, err
+		}
+		snapshots = append(snapshots, s)
+	}
+	return snapshots, rows.Err()
+}
+
+// GetSnapshot returns a single snapshot with its files loaded.
+func (d *DB) GetSnapshot(snapshotID int) (*types.ReviewSnapshot, error) {
+	s := &types.ReviewSnapshot{}
+	err := d.QueryRow(
+		`SELECT id, session_id, submission_id, review_round, head_ref, base_ref, created_at
+		 FROM review_snapshots WHERE id = ?`, snapshotID,
+	).Scan(&s.ID, &s.SessionID, &s.SubmissionID, &s.ReviewRound, &s.HeadRef, &s.BaseRef, &s.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := d.Query(
+		`SELECT path, status, reviewed, blob_sha, content
+		 FROM review_snapshot_files WHERE snapshot_id = ? ORDER BY path`, snapshotID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var f types.SnapshotFile
+		var status string
+		var reviewed int
+		if err := rows.Scan(&f.Path, &status, &reviewed, &f.BlobSHA, &f.Content); err != nil {
+			return nil, err
+		}
+		f.Status = types.FileChangeStatus(status)
+		f.Reviewed = reviewed != 0
+		s.Files = append(s.Files, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Build path lookup map for O(1) access
+	s.FilesByPath = make(map[string]*types.SnapshotFile, len(s.Files))
+	for i := range s.Files {
+		s.FilesByPath[s.Files[i].Path] = &s.Files[i]
+	}
+
+	return s, nil
+}
+
+// DeleteSnapshots removes all snapshots and their files for a session.
+func (d *DB) DeleteSnapshots(sessionID string) error {
+	// Delete files first (child rows)
+	_, err := d.Exec(
+		`DELETE FROM review_snapshot_files WHERE snapshot_id IN
+		 (SELECT id FROM review_snapshots WHERE session_id = ?)`, sessionID,
+	)
+	if err != nil {
+		return fmt.Errorf("delete snapshot files: %w", err)
+	}
+
+	// Delete snapshots
+	_, err = d.Exec(`DELETE FROM review_snapshots WHERE session_id = ?`, sessionID)
+	if err != nil {
+		return fmt.Errorf("delete snapshots: %w", err)
+	}
+
+	return nil
+}
+
+// HasSnapshots returns true if any snapshots exist for the session.
+func (d *DB) HasSnapshots(sessionID string) (bool, error) {
+	var count int
+	err := d.QueryRow(
+		`SELECT COUNT(*) FROM review_snapshots WHERE session_id = ?`, sessionID,
+	).Scan(&count)
+	return count > 0, err
 }
 
 func boolToInt(b bool) int {
