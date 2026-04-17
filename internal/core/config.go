@@ -42,7 +42,8 @@ func DefaultConfig() *types.Config {
 			MaxSnippetLines: 10,
 			IncludeSummary:  true,
 		},
-		MinDiffWidth: 80,
+		MinDiffWidth:   80,
+		ReviewTracking: true,
 	}
 }
 

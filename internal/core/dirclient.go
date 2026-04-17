@@ -129,6 +129,11 @@ func (d *DirClient) HashObjectDry(_ string) (string, error) {
 	return "", fmt.Errorf("no git repository: cannot hash object")
 }
 
+// HashObjectsDry is not supported in non-git mode.
+func (d *DirClient) HashObjectsDry(_ []string) (map[string]string, error) {
+	return nil, fmt.Errorf("no git repository: cannot hash objects")
+}
+
 // CatFile is not supported in non-git mode. Returns empty string.
 func (d *DirClient) CatFile(_ string) (string, error) {
 	return "", fmt.Errorf("no git repository: cannot cat file")

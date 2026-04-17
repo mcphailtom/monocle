@@ -36,6 +36,9 @@ func TestDefaultConfig(t *testing.T) {
 	if len(cfg.IgnorePatterns) != 0 {
 		t.Errorf("IgnorePatterns: got %d elements, want 0", len(cfg.IgnorePatterns))
 	}
+	if !cfg.ReviewTracking {
+		t.Error("ReviewTracking: got false, want true (on by default)")
+	}
 }
 
 func TestSaveAndLoadConfig(t *testing.T) {

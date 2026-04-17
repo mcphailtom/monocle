@@ -20,7 +20,7 @@ func NewSessionManager(database *db.DB, git GitAPI) *SessionManager {
 	return &SessionManager{db: database, git: git}
 }
 
-// CreateSession starts a new review session.
+// CreateSession starts a new review session with the given options.
 func (sm *SessionManager) CreateSession(opts SessionOptions) (*types.ReviewSession, error) {
 	baseRef := opts.BaseRef
 	if baseRef == "" {
@@ -55,7 +55,7 @@ func (sm *SessionManager) CreateSession(opts SessionOptions) (*types.ReviewSessi
 	return session, nil
 }
 
-// ResumeSession loads an existing session from the database.
+// ResumeSession loads an existing session from the database and restores all related state.
 func (sm *SessionManager) ResumeSession(sessionID string) (*types.ReviewSession, error) {
 	session, err := sm.db.GetSession(sessionID)
 	if err != nil {
@@ -96,16 +96,18 @@ func (sm *SessionManager) ResumeSession(sessionID string) (*types.ReviewSession,
 	return session, nil
 }
 
-// RefreshChangedFiles re-runs git diff and updates the session's file list.
+// RefreshChangedFiles re-runs git diff and updates the session's file list, merging with existing review status.
 func (sm *SessionManager) RefreshChangedFiles(session *types.ReviewSession) ([]types.ChangedFile, error) {
 	files, err := sm.git.Diff(session.BaseRef)
 	if err != nil {
 		return nil, fmt.Errorf("git diff: %w", err)
 	}
 
-	// Merge with existing review status
-	existingStatus := make(map[string]bool)
-	for _, f := range session.ChangedFiles {
+	// Read reviewed state from DB (source of truth) rather than in-memory
+	// session.ChangedFiles, which can be stale during concurrent submit.
+	dbFiles, _ := sm.db.GetChangedFiles(session.ID)
+	existingStatus := make(map[string]bool, len(dbFiles))
+	for _, f := range dbFiles {
 		existingStatus[f.Path] = f.Reviewed
 	}
 
@@ -120,19 +122,15 @@ func (sm *SessionManager) RefreshChangedFiles(session *types.ReviewSession) ([]t
 	return files, nil
 }
 
-// AdvanceRound increments the review round and clears content items.
-// Files and base ref are untouched — the periodic refresh handles file updates.
+// AdvanceRound increments the review round. Files, artifacts, and base ref are
+// untouched — reviewed state is managed by the submit-time mark/reset logic,
+// and the periodic refresh handles downstream updates.
 func (sm *SessionManager) AdvanceRound(session *types.ReviewSession) error {
 	session.ReviewRound++
 	session.UpdatedAt = time.Now()
 
 	if err := sm.db.UpdateSession(session); err != nil {
 		return fmt.Errorf("update session round: %w", err)
-	}
-
-	session.ContentItems = nil
-	if err := sm.db.DeleteContentItems(session.ID); err != nil {
-		return fmt.Errorf("clear content items: %w", err)
 	}
 
 	return nil

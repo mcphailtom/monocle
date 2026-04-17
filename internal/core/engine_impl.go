@@ -29,9 +29,8 @@ type Engine struct {
 	current *types.ReviewSession
 
 	// hasUnreviewedActivity is set by handleMarkActivity when Claude fires a
-	// write-tool during a turn, and cleared whenever the reviewer's feedback
-	// queue is drained by any caller (AwaitReview, PollFeedback, etc). The
-	// Stop-hook's AwaitReview call consults this flag to decide whether the
+	// write-tool (PostToolUse hook). Cleared when the reviewer's feedback
+	// queue is next drained. Used by handleAwaitReview to decide whether a
 	// turn needs a review gate or can end normally.
 	hasUnreviewedActivity bool
 
@@ -40,10 +39,10 @@ type Engine struct {
 	lastKnownHead  string
 	selectedRef    string // the commit the user picked (BaseRef stores its parent for diffing)
 
-	// activeSnapshot: when non-nil, diffs are computed against this snapshot's stored state
-	activeSnapshot *types.ReviewSnapshot
-	// latestSnapshot: cached latest snapshot for auto-unmark comparison (avoids DB queries per refresh)
-	latestSnapshot *types.ReviewSnapshot
+	// reviewBase: when non-nil, the snapshot is the single source of truth for
+	// review tracking — file list merging, auto-unmark, and diff computation all
+	// use this snapshot as the base. Nil means normal git-based diffing.
+	reviewBase *types.ReviewSnapshot
 
 	// event subscribers: EventKind -> subscriber ID -> callback
 	subscribers map[EventKind]map[int]EventCallback
@@ -159,6 +158,8 @@ func (e *Engine) ResumeSession(sessionID string) (*types.ReviewSession, error) {
 	e.mu.Lock()
 	e.current = session
 	e.hasUnreviewedActivity = false
+	// reviewBase stays nil — Working Tree is the default view.
+	// Snapshots in DB are used for auto-unmark during refresh.
 	e.mu.Unlock()
 
 	return session, nil
@@ -208,10 +209,24 @@ func (e *Engine) RefreshChangedFiles() ([]types.ChangedFile, error) {
 
 	e.mu.Lock()
 	if e.current != nil && e.current.ID == session.ID {
-		// Auto-unmark files and content items that changed since the latest snapshot
-		if e.latestSnapshot != nil {
-			e.autoUnmarkChangedFiles(session, files, e.latestSnapshot)
-			e.autoUnmarkChangedContent(session, e.latestSnapshot)
+		if e.IsReviewTrackingEnabled() {
+			// Auto-unmark runs against the latest snapshot in DB, independent
+			// of the current view (reviewBase). This way reviewed state stays
+			// accurate even when the user is viewing Working Tree diffs.
+			latestSnap, snapErr := e.latestSnapshotFromDB(session.ID)
+			if snapErr != nil {
+				e.mu.Unlock()
+				return nil, snapErr
+			}
+			if latestSnap != nil {
+				e.autoUnmarkChangedFiles(session, files, latestSnap)
+			}
+
+			// When a review base is selected, recompute the file list relative
+			// to the snapshot: add reverted files, remove unchanged files.
+			if e.reviewBase != nil {
+				files = e.filesRelativeToSnapshot(session, files, e.reviewBase)
+			}
 		}
 		e.current.ChangedFiles = files
 	}
@@ -241,13 +256,13 @@ func (e *Engine) GetContentItems() []types.ContentItem {
 func (e *Engine) GetFileDiff(path string) (*types.DiffResult, error) {
 	e.mu.RLock()
 	session := e.current
-	snapshot := e.activeSnapshot
+	snapshot := e.reviewBase
 	e.mu.RUnlock()
 	if session == nil {
 		return nil, fmt.Errorf("no active session")
 	}
 
-	// Snapshot mode: diff stored content against current working tree
+	// Review base mode: diff stored content against current working tree
 	if snapshot != nil {
 		return e.snapshotFileDiff(snapshot, path)
 	}
@@ -646,12 +661,18 @@ func (e *Engine) ClearReview() error {
 		e.current.FileStatuses[k] = false
 	}
 
+	// Wipe snapshot history — :clear is a full reset
+	e.deleteSnapshots()
+
 	return nil
 }
 
 // -- Review status --
 
 func (e *Engine) MarkReviewed(path string) error {
+	if !e.IsReviewTrackingEnabled() {
+		return nil
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -683,6 +704,9 @@ func (e *Engine) MarkReviewed(path string) error {
 }
 
 func (e *Engine) UnmarkReviewed(path string) error {
+	if !e.IsReviewTrackingEnabled() {
+		return nil
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -713,7 +737,54 @@ func (e *Engine) UnmarkReviewed(path string) error {
 	return nil
 }
 
+// DismissArtifact permanently removes an artifact from the current session,
+// along with its version history and any comments targeting it.
+func (e *Engine) DismissArtifact(id string) error {
+	e.mu.Lock()
+
+	if e.current == nil {
+		e.mu.Unlock()
+		return fmt.Errorf("no active session")
+	}
+
+	sessionID := e.current.ID
+	if err := e.database.DeleteContentItem(sessionID, id); err != nil {
+		e.mu.Unlock()
+		return fmt.Errorf("delete content item: %w", err)
+	}
+	if err := e.database.DeleteCommentsByTarget(sessionID, types.TargetContent, id); err != nil {
+		e.mu.Unlock()
+		return fmt.Errorf("delete artifact comments: %w", err)
+	}
+
+	items := e.current.ContentItems[:0]
+	for _, item := range e.current.ContentItems {
+		if item.ID != id {
+			items = append(items, item)
+		}
+	}
+	e.current.ContentItems = items
+
+	comments := e.current.Comments[:0]
+	for _, c := range e.current.Comments {
+		if c.TargetType == types.TargetContent && c.TargetRef == id {
+			continue
+		}
+		comments = append(comments, c)
+	}
+	e.current.Comments = comments
+
+	e.mu.Unlock()
+
+	// emit must be called without the lock held (see emit doc comment).
+	e.emit(EventFileChanged, EventPayload{Kind: EventFileChanged})
+	return nil
+}
+
 func (e *Engine) MarkContentReviewed(id string) error {
+	if !e.IsReviewTrackingEnabled() {
+		return nil
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -736,6 +807,9 @@ func (e *Engine) MarkContentReviewed(id string) error {
 }
 
 func (e *Engine) UnmarkContentReviewed(id string) error {
+	if !e.IsReviewTrackingEnabled() {
+		return nil
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -758,6 +832,9 @@ func (e *Engine) UnmarkContentReviewed(id string) error {
 }
 
 func (e *Engine) ResetAllReviewed() error {
+	if !e.IsReviewTrackingEnabled() {
+		return nil
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -786,6 +863,9 @@ func (e *Engine) ResetAllReviewed() error {
 }
 
 func (e *Engine) MarkAllReviewed() error {
+	if !e.IsReviewTrackingEnabled() {
+		return nil
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -906,21 +986,24 @@ func (e *Engine) Submit(action types.SubmitAction, body string) (*SubmitResult, 
 
 	// Snapshot lifecycle: request_changes creates a snapshot, approve wipes all.
 	// markReviewedOnSubmit and ResetAllReviewed acquire e.mu internally,
-	// so snapshot operations that access e.current/e.activeSnapshot must
+	// so snapshot operations that access e.current/e.reviewBase must
 	// run under a separate lock scope.
-	if action == types.ActionRequestChanges {
-		e.markReviewedOnSubmit(session)
-		e.mu.Lock()
-		_ = e.createSnapshot(session, sub.ID)
-		e.mu.Unlock()
-	} else {
-		e.mu.Lock()
-		e.deleteSnapshots()
-		e.mu.Unlock()
+	if e.IsReviewTrackingEnabled() {
+		if action == types.ActionRequestChanges {
+			e.markReviewedOnSubmit(session)
+			e.mu.Lock()
+			_ = e.createSnapshot(session, sub.ID)
+			e.mu.Unlock()
+			// Don't reset reviewed state — auto-unmark will handle it on the
+			// next refresh, unmarking only files that actually changed.
+		} else {
+			// Approve: review is complete, wipe everything
+			e.mu.Lock()
+			e.deleteSnapshots()
+			e.mu.Unlock()
+			_ = e.ResetAllReviewed()
+		}
 	}
-
-	// Reset all reviewed states after submitting
-	_ = e.ResetAllReviewed()
 
 	e.emit(EventFeedbackStatusChanged, EventPayload{
 		Kind:   EventFeedbackStatusChanged,
@@ -1054,8 +1137,8 @@ func (e *Engine) SetBaseRef(ref string) error {
 	e.selectedRef = selected
 	_ = e.database.UpdateSession(e.current)
 
-	// Wipe snapshots — changing base ref invalidates old review state
-	e.deleteSnapshots()
+	// Clear review base view but keep snapshots in DB — only approve wipes history
+	e.reviewBase = nil
 
 	return nil
 }
@@ -1068,8 +1151,8 @@ func (e *Engine) SetAutoAdvanceRef(enabled bool) {
 	if enabled {
 		e.lastKnownHead = "" // Force HEAD re-detection on next refresh
 		e.selectedRef = ""
-		// Wipe snapshots — switching to auto mode invalidates review state
-		e.deleteSnapshots()
+		// Clear review base view but keep snapshots in DB — only approve wipes history
+		e.reviewBase = nil
 	}
 }
 
@@ -1098,6 +1181,9 @@ func (e *Engine) RecentCommits(n int) ([]LogEntry, error) {
 
 // GetSnapshots returns all review snapshots for the current session.
 func (e *Engine) GetSnapshots() ([]types.ReviewSnapshot, error) {
+	if !e.IsReviewTrackingEnabled() {
+		return nil, nil
+	}
 	e.mu.RLock()
 	session := e.current
 	e.mu.RUnlock()
@@ -1115,26 +1201,29 @@ func (e *Engine) SetSnapshotBase(snapshotID int) error {
 	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.activeSnapshot = snap
+	e.reviewBase = snap
 	return nil
 }
 
-// ClearSnapshotBase deactivates snapshot-based diffing.
+// ClearSnapshotBase deactivates review-base diffing and reverts to git diffs.
 func (e *Engine) ClearSnapshotBase() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	e.activeSnapshot = nil
+	e.reviewBase = nil
 }
 
-// GetActiveSnapshot returns the currently active snapshot, or nil if not in snapshot mode.
+// GetActiveSnapshot returns the current review base snapshot, or nil if using git diffs.
 func (e *Engine) GetActiveSnapshot() *types.ReviewSnapshot {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return e.activeSnapshot
+	return e.reviewBase
 }
 
 // HasSnapshots returns true if any snapshots exist for the current session.
 func (e *Engine) HasSnapshots() (bool, error) {
+	if !e.IsReviewTrackingEnabled() {
+		return false, nil
+	}
 	e.mu.RLock()
 	session := e.current
 	e.mu.RUnlock()
@@ -1180,7 +1269,7 @@ func (e *Engine) createSnapshot(session *types.ReviewSession, submissionID strin
 		snapshotFiles = append(snapshotFiles, sf)
 	}
 
-	snapshotID, err := e.database.CreateSnapshot(
+	_, err = e.database.CreateSnapshot(
 		session.ID, submissionID, session.ReviewRound,
 		headRef, session.BaseRef, snapshotFiles,
 	)
@@ -1188,21 +1277,34 @@ func (e *Engine) createSnapshot(session *types.ReviewSession, submissionID strin
 		return err
 	}
 
-	// Cache the latest snapshot for auto-unmark comparison
-	snap, loadErr := e.database.GetSnapshot(int(snapshotID))
-	if loadErr == nil {
-		e.latestSnapshot = snap
-	}
+	// Snapshot saved to DB. The user can activate it via the ref picker.
+	// reviewBase is NOT auto-set — Working Tree remains the default view.
 	return nil
 }
 
-// deleteSnapshots removes all snapshots for the current session and clears cached state.
+// latestSnapshotFromDB loads the most recent snapshot from the database.
+// Returns (nil, nil) when no snapshots exist; (nil, err) on DB failure.
+func (e *Engine) latestSnapshotFromDB(sessionID string) (*types.ReviewSnapshot, error) {
+	snapshots, err := e.database.GetSnapshots(sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("list snapshots: %w", err)
+	}
+	if len(snapshots) == 0 {
+		return nil, nil
+	}
+	snap, err := e.database.GetSnapshot(snapshots[0].ID)
+	if err != nil {
+		return nil, fmt.Errorf("load snapshot %d: %w", snapshots[0].ID, err)
+	}
+	return snap, nil
+}
+
+// deleteSnapshots removes all snapshots for the current session and clears the review base.
 func (e *Engine) deleteSnapshots() {
 	if e.current != nil {
 		_ = e.database.DeleteSnapshots(e.current.ID)
 	}
-	e.activeSnapshot = nil
-	e.latestSnapshot = nil
+	e.reviewBase = nil
 }
 
 // markReviewedOnSubmit marks files as reviewed based on the config setting.
@@ -1219,11 +1321,18 @@ func (e *Engine) markReviewedOnSubmit(session *types.ReviewSession) {
 	case "all":
 		_ = e.MarkAllReviewed()
 	case "commented":
-		// Mark only files that have unresolved comments
+		// Mark only files and artifacts that have unresolved comments
 		commentedPaths := make(map[string]bool)
+		commentedItems := make(map[string]bool)
 		for _, c := range session.Comments {
-			if !c.Resolved && c.TargetType == types.TargetFile {
+			if c.Resolved {
+				continue
+			}
+			switch c.TargetType {
+			case types.TargetFile:
 				commentedPaths[c.TargetRef] = true
+			case types.TargetContent:
+				commentedItems[c.TargetRef] = true
 			}
 		}
 		for _, f := range session.ChangedFiles {
@@ -1231,21 +1340,108 @@ func (e *Engine) markReviewedOnSubmit(session *types.ReviewSession) {
 				_ = e.MarkReviewed(f.Path)
 			}
 		}
+		for _, item := range session.ContentItems {
+			if commentedItems[item.ID] {
+				_ = e.MarkContentReviewed(item.ID)
+			}
+		}
 	case "manual":
 		// Do nothing — respect only explicit r toggles
 	}
 }
 
+// filesRelativeToSnapshot filters the file list to only include files that
+// differ from the snapshot. Files in git diff but unchanged from the snapshot
+// are removed. Files reverted to match the git base (not in git diff) but
+// different from the snapshot are added. The snapshot acts as the base ref.
+func (e *Engine) filesRelativeToSnapshot(session *types.ReviewSession, files []types.ChangedFile, snapshot *types.ReviewSnapshot) []types.ChangedFile {
+	snapshotSHAs := make(map[string]string, len(snapshot.Files))
+	for _, sf := range snapshot.Files {
+		if sf.BlobSHA != "" {
+			snapshotSHAs[sf.Path] = sf.BlobSHA
+		}
+	}
+
+	seen := make(map[string]bool, len(files))
+	var toHash []string
+	for _, f := range files {
+		seen[f.Path] = true
+		if _, ok := snapshotSHAs[f.Path]; ok {
+			toHash = append(toHash, f.Path)
+		}
+	}
+	for _, sf := range snapshot.Files {
+		if !seen[sf.Path] && sf.BlobSHA != "" {
+			toHash = append(toHash, sf.Path)
+		}
+	}
+	currentSHAs := e.hashPaths(toHash)
+
+	var result []types.ChangedFile
+	for _, f := range files {
+		if snapSHA, inSnapshot := snapshotSHAs[f.Path]; inSnapshot {
+			if currentSHA, ok := currentSHAs[f.Path]; ok && currentSHA == snapSHA {
+				continue // unchanged from snapshot, hide it
+			}
+		}
+		result = append(result, f)
+	}
+
+	// Reverted files: in snapshot but not in git diff, and content differs
+	for _, sf := range snapshot.Files {
+		if seen[sf.Path] {
+			continue
+		}
+		if sf.BlobSHA != "" {
+			if currentSHA, ok := currentSHAs[sf.Path]; ok && currentSHA == sf.BlobSHA {
+				continue // content matches snapshot, skip
+			}
+		}
+		merged := types.ChangedFile{
+			Path:     sf.Path,
+			Status:   types.FileModified,
+			Reviewed: false,
+		}
+		_ = e.database.UpsertChangedFile(session.ID, &merged)
+		result = append(result, merged)
+	}
+
+	return result
+}
+
+// hashPaths batches git hash-object calls and returns a map[path]SHA. Paths that
+// can't be hashed are omitted. Returns an empty map if the git client is nil.
+func (e *Engine) hashPaths(paths []string) map[string]string {
+	if e.git == nil || len(paths) == 0 {
+		return map[string]string{}
+	}
+	shas, err := e.git.HashObjectsDry(paths)
+	if err != nil {
+		return map[string]string{}
+	}
+	return shas
+}
+
 // autoUnmarkChangedFiles compares current files against the latest snapshot and
 // marks files as unreviewed if their content changed since the snapshot.
 func (e *Engine) autoUnmarkChangedFiles(session *types.ReviewSession, files []types.ChangedFile, snapshot *types.ReviewSnapshot) {
-	// Build lookup from snapshot files
-	snapshotBySHA := make(map[string]string) // path -> blob_sha
+	snapshotBySHA := make(map[string]string)
 	for _, sf := range snapshot.Files {
 		if sf.BlobSHA != "" {
 			snapshotBySHA[sf.Path] = sf.BlobSHA
 		}
 	}
+
+	var toHash []string
+	for _, f := range files {
+		if f.Status == types.FileDeleted {
+			continue
+		}
+		if _, ok := snapshotBySHA[f.Path]; ok {
+			toHash = append(toHash, f.Path)
+		}
+	}
+	currentSHAs := e.hashPaths(toHash)
 
 	for i := range files {
 		f := &files[i]
@@ -1271,9 +1467,8 @@ func (e *Engine) autoUnmarkChangedFiles(session *types.ReviewSession, files []ty
 			continue
 		}
 
-		// Compare current content hash against snapshot (dry: don't write to object store)
-		currentSHA, err := e.git.HashObjectDry(f.Path)
-		if err != nil {
+		currentSHA, ok := currentSHAs[f.Path]
+		if !ok {
 			continue // can't hash, skip
 		}
 
@@ -1284,26 +1479,6 @@ func (e *Engine) autoUnmarkChangedFiles(session *types.ReviewSession, files []ty
 				session.FileStatuses[f.Path] = false
 				_ = e.database.MarkFileReviewed(session.ID, f.Path, false)
 			}
-		} else if !f.Reviewed {
-			// Content unchanged since snapshot — mark as reviewed
-			f.Reviewed = true
-			session.FileStatuses[f.Path] = true
-			_ = e.database.MarkFileReviewed(session.ID, f.Path, true)
-		}
-	}
-}
-
-// autoUnmarkChangedContent marks content items as unreviewed if they were updated
-// after the snapshot was created. Uses existing version timestamps — no separate
-// snapshot table needed since content items already have version history.
-func (e *Engine) autoUnmarkChangedContent(session *types.ReviewSession, snapshot *types.ReviewSnapshot) {
-	for i := range session.ContentItems {
-		item := &session.ContentItems[i]
-		if item.UpdatedAt.After(snapshot.CreatedAt) {
-			if item.Reviewed {
-				item.Reviewed = false
-				_ = e.database.MarkContentItemReviewed(session.ID, item.ID, false)
-			}
 		}
 	}
 }
@@ -1311,7 +1486,10 @@ func (e *Engine) autoUnmarkChangedContent(session *types.ReviewSession, snapshot
 // snapshotFileDiff computes a diff between the snapshot's stored content and the current working tree.
 func (e *Engine) snapshotFileDiff(snapshot *types.ReviewSnapshot, path string) (*types.DiffResult, error) {
 	// Find the file in the snapshot
-	snapshotFile := snapshot.FilesByPath[path]
+	var snapshotFile *types.SnapshotFile
+	if snapshot.FilesByPath != nil {
+		snapshotFile = snapshot.FilesByPath[path]
+	}
 
 	// Get current working tree content
 	currentContent, currentErr := e.git.FileContent("", path)
@@ -1424,15 +1602,22 @@ func (e *Engine) SubmitContentForReview(id, title, content, contentType string, 
 		UpdatedAt:   now,
 	}
 
-	// Upsert into session's content items
+	// Upsert into session's content items. If the content text changed, clear
+	// Reviewed so the user has to re-review the new version. Title-only or
+	// metadata-only updates leave Reviewed alone.
 	found := false
 	for i := range session.ContentItems {
 		if session.ContentItems[i].ID == id {
+			contentChanged := session.ContentItems[i].Content != content
 			session.ContentItems[i].Title = title
 			session.ContentItems[i].Content = content
 			session.ContentItems[i].ContentType = contentType
 			session.ContentItems[i].IsPlan = isPlan
 			session.ContentItems[i].UpdatedAt = now
+			if contentChanged && session.ContentItems[i].Reviewed {
+				session.ContentItems[i].Reviewed = false
+				_ = e.database.MarkContentItemReviewed(session.ID, id, false)
+			}
 			item = session.ContentItems[i]
 			found = true
 			break
@@ -1566,6 +1751,11 @@ func (e *Engine) emit(event EventKind, payload EventPayload) {
 // GetConfig returns the current configuration.
 func (e *Engine) GetConfig() *types.Config {
 	return e.cfg
+}
+
+// IsReviewTrackingEnabled returns true when review state tracking is active.
+func (e *Engine) IsReviewTrackingEnabled() bool {
+	return e.cfg != nil && e.cfg.ReviewTracking
 }
 
 // SaveConfig persists the current configuration to disk.

@@ -16,6 +16,7 @@ type Config struct {
 	CommentExpand         *bool  `json:"comment_expand"`
 	CommentExpandDelay    int    `json:"comment_expand_delay"`
 	MarkReviewedOnSubmit  string `json:"mark_reviewed_on_submit"` // "all" (default), "commented", "manual"
+	ReviewTracking        bool   `json:"review_tracking"`         // enable reviewed state, snapshots, change detection (default: true)
 }
 
 type ReviewFormatConfig struct {

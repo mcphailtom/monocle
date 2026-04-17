@@ -21,8 +21,9 @@ type GitAPI interface {
 	FileContent(ref, path string) (string, error)
 	RecentCommits(n int) ([]LogEntry, error)
 	ResolveRef(ref string) (string, error)
-	HashObject(path string) (string, error)     // writes blob to object store
-	HashObjectDry(path string) (string, error)  // computes SHA without writing
+	HashObject(path string) (string, error)                // writes blob to object store
+	HashObjectDry(path string) (string, error)             // computes SHA without writing
+	HashObjectsDry(paths []string) (map[string]string, error) // batched HashObjectDry
 	CatFile(sha string) (string, error)
 }
 
@@ -216,6 +217,58 @@ func (g *GitClient) HashObjectDry(path string) (string, error) {
 		return "", fmt.Errorf("git hash-object %s: %w", path, err)
 	}
 	return strings.TrimSpace(out), nil
+}
+
+// HashObjectsDry computes blob SHAs for multiple paths in a single git invocation
+// via `git hash-object --stdin-paths`. Returns a map from input path to SHA.
+// Paths that git refuses to hash (missing, unreadable) are omitted from the result
+// without failing the batch: a single missing file on a 2s refresh tick should not
+// blank out auto-unmark for every other file.
+func (g *GitClient) HashObjectsDry(paths []string) (map[string]string, error) {
+	result := make(map[string]string, len(paths))
+	if len(paths) == 0 {
+		return result, nil
+	}
+
+	var stdin strings.Builder
+	for _, p := range paths {
+		stdin.WriteString(filepath.Join(g.repoRoot, p))
+		stdin.WriteByte('\n')
+	}
+
+	cmd := exec.Command("git", "hash-object", "--stdin-paths")
+	cmd.Dir = g.repoRoot
+	cmd.Stdin = strings.NewReader(stdin.String())
+	env := os.Environ()
+	filtered := env[:0]
+	for _, e := range env {
+		if !strings.HasPrefix(e, "GIT_DIR=") && !strings.HasPrefix(e, "GIT_WORK_TREE=") {
+			filtered = append(filtered, e)
+		}
+	}
+	cmd.Env = filtered
+	out, err := cmd.Output()
+	if err != nil {
+		// Fall back to per-path hashing so one unreadable file can't kill the batch.
+		for _, p := range paths {
+			if sha, ferr := g.HashObjectDry(p); ferr == nil {
+				result[p] = sha
+			}
+		}
+		return result, nil
+	}
+
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	for i, sha := range lines {
+		if i >= len(paths) {
+			break
+		}
+		sha = strings.TrimSpace(sha)
+		if sha != "" {
+			result[paths[i]] = sha
+		}
+	}
+	return result, nil
 }
 
 // CatFile retrieves content from the git object store by SHA.

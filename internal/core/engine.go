@@ -82,6 +82,7 @@ type EngineAPI interface {
 	GetContentDiff(id string) (*types.DiffResult, error)
 	GetContentVersions(id string) ([]types.ContentVersion, error)
 	GetContentDiffBetweenVersions(id string, fromVersion, toVersion int) (*types.DiffResult, error)
+	DismissArtifact(id string) error
 
 	// Additional files
 	GetAdditionalFiles() []types.AdditionalFile
@@ -150,6 +151,7 @@ type EngineAPI interface {
 	// Config
 	GetConfig() *types.Config
 	SaveConfig() error
+	IsReviewTrackingEnabled() bool
 
 	// Lifecycle
 	Shutdown()
