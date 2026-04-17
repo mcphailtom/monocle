@@ -336,6 +336,10 @@ func (s *SocketServer) handleMessage(msg any) any {
 		return s.engine.handleSubmitContent(m)
 	case *protocol.AddAdditionalFilesMsg:
 		return s.engine.handleAddAdditionalFiles(m)
+	case *protocol.MarkActivityMsg:
+		return s.engine.handleMarkActivity(m)
+	case *protocol.AwaitReviewMsg:
+		return s.engine.handleAwaitReview(m)
 	case *protocol.IdentifyMsg:
 		s.handleIdentify(m)
 		return nil

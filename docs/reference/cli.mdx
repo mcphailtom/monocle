@@ -36,7 +36,7 @@ Monocle detects the Git repository root from the current working directory and o
 Register monocle with an agent. Depending on the integration mode, this either configures an MCP server with tools or installs skill files into the agent's skill directory.
 
 ```bash
-monocle register [agent] [--global] [--integration-mode MODE] [--no-plan-hook]
+monocle register [agent] [--global] [--integration-mode MODE] [--no-plan-hook] [--no-review-gate]
 ```
 
 ### Arguments
@@ -51,18 +51,21 @@ monocle register [agent] [--global] [--integration-mode MODE] [--no-plan-hook]
 |------|-------------|
 | `--global` | Write configuration to the user-level config directory instead of the current project directory. |
 | `--integration-mode MODE` | Override the default integration mode. One of `auto`, `mcp`, or `skills`. Defaults to `auto`. |
-| `--no-plan-hook` | Skip installation of the Claude Code `ExitPlanMode` hook. By default registration installs two hooks (`PreToolUse` + `PermissionRequest`) on `ExitPlanMode` so every plan the agent produces in plan mode is automatically routed through the Monocle reviewer. |
+| `--no-plan-hook` | Skip installation of the Claude Code plan-mode hooks (`PreToolUse` + `PermissionRequest` on `ExitPlanMode`). |
+| `--no-review-gate` | Skip installation of the Claude Code turn-end review-gate hooks (`PostToolUse` on write-tools + `Stop`). |
 
 ### Plan-mode hooks (Claude Code)
 
-When registering Claude Code, monocle adds two entries to `.claude/settings.json`:
+When registering Claude Code, monocle adds up to four hook entries to `.claude/settings.json`:
 
-| Hook event | Matcher | Command | Timeout |
-|---|---|---|---|
-| `PreToolUse` | `ExitPlanMode` | `monocle hooks enter-plan --agent claude` | 5s |
-| `PermissionRequest` | `ExitPlanMode` | `monocle hooks exit-plan --agent claude` | 345600s |
+| Hook event | Matcher | Command | Timeout | Purpose |
+|---|---|---|---|---|
+| `PreToolUse` | `ExitPlanMode` | `monocle hooks enter-plan --agent claude` | 5s | Inject review context before Claude drafts its plan. |
+| `PermissionRequest` | `ExitPlanMode` | `monocle hooks exit-plan --agent claude` | 345600s | Route the plan through the Monocle reviewer; convert approve/request-changes to allow/deny. |
+| `PostToolUse` | `Edit\|Write\|NotebookEdit\|MultiEdit` | `monocle hooks mark-activity --agent claude` | 5s | Mark the session as having unreviewed changes. |
+| `Stop` | — | `monocle hooks on-stop --agent claude` | 345600s | Block turn-end on reviewer approval when the turn included file edits. |
 
-The `PreToolUse` hook fires right before Claude drafts its plan and injects a short context string telling the agent the plan will be reviewed. The `PermissionRequest` hook fires when Claude is about to exit plan mode; it sends the plan to the Monocle TUI, blocks until you submit feedback, and converts "approve" to `allow` or "request changes" to `deny` with your feedback as the reason. If Monocle isn't running the hook exits silently so Claude falls back to its default plan-approval prompt. Pass `--no-plan-hook` at registration to skip installing these entries.
+The first two form the plan-review flow; opt out with `--no-plan-hook`. The last two form the per-turn review gate; opt out with `--no-review-gate`. Each subset can be toggled independently via the interactive picker's nested sub-rows. If Monocle isn't running, every hook exits silently so Claude's default behavior kicks in — the hooks never hard-block the agent.
 
 ### Integration modes
 
@@ -126,6 +129,8 @@ Handlers for agent lifecycle events. These subcommands are invoked by the agent'
 |---|---|---|
 | `monocle hooks exit-plan --agent claude` | required | Block on the Monocle reviewer and emit a Claude Code `PermissionRequest` `allow`/`deny` decision. |
 | `monocle hooks enter-plan --agent claude` | required | Emit a Claude Code `PreToolUse` `additionalContext` string pointing the agent at Monocle's review loop. |
+| `monocle hooks mark-activity --agent claude` | required | Notify the Monocle engine that a write-tool just fired, marking the session as having unreviewed changes. |
+| `monocle hooks on-stop --agent claude` | required | On Claude's `Stop` event, block the turn-end until the reviewer responds if (and only if) the turn included file edits. Emits a Claude Code Stop-hook `{"decision":"block","reason":...}` on "request changes"; exits 0 empty on "approve" or on a pure-chat turn. |
 
 The `--agent` flag is required on every subcommand, even though `claude` is currently the only supported value. This keeps `settings.json` entries self-describing and makes future agents additive rather than breaking.
 

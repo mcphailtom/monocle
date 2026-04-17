@@ -28,6 +28,13 @@ type Engine struct {
 
 	current *types.ReviewSession
 
+	// hasUnreviewedActivity is set by handleMarkActivity when Claude fires a
+	// write-tool during a turn, and cleared whenever the reviewer's feedback
+	// queue is drained by any caller (AwaitReview, PollFeedback, etc). The
+	// Stop-hook's AwaitReview call consults this flag to decide whether the
+	// turn needs a review gate or can end normally.
+	hasUnreviewedActivity bool
+
 	// autoAdvanceRef: when true, baseRef advances to HEAD on each refresh
 	autoAdvanceRef bool
 	lastKnownHead  string
@@ -133,6 +140,7 @@ func (e *Engine) StartSession(opts SessionOptions) (*types.ReviewSession, error)
 
 	e.mu.Lock()
 	e.current = session
+	e.hasUnreviewedActivity = false
 	e.mu.Unlock()
 
 	return session, nil
@@ -150,6 +158,7 @@ func (e *Engine) ResumeSession(sessionID string) (*types.ReviewSession, error) {
 
 	e.mu.Lock()
 	e.current = session
+	e.hasUnreviewedActivity = false
 	e.mu.Unlock()
 
 	return session, nil
@@ -1625,12 +1634,94 @@ func (e *Engine) handlePollFeedback(msg *protocol.PollFeedbackMsg) *protocol.Pol
 	}
 }
 
+// handleMarkActivity marks the current session as having unreviewed changes.
+// Called from the PostToolUse hook when Claude fires a write-tool. Idempotent
+// — repeated calls in the same turn leave the flag set. Cleared when the
+// reviewer's feedback queue is next drained.
+func (e *Engine) handleMarkActivity(_ *protocol.MarkActivityMsg) *protocol.MarkActivityResponse {
+	e.mu.Lock()
+	e.hasUnreviewedActivity = true
+	e.mu.Unlock()
+	return &protocol.MarkActivityResponse{
+		Type:    protocol.TypeMarkActivityResponse,
+		Success: true,
+	}
+}
+
+// handleAwaitReview is invoked by the Stop hook when Claude finishes a turn.
+// Order of checks:
+//  1. Drain any already-queued feedback first — if the reviewer submitted
+//     while Claude was still working, return it immediately.
+//  2. If no queued feedback AND !hasUnreviewedActivity, the turn had no
+//     reviewable writes (pure chat). Return HasActivity=false; the Stop
+//     hook exits 0 and the turn ends normally.
+//  3. Dirty with no queued feedback: block until the reviewer submits
+//     (if Wait=true), then return their verdict.
+func (e *Engine) handleAwaitReview(msg *protocol.AwaitReviewMsg) *protocol.AwaitReviewResponse {
+	// Step 1: drain any already-queued feedback.
+	if result := e.feedback.PollWithInfo(); result != nil && len(result.Reviews) > 0 {
+		if !result.ChannelDelivered {
+			e.completeQueuedDelivery()
+		}
+		feedback, _, action := result.CombinedFeedback()
+		return &protocol.AwaitReviewResponse{
+			Type:        protocol.TypeAwaitReviewResponse,
+			HasActivity: true,
+			Action:      action,
+			Feedback:    feedback,
+		}
+	}
+
+	// Step 2: clean session, nothing to gate.
+	e.mu.RLock()
+	dirty := e.hasUnreviewedActivity
+	e.mu.RUnlock()
+	if !dirty {
+		return &protocol.AwaitReviewResponse{
+			Type:        protocol.TypeAwaitReviewResponse,
+			HasActivity: false,
+		}
+	}
+
+	// Step 3: dirty, no feedback queued. Block on the reviewer.
+	if !msg.Wait {
+		return &protocol.AwaitReviewResponse{
+			Type:        protocol.TypeAwaitReviewResponse,
+			HasActivity: true,
+		}
+	}
+	e.emit(EventWaitStatusChanged, EventPayload{
+		Kind:   EventWaitStatusChanged,
+		Status: "waiting",
+	})
+	result := e.feedback.WaitForFeedbackWithInfo()
+	e.emit(EventWaitStatusChanged, EventPayload{
+		Kind:   EventWaitStatusChanged,
+		Status: "",
+	})
+	if !result.ChannelDelivered {
+		e.completeQueuedDelivery()
+	}
+	feedback, _, action := result.CombinedFeedback()
+	return &protocol.AwaitReviewResponse{
+		Type:        protocol.TypeAwaitReviewResponse,
+		HasActivity: true,
+		Action:      action,
+		Feedback:    feedback,
+	}
+}
+
 // completeQueuedDelivery performs the side effects of delivering queued feedback:
 // advancing the round, marking DB submissions as delivered, clearing comments,
 // and emitting events so the TUI can update.
 func (e *Engine) completeQueuedDelivery() {
 	e.mu.Lock()
 	session := e.current
+	// The reviewer has responded; any write-tool activity that preceded this
+	// submission has now been reviewed. Clearing here centralizes the flag
+	// lifecycle: any poller that drains the queue (AwaitReview, PollFeedback,
+	// agent's get_feedback MCP call, etc.) takes the same code path.
+	e.hasUnreviewedActivity = false
 	if session != nil {
 		_ = e.sessions.AdvanceRound(session)
 	}

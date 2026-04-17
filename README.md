@@ -94,7 +94,10 @@ monocle register claude   # or: opencode, codex, gemini, all
 
 This configures MCP tools or skills depending on the agent. Claude Code gets an MCP server and slash commands; other agents get skill files. Use `--global` to write to the user-level config directory instead of the project. Override the default with `--integration-mode mcp` or `--integration-mode skills`.
 
-For Claude Code, `monocle register` also installs two hooks on `ExitPlanMode` (a `PreToolUse` hook that injects review context before planning, and a `PermissionRequest` hook that routes the final plan through the Monocle reviewer for approve/deny). Pass `--no-plan-hook` to opt out, or uncheck the nested "Install plan review hooks" option in the interactive picker.
+For Claude Code, `monocle register` also installs four hooks in `.claude/settings.json`:
+
+- `PreToolUse:ExitPlanMode` + `PermissionRequest:ExitPlanMode` — plan review. When Claude exits plan mode, the proposed plan is automatically sent to Monocle; the agent blocks until you approve, and "request changes" feedback is delivered straight back as the rejection reason. Opt out with `--no-plan-hook` or the picker sub-row.
+- `PostToolUse:Edit|Write|NotebookEdit|MultiEdit` + `Stop` — turn-end review gate. After any turn that touches files, Claude blocks at turn-end until you approve or request changes. Pure-chat turns (no write-tools) are not interrupted. Opt out with `--no-review-gate` or the picker sub-row.
 
 #### Other agents
 
@@ -149,6 +152,7 @@ This means you can review the agent's *thinking* before it writes code — not j
 - **Plan & architecture review** — Your agent can submit plans, architecture decisions, and other content for review with markdown rendering. When iterating, Monocle shows diffs between plan versions so you can see exactly what changed. Use focus mode (`F`) for distraction-free reading
 - **Review gating** — `/review-plan-wait` blocks the agent until you approve the submitted content before it proceeds
 - **Automatic plan review (Claude Code)** — Registers hooks on `ExitPlanMode` so every plan the agent produces in plan mode is automatically sent to Monocle; the agent blocks until you approve, and "request changes" feedback is delivered straight back as the rejection reason
+- **Turn-end review gate (Claude Code)** — After any turn that includes file edits (`Edit`/`Write`/`NotebookEdit`/`MultiEdit`), Claude blocks at turn-end until the reviewer approves or requests changes. Pure-chat turns are not interrupted. Works without MCP channels.
 - **Pause flow** — Ask your agent to stop and wait while you review, then release it when ready (requires MCP channel support)
 - **Live diff viewer** — Unified and split (side-by-side) views with syntax highlighting and intra-line diffs
 - **Structured comments** — Tag feedback as issues, suggestions, notes, or praise with line-level or file-level precision
@@ -258,13 +262,13 @@ The comment editor supports standard emacs-style shortcuts:
 
 ```
 monocle [--socket PATH]              Start a review session
-monocle register [agent] [--global] [--no-plan-hook]
+monocle register [agent] [--global] [--no-plan-hook] [--no-review-gate]
                                      Register Monocle for an agent
 monocle unregister [agent] [--global] Remove Monocle registration
 monocle --version                    Print version
 ```
 
-The `agent` argument is one of `claude`, `opencode`, `codex`, `gemini`, or `all`. If omitted, an interactive picker lets you select which agents to register. The `--global` flag writes to the user-level config directory instead of the project. `--no-plan-hook` skips installation of the Claude Code `ExitPlanMode` hook (default: installed).
+The `agent` argument is one of `claude`, `opencode`, `codex`, `gemini`, or `all`. If omitted, an interactive picker lets you select which agents to register. The `--global` flag writes to the user-level config directory instead of the project. `--no-plan-hook` skips installation of the Claude Code `ExitPlanMode` hooks; `--no-review-gate` skips the `PostToolUse`+`Stop` review-gate hooks (default: both installed).
 
 ### Agent-Facing Commands
 

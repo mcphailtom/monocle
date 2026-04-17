@@ -42,28 +42,72 @@ type ClaudeAdapter struct {
 	// the Monocle reviewer. Set to true to opt out (e.g. from --no-plan-hook
 	// or by unchecking the picker sub-option).
 	SkipPlanHook bool
+
+	// SkipReviewGate, when true, omits the PostToolUse (mark-activity) and
+	// Stop (on-stop) hook entries that implement the per-turn review gate.
+	// Default (zero value) is false, meaning the gate is installed and any
+	// turn that includes file changes blocks at turn-end until the reviewer
+	// approves or requests changes. Set to true to opt out (from
+	// --no-review-gate or by unchecking the picker sub-option).
+	SkipReviewGate bool
 }
 
-// claudePlanHooks describes the settings.json hook entries monocle installs.
+// claudeHookGroup identifies which opt-out flag gates a hook entry.
+type claudeHookGroup int
+
+const (
+	groupPlanHook claudeHookGroup = iota
+	groupReviewGate
+)
+
+// allHookGroups enables every monocle hook group. Used by callers that want
+// the default "install everything" behavior (e.g. tests).
+var allHookGroups = map[claudeHookGroup]bool{
+	groupPlanHook:   true,
+	groupReviewGate: true,
+}
+
+// claudeHookEntry describes one settings.json hook entry monocle installs.
 // The command suffix is matched during unregister to identify monocle's
-// entries without clobbering any user-added siblings.
-var claudePlanHooks = []struct {
-	event         string
-	matcher       string
-	subcommand    string // matched against the end of command strings during unregister
-	timeoutSecs   int
-}{
+// entries without clobbering any user-added siblings. The group tags which
+// opt-out flag controls the entry (SkipPlanHook vs SkipReviewGate).
+type claudeHookEntry struct {
+	group       claudeHookGroup
+	event       string
+	matcher     string
+	subcommand  string // matched against the end of command strings during unregister
+	timeoutSecs int
+}
+
+// claudeHooks is the full table of settings.json hooks monocle installs.
+var claudeHooks = []claudeHookEntry{
 	{
+		group:       groupPlanHook,
 		event:       "PermissionRequest",
 		matcher:     "ExitPlanMode",
 		subcommand:  "hooks exit-plan",
 		timeoutSecs: 345600,
 	},
 	{
+		group:       groupPlanHook,
 		event:       "PreToolUse",
 		matcher:     "ExitPlanMode",
 		subcommand:  "hooks enter-plan",
 		timeoutSecs: 5,
+	},
+	{
+		group:       groupReviewGate,
+		event:       "PostToolUse",
+		matcher:     "Edit|Write|NotebookEdit|MultiEdit",
+		subcommand:  "hooks mark-activity",
+		timeoutSecs: 5,
+	},
+	{
+		group:       groupReviewGate,
+		event:       "Stop",
+		matcher:     "",
+		subcommand:  "hooks on-stop",
+		timeoutSecs: 345600,
 	},
 }
 
@@ -80,8 +124,8 @@ func (a *ClaudeAdapter) ConfigPaths(global bool) []string {
 		paths = append(paths, SkillPaths(claudeSkillsDir(global))...)
 	} else {
 		paths = append(paths, CommandPaths(claudeCommandsDir(global), ".md")...)
-		if !a.SkipPlanHook {
-			// MCP-tools mode also touches settings.json when the plan hook is installed.
+		if !a.SkipPlanHook || !a.SkipReviewGate {
+			// MCP-tools mode also touches settings.json when any hook is installed.
 			paths = append(paths, settingsPath)
 		}
 	}
@@ -136,11 +180,13 @@ func (a *ClaudeAdapter) Register(global bool) error {
 		}
 	}
 
-	if !a.SkipPlanHook {
-		settingsPath := claudeSettingsPath(global)
-		if err := configureClaudeHooks(settingsPath, ResolveHookCommand(settingsPath, global)); err != nil {
-			return fmt.Errorf("configure hooks: %w", err)
-		}
+	settingsPath := claudeSettingsPath(global)
+	enabled := map[claudeHookGroup]bool{
+		groupPlanHook:   !a.SkipPlanHook,
+		groupReviewGate: !a.SkipReviewGate,
+	}
+	if err := configureClaudeHooks(settingsPath, ResolveHookCommand(settingsPath, global), enabled); err != nil {
+		return fmt.Errorf("configure hooks: %w", err)
 	}
 	return nil
 }
@@ -381,11 +427,13 @@ func configureClaudeSettings(path string) error {
 	return WriteJSONFile(path, data)
 }
 
-// configureClaudeHooks installs monocle's ExitPlanMode hook entries into
+// configureClaudeHooks installs the requested monocle hook entries into
 // .claude/settings.json. Idempotent: re-running updates stale command paths
 // rather than duplicating entries, and preserves any sibling hooks users
-// added themselves.
-func configureClaudeHooks(path, command string) error {
+// added themselves. Only entries whose group is in `enabledGroups` are
+// installed; any monocle entries for other groups are removed so an opt-out
+// takes effect even when re-running register after a prior install.
+func configureClaudeHooks(path, command string, enabledGroups map[claudeHookGroup]bool) error {
 	data, err := ReadJSONFile(path)
 	if err != nil {
 		return err
@@ -397,16 +445,33 @@ func configureClaudeHooks(path, command string) error {
 		data["hooks"] = hooks
 	}
 
-	for _, h := range claudePlanHooks {
-		fullCmd := fmt.Sprintf("%s %s --agent claude", command, h.subcommand)
-		ours := map[string]any{
-			"type":    "command",
-			"command": fullCmd,
-			"timeout": h.timeoutSecs,
+	for _, h := range claudeHooks {
+		if enabledGroups[h.group] {
+			fullCmd := fmt.Sprintf("%s %s --agent claude", command, h.subcommand)
+			ours := map[string]any{
+				"type":    "command",
+				"command": fullCmd,
+				"timeout": h.timeoutSecs,
+			}
+			hooks[h.event] = upsertMatcherHook(asSlice(hooks[h.event]), h.matcher, h.subcommand, ours)
+		} else {
+			// Group is opt-out'd for this register call — make sure no stale
+			// monocle entry lingers from a previous install.
+			cleaned := removeMonocleHook(asSlice(hooks[h.event]), h.matcher, h.subcommand)
+			if len(cleaned) == 0 {
+				delete(hooks, h.event)
+			} else {
+				hooks[h.event] = cleaned
+			}
 		}
-		hooks[h.event] = upsertMatcherHook(asSlice(hooks[h.event]), h.matcher, h.subcommand, ours)
 	}
 
+	if len(hooks) == 0 {
+		delete(data, "hooks")
+	}
+	if len(data) == 0 {
+		return RemoveFileIfExists(path)
+	}
 	return WriteJSONFile(path, data)
 }
 
@@ -423,7 +488,7 @@ func unconfigureClaudeHooks(path string) error {
 		return nil
 	}
 
-	for _, h := range claudePlanHooks {
+	for _, h := range claudeHooks {
 		entries, ok := hooks[h.event].([]any)
 		if !ok {
 			continue
@@ -455,7 +520,8 @@ func upsertMatcherHook(entries []any, matcher, subcommand string, ours map[strin
 		if !ok {
 			continue
 		}
-		if s, _ := m["matcher"].(string); s != matcher {
+		existing, _ := m["matcher"].(string)
+		if existing != matcher {
 			continue
 		}
 		inner := asSlice(m["hooks"])
@@ -474,10 +540,13 @@ func upsertMatcherHook(entries []any, matcher, subcommand string, ours map[strin
 		entries[i] = m
 		return entries
 	}
-	return append(entries, map[string]any{
-		"matcher": matcher,
-		"hooks":   []any{ours},
-	})
+	entry := map[string]any{
+		"hooks": []any{ours},
+	}
+	if matcher != "" {
+		entry["matcher"] = matcher
+	}
+	return append(entries, entry)
 }
 
 // removeMonocleHook strips monocle's inner hook from every matcher entry in

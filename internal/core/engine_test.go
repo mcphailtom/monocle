@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/josephschmitt/monocle/internal/db"
+	"github.com/josephschmitt/monocle/internal/protocol"
 	"github.com/josephschmitt/monocle/internal/types"
 )
 
@@ -1270,5 +1271,166 @@ func TestMarkReviewedOnSubmitConfig(t *testing.T) {
 		if f.Path == "utils.go" && f.Reviewed {
 			t.Error("expected utils.go to NOT be reviewed (no comment)")
 		}
+	}
+}
+
+// --- Review-gate (PostToolUse mark-activity + Stop on-stop) ---
+
+func TestAwaitReview_CleanTurnReturnsImmediately(t *testing.T) {
+	e := &Engine{
+		feedback:    NewFeedbackQueue(),
+		subscribers: make(map[EventKind]map[int]EventCallback),
+	}
+	e.current = &types.ReviewSession{}
+
+	// No mark-activity call → turn had no reviewable changes.
+	resp := e.handleAwaitReview(&protocol.AwaitReviewMsg{Type: protocol.TypeAwaitReview, Wait: true})
+	if resp.HasActivity {
+		t.Fatal("clean turn should report HasActivity=false so the Stop proceeds normally")
+	}
+	if resp.Feedback != "" {
+		t.Errorf("clean turn should return no feedback, got %q", resp.Feedback)
+	}
+}
+
+func TestAwaitReview_DrainsPreQueuedFeedback(t *testing.T) {
+	database, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+	stub := &gitStub{repoRoot: "/tmp/test-repo", currentRef: "abc", files: []types.ChangedFile{}}
+	cfg := DefaultConfig()
+	e := &Engine{
+		cfg:         cfg,
+		database:    database,
+		git:         stub,
+		feedback:    NewFeedbackQueue(),
+		sessions:    NewSessionManager(database, stub),
+		formatter:   NewReviewFormatter(func(string, int, int) string { return "" }, cfg.ReviewFormat),
+		subscribers: make(map[EventKind]map[int]EventCallback),
+	}
+	_, err = e.StartSession(SessionOptions{Agent: "test", RepoRoot: stub.repoRoot})
+	if err != nil {
+		t.Fatalf("start session: %v", err)
+	}
+
+	// Reviewer submitted feedback WHILE Claude was still working — queue holds it.
+	e.feedback.Submit(&FormattedReview{
+		Formatted:    "please fix this",
+		CommentCount: 1,
+		Action:       "request_changes",
+	}, false)
+
+	resp := e.handleAwaitReview(&protocol.AwaitReviewMsg{Type: protocol.TypeAwaitReview, Wait: true})
+	if !resp.HasActivity {
+		t.Fatal("drained pre-queued feedback should report HasActivity=true")
+	}
+	if resp.Action != "request_changes" {
+		t.Errorf("expected action=request_changes, got %q", resp.Action)
+	}
+	if resp.Feedback == "" {
+		t.Error("expected feedback text to be passed through")
+	}
+
+	// Queue is drained; next call with no activity should noop.
+	if e.hasUnreviewedActivity {
+		t.Error("activity flag should be cleared after queue drain")
+	}
+}
+
+func TestAwaitReview_DirtyBlocksAndUnblocksOnSubmit(t *testing.T) {
+	database, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+	stub := &gitStub{repoRoot: "/tmp/test-repo", currentRef: "abc", files: []types.ChangedFile{}}
+	cfg := DefaultConfig()
+	e := &Engine{
+		cfg:         cfg,
+		database:    database,
+		git:         stub,
+		feedback:    NewFeedbackQueue(),
+		sessions:    NewSessionManager(database, stub),
+		formatter:   NewReviewFormatter(func(string, int, int) string { return "" }, cfg.ReviewFormat),
+		subscribers: make(map[EventKind]map[int]EventCallback),
+	}
+	_, err = e.StartSession(SessionOptions{Agent: "test", RepoRoot: stub.repoRoot})
+	if err != nil {
+		t.Fatalf("start session: %v", err)
+	}
+
+	// Simulate a PostToolUse fire.
+	e.handleMarkActivity(&protocol.MarkActivityMsg{Type: protocol.TypeMarkActivity})
+	if !e.hasUnreviewedActivity {
+		t.Fatal("mark-activity should set the flag")
+	}
+
+	// AwaitReview should block until we submit. Drive the block on a goroutine.
+	var wg sync.WaitGroup
+	var resp *protocol.AwaitReviewResponse
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		resp = e.handleAwaitReview(&protocol.AwaitReviewMsg{Type: protocol.TypeAwaitReview, Wait: true})
+	}()
+
+	// Brief pause so the goroutine is parked in Wait; then submit.
+	time.Sleep(50 * time.Millisecond)
+	e.feedback.Submit(&FormattedReview{
+		Formatted:    "lgtm after fix",
+		CommentCount: 0,
+		Action:       "approve",
+	}, false)
+
+	wg.Wait()
+
+	if resp == nil {
+		t.Fatal("AwaitReview should have returned")
+	}
+	if !resp.HasActivity {
+		t.Error("dirty+unblocked should report HasActivity=true")
+	}
+	if resp.Action != "approve" {
+		t.Errorf("expected action=approve, got %q", resp.Action)
+	}
+	if e.hasUnreviewedActivity {
+		t.Error("activity flag should be cleared after the reviewer responds")
+	}
+}
+
+func TestAwaitReview_PollFeedbackAlsoClearsActivity(t *testing.T) {
+	// If the agent drains feedback via the existing PollFeedback path (e.g.
+	// the MCP get_feedback tool), the activity flag should also clear so the
+	// next Stop hook doesn't redundantly block.
+	database, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer database.Close()
+	stub := &gitStub{repoRoot: "/tmp/test-repo", currentRef: "abc", files: []types.ChangedFile{}}
+	cfg := DefaultConfig()
+	e := &Engine{
+		cfg:         cfg,
+		database:    database,
+		git:         stub,
+		feedback:    NewFeedbackQueue(),
+		sessions:    NewSessionManager(database, stub),
+		formatter:   NewReviewFormatter(func(string, int, int) string { return "" }, cfg.ReviewFormat),
+		subscribers: make(map[EventKind]map[int]EventCallback),
+	}
+	_, err = e.StartSession(SessionOptions{Agent: "test", RepoRoot: stub.repoRoot})
+	if err != nil {
+		t.Fatalf("start session: %v", err)
+	}
+
+	e.handleMarkActivity(&protocol.MarkActivityMsg{Type: protocol.TypeMarkActivity})
+	e.feedback.Submit(&FormattedReview{Formatted: "note", CommentCount: 1, Action: "request_changes"}, false)
+
+	_ = e.handlePollFeedback(&protocol.PollFeedbackMsg{Type: protocol.TypePollFeedback, Wait: false})
+
+	if e.hasUnreviewedActivity {
+		t.Error("PollFeedback drain should also clear the activity flag (centralized in completeQueuedDelivery)")
 	}
 }

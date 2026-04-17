@@ -93,6 +93,7 @@ type RegisterCmd struct {
 	Global          bool   `help:"Register in user-level config instead of project" default:"false"`
 	IntegrationMode string `help:"Override the default integration mode (auto, mcp, or skills)" enum:"auto,mcp,skills" default:"auto"`
 	NoPlanHook      bool   `help:"Skip installing the Claude Code ExitPlanMode hook" name:"no-plan-hook" default:"false"`
+	NoReviewGate    bool   `help:"Skip installing the Claude Code turn-end review-gate hooks (PostToolUse mark-activity + Stop on-stop)" name:"no-review-gate" default:"false"`
 }
 
 type UnregisterCmd struct {
@@ -154,12 +155,17 @@ func (cmd *RegisterCmd) Run() error {
 		return nil // user cancelled picker
 	}
 
-	// --no-plan-hook overrides whatever the interactive picker decided.
-	if cmd.NoPlanHook {
-		for _, a := range agents {
-			if claude, ok := a.(*adapters.ClaudeAdapter); ok {
-				claude.SkipPlanHook = true
-			}
+	// CLI flags override whatever the interactive picker decided.
+	for _, a := range agents {
+		claude, ok := a.(*adapters.ClaudeAdapter)
+		if !ok {
+			continue
+		}
+		if cmd.NoPlanHook {
+			claude.SkipPlanHook = true
+		}
+		if cmd.NoReviewGate {
+			claude.SkipReviewGate = true
 		}
 	}
 

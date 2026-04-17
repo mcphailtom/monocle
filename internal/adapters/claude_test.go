@@ -20,7 +20,7 @@ func TestClaudeRegister_MCPToolsMode(t *testing.T) {
 	os.Chdir(projDir)
 	defer os.Chdir(origDir)
 
-	adapter := &ClaudeAdapter{Mode: ModeMCPTools, SkipPlanHook: true}
+	adapter := &ClaudeAdapter{Mode: ModeMCPTools, SkipPlanHook: true, SkipReviewGate: true}
 
 	if !adapter.NeedsRegister() {
 		t.Fatal("should need register initially")
@@ -552,7 +552,7 @@ func TestConfigureClaudeHooks_NewFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
 
-	if err := configureClaudeHooks(path, "/usr/bin/monocle"); err != nil {
+	if err := configureClaudeHooks(path, "/usr/bin/monocle", allHookGroups); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
 
@@ -594,10 +594,10 @@ func TestConfigureClaudeHooks_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
 
-	if err := configureClaudeHooks(path, "monocle"); err != nil {
+	if err := configureClaudeHooks(path, "monocle", allHookGroups); err != nil {
 		t.Fatal(err)
 	}
-	if err := configureClaudeHooks(path, "monocle"); err != nil {
+	if err := configureClaudeHooks(path, "monocle", allHookGroups); err != nil {
 		t.Fatal(err)
 	}
 
@@ -617,10 +617,10 @@ func TestConfigureClaudeHooks_UpdatesStaleCommand(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
 
-	if err := configureClaudeHooks(path, "/old/path/monocle"); err != nil {
+	if err := configureClaudeHooks(path, "/old/path/monocle", allHookGroups); err != nil {
 		t.Fatal(err)
 	}
-	if err := configureClaudeHooks(path, "/new/path/monocle"); err != nil {
+	if err := configureClaudeHooks(path, "/new/path/monocle", allHookGroups); err != nil {
 		t.Fatal(err)
 	}
 
@@ -664,7 +664,7 @@ func TestConfigureClaudeHooks_PreservesSiblingHooks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := configureClaudeHooks(path, "monocle"); err != nil {
+	if err := configureClaudeHooks(path, "monocle", allHookGroups); err != nil {
 		t.Fatal(err)
 	}
 
@@ -697,7 +697,7 @@ func TestUnconfigureClaudeHooks_RemovesOnlyMonocleEntries(t *testing.T) {
 	path := filepath.Join(dir, "settings.json")
 
 	// Seed with a user-owned hook alongside a monocle hook on the same matcher.
-	if err := configureClaudeHooks(path, "monocle"); err != nil {
+	if err := configureClaudeHooks(path, "monocle", allHookGroups); err != nil {
 		t.Fatal(err)
 	}
 	data, _ := ReadJSONFile(path)
@@ -735,7 +735,7 @@ func TestUnconfigureClaudeHooks_RemovesEmptyFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
 
-	if err := configureClaudeHooks(path, "monocle"); err != nil {
+	if err := configureClaudeHooks(path, "monocle", allHookGroups); err != nil {
 		t.Fatal(err)
 	}
 	if err := unconfigureClaudeHooks(path); err != nil {
@@ -775,6 +775,66 @@ func TestClaudeRegister_InstallsPlanHookByDefault(t *testing.T) {
 	}
 	if _, ok := hooks["PreToolUse"]; !ok {
 		t.Error("PreToolUse hook missing")
+	}
+	if _, ok := hooks["PostToolUse"]; !ok {
+		t.Error("PostToolUse hook (review gate mark-activity) missing")
+	}
+	if _, ok := hooks["Stop"]; !ok {
+		t.Error("Stop hook (review gate on-stop) missing")
+	}
+
+	// PostToolUse entry should match the write-tools alternation.
+	postEntries := hooks["PostToolUse"].([]any)
+	postEntry := postEntries[0].(map[string]any)
+	if postEntry["matcher"] != "Edit|Write|NotebookEdit|MultiEdit" {
+		t.Errorf("PostToolUse matcher should target write-tools, got %v", postEntry["matcher"])
+	}
+	postInner := postEntry["hooks"].([]any)[0].(map[string]any)
+	if postInner["timeout"].(float64) != 5 {
+		t.Errorf("PostToolUse timeout should be 5, got %v", postInner["timeout"])
+	}
+
+	// Stop entry should have no matcher and a long timeout.
+	stopEntries := hooks["Stop"].([]any)
+	stopEntry := stopEntries[0].(map[string]any)
+	if m, present := stopEntry["matcher"]; present && m != "" {
+		t.Errorf("Stop hook should have no matcher, got %v", m)
+	}
+	stopInner := stopEntry["hooks"].([]any)[0].(map[string]any)
+	if stopInner["timeout"].(float64) != 345600 {
+		t.Errorf("Stop timeout should be 345600, got %v", stopInner["timeout"])
+	}
+}
+
+func TestClaudeRegister_SkipReviewGateOmitsActivityHooks(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", filepath.Join(dir, "home"))
+
+	origDir, _ := os.Getwd()
+	projDir := filepath.Join(dir, "project")
+	os.MkdirAll(projDir, 0755)
+	os.Chdir(projDir)
+	defer os.Chdir(origDir)
+
+	adapter := &ClaudeAdapter{Mode: ModeMCPTools, SkipReviewGate: true}
+	if err := adapter.Register(false); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	data, err := ReadJSONFile(filepath.Join(projDir, ".claude", "settings.json"))
+	if err != nil {
+		t.Fatalf("read settings: %v", err)
+	}
+	hooks, _ := data["hooks"].(map[string]any)
+	if _, present := hooks["PostToolUse"]; present {
+		t.Error("PostToolUse should be omitted when SkipReviewGate is set")
+	}
+	if _, present := hooks["Stop"]; present {
+		t.Error("Stop should be omitted when SkipReviewGate is set")
+	}
+	// Plan hooks should still be present.
+	if _, ok := hooks["PermissionRequest"]; !ok {
+		t.Error("PermissionRequest (plan hook) should remain")
 	}
 }
 

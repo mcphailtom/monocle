@@ -119,6 +119,39 @@ func TestDecodeHookInput_EmptyStdin(t *testing.T) {
 	}
 }
 
+func TestEmitClaudeStopBlock_PassesReasonThrough(t *testing.T) {
+	var buf bytes.Buffer
+	if err := emitClaudeStopBlock(&buf, "please add error handling to the timeout path"); err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &out); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+	if out["decision"] != "block" {
+		t.Errorf("expected decision=block, got %v", out["decision"])
+	}
+	if out["reason"] != "please add error handling to the timeout path" {
+		t.Errorf("reason should be passed through verbatim, got %v", out["reason"])
+	}
+	// Stop hook uses the top-level shape, NOT hookSpecificOutput.
+	if _, present := out["hookSpecificOutput"]; present {
+		t.Error("Stop hook output must use top-level {decision,reason}, not hookSpecificOutput")
+	}
+}
+
+func TestEmitClaudeStopBlock_FallbackReasonWhenEmpty(t *testing.T) {
+	var buf bytes.Buffer
+	if err := emitClaudeStopBlock(&buf, ""); err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]any
+	json.Unmarshal(buf.Bytes(), &out)
+	if out["reason"] == nil || out["reason"] == "" {
+		t.Error("empty reason should be replaced with a non-empty fallback")
+	}
+}
+
 func TestFirstHeading(t *testing.T) {
 	cases := map[string]string{
 		"# Title\nbody":    "Title",

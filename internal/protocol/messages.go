@@ -9,6 +9,8 @@ const (
 	TypeConnect            = "connect"
 	TypeIdentify           = "identify"
 	TypeAddAdditionalFiles = "add_additional_files"
+	TypeMarkActivity       = "mark_activity"
+	TypeAwaitReview        = "await_review"
 )
 
 // Outbound message types (from engine to CLI subcommands)
@@ -20,6 +22,8 @@ const (
 	TypeConnectResponse            = "connect_response"
 	TypeEventNotification          = "event_notification"
 	TypeAddAdditionalFilesResponse = "add_additional_files_response"
+	TypeMarkActivityResponse       = "mark_activity_response"
+	TypeAwaitReviewResponse        = "await_review_response"
 )
 
 // GetReviewStatusMsg requests the current review state from the engine.
@@ -119,4 +123,39 @@ type AddAdditionalFilesResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
 	Count   int    `json:"count"`
+}
+
+// MarkActivityMsg notifies the engine that a write-tool just fired in the
+// current session, marking the session as having unreviewed changes. The
+// Stop-hook's AwaitReview call consults this flag to decide whether to
+// block the turn or let it end normally.
+type MarkActivityMsg struct {
+	Type string `json:"type"`
+}
+
+// MarkActivityResponse acknowledges an activity mark.
+type MarkActivityResponse struct {
+	Type    string `json:"type"`
+	Success bool   `json:"success"`
+}
+
+// AwaitReviewMsg is issued by the Stop hook at turn-end. If the session
+// has unreviewed activity (a write-tool fired during the turn), the engine
+// blocks until the reviewer submits feedback. Otherwise it returns
+// immediately with HasActivity=false so the agent's turn can end cleanly.
+type AwaitReviewMsg struct {
+	Type string `json:"type"`
+	Wait bool   `json:"wait"` // true = block on reviewer; false = snapshot query
+}
+
+// AwaitReviewResponse reports the outcome of an AwaitReview call.
+// When HasActivity is false the turn may end normally; when true with
+// Action="approve" the turn ends after the reviewer saw the diff; when
+// true with Action="request_changes" the hook converts the feedback into
+// a Stop-hook block decision that sends Claude back to work.
+type AwaitReviewResponse struct {
+	Type        string `json:"type"`
+	HasActivity bool   `json:"has_activity"`
+	Action      string `json:"action,omitempty"`
+	Feedback    string `json:"feedback,omitempty"`
 }

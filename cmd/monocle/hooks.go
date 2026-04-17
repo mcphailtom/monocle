@@ -21,8 +21,10 @@ import (
 // human; all error paths exit 0 with empty stdout so the agent degrades
 // to its default behavior rather than hard-blocking.
 type HooksCmd struct {
-	ExitPlan  ExitPlanHookCmd  `cmd:"" name:"exit-plan" help:"Handle an agent's plan-mode exit: send the plan to the Monocle reviewer and approve or deny based on feedback."`
-	EnterPlan EnterPlanHookCmd `cmd:"" name:"enter-plan" help:"Inject review context into the agent right before it begins planning."`
+	ExitPlan     ExitPlanHookCmd     `cmd:"" name:"exit-plan" help:"Handle an agent's plan-mode exit: send the plan to the Monocle reviewer and approve or deny based on feedback."`
+	EnterPlan    EnterPlanHookCmd    `cmd:"" name:"enter-plan" help:"Inject review context into the agent right before it begins planning."`
+	MarkActivity MarkActivityHookCmd `cmd:"" name:"mark-activity" help:"Notify the Monocle engine that a write-tool just fired, marking the current session as having unreviewed changes."`
+	OnStop       OnStopHookCmd       `cmd:"" name:"on-stop" help:"Block the agent's turn-end until the reviewer approves or requests changes \u2014 but only if the turn included file changes."`
 }
 
 // ExitPlanHookCmd handles the agent's plan-mode exit event. For Claude Code
@@ -295,4 +297,138 @@ func emitClaudePreToolUseContext(w io.Writer, context string) error {
 		},
 	}
 	return json.NewEncoder(w).Encode(payload)
+}
+
+// MarkActivityHookCmd notifies the Monocle engine that a write-tool just
+// fired in the current session. Registered as the PostToolUse hook with
+// matcher Edit|Write|NotebookEdit|MultiEdit. Runs with a tight timeout
+// (5s) and must not block the agent — exits 0 empty on every error.
+type MarkActivityHookCmd struct {
+	WorkDirFlag
+	Agent  string `help:"Agent whose hook is invoking this command." required:"" enum:"claude"`
+	Socket string `help:"Override socket path" env:"MONOCLE_SOCKET" default:""`
+}
+
+func (cmd *MarkActivityHookCmd) Run() error {
+	hookDebug("mark-activity: invoked, agent=%q", cmd.Agent)
+	in, err := decodeHookInput(os.Stdin)
+	if err != nil {
+		hookDebug("mark-activity: decode stdin failed: %v", err)
+		return nil
+	}
+	if cmd.Agent != "claude" {
+		return nil
+	}
+
+	workdir := cmd.WorkDir
+	if workdir == "" && in.CWD != "" {
+		workdir = in.CWD
+	}
+	socketPath, err := resolveSocketForWorkDir(cmd.Socket, workdir)
+	if err != nil {
+		hookDebug("mark-activity: socket resolve failed: %v", err)
+		return nil
+	}
+
+	c, err := client.Connect(socketPath)
+	if err != nil {
+		hookDebug("mark-activity: connect failed: %v", err)
+		return nil
+	}
+	defer c.Close()
+
+	if _, err := c.Request(
+		&protocol.MarkActivityMsg{Type: protocol.TypeMarkActivity},
+		client.DefaultTimeout,
+	); err != nil {
+		hookDebug("mark-activity: request failed: %v", err)
+		return nil
+	}
+	hookDebug("mark-activity: session marked dirty")
+	return nil
+}
+
+// OnStopHookCmd gates Claude's turn-end on reviewer approval when the turn
+// made reviewable file changes. Registered as the Stop hook. If the session
+// isn't dirty (no write-tools fired), the hook exits 0 and the turn ends
+// normally. If the session is dirty, the hook blocks until the reviewer
+// submits feedback; "request_changes" becomes a Stop-hook block decision
+// that sends Claude back to address the feedback.
+type OnStopHookCmd struct {
+	WorkDirFlag
+	Agent  string `help:"Agent whose hook is invoking this command." required:"" enum:"claude"`
+	Socket string `help:"Override socket path" env:"MONOCLE_SOCKET" default:""`
+}
+
+func (cmd *OnStopHookCmd) Run() error {
+	hookDebug("on-stop: invoked, agent=%q", cmd.Agent)
+	in, err := decodeHookInput(os.Stdin)
+	if err != nil {
+		hookDebug("on-stop: decode stdin failed: %v", err)
+		return nil
+	}
+	if cmd.Agent != "claude" {
+		return nil
+	}
+
+	workdir := cmd.WorkDir
+	if workdir == "" && in.CWD != "" {
+		workdir = in.CWD
+	}
+	socketPath, err := resolveSocketForWorkDir(cmd.Socket, workdir)
+	if err != nil {
+		hookDebug("on-stop: socket resolve failed: %v", err)
+		return nil
+	}
+
+	c, err := client.Connect(socketPath)
+	if err != nil {
+		hookDebug("on-stop: connect failed (engine down, turn ends normally): %v", err)
+		return nil
+	}
+	defer c.Close()
+
+	resp, err := c.Request(
+		&protocol.AwaitReviewMsg{Type: protocol.TypeAwaitReview, Wait: true},
+		0,
+	)
+	if err != nil {
+		hookDebug("on-stop: await-review request failed: %v", err)
+		return nil
+	}
+	review, ok := resp.(*protocol.AwaitReviewResponse)
+	if !ok {
+		hookDebug("on-stop: unexpected response type %T", resp)
+		return nil
+	}
+	hookDebug("on-stop: has_activity=%v action=%q feedback_len=%d", review.HasActivity, review.Action, len(review.Feedback))
+
+	if !review.HasActivity {
+		return nil
+	}
+	if review.Action == "request_changes" {
+		return emitClaudeStopBlock(os.Stdout, review.Feedback)
+	}
+	// HasActivity=true but approved (or no explicit action) — turn ends normally.
+	return nil
+}
+
+// emitClaudeStopBlock writes a Claude Code Stop-hook response that blocks
+// the stop with the reviewer's feedback injected as the reason. Claude
+// sees the reason and continues the conversation to address it.
+func emitClaudeStopBlock(w io.Writer, reason string) error {
+	if reason == "" {
+		reason = "Reviewer requested changes."
+	}
+	payload := map[string]any{
+		"decision": "block",
+		"reason":   reason,
+	}
+	buf, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	hookDebug("on-stop: emitting block decision=%s", string(buf))
+	_, err = fmt.Fprintln(w, string(buf))
+	return err
 }

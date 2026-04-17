@@ -12,6 +12,18 @@
         "matcher": "ExitPlanMode"
       }
     ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "./bin/monocle hooks mark-activity --agent claude",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write|NotebookEdit|MultiEdit"
+      }
+    ],
     "PreToolUse": [
       {
         "hooks": [
@@ -29,6 +41,17 @@
         "hooks": [
           {
             "command": "echo 'export PATH=\"./bin:$PATH\"' \u003e\u003e \"$CLAUDE_ENV_FILE\"",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "./bin/monocle hooks on-stop --agent claude",
+            "timeout": 345600,
             "type": "command"
           }
         ]
