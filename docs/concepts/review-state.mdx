@@ -3,6 +3,10 @@ title: "Review State"
 description: "How monocle tracks what you've reviewed, detects changes between rounds, and helps you focus on what's new."
 ---
 
+<Note>
+  Review state tracking is **on by default**. If you'd rather see raw git diffs with no reviewed indicators, snapshots, or change detection, set `"review_tracking": false` in your [config file](/configuration/config-file).
+</Note>
+
 When you review code with monocle, you're not just reading diffs — you're building up a picture of the codebase as the agent modifies it. Monocle tracks this picture so that when the agent makes more changes, you can see exactly what's new since you last looked.
 
 ## Sessions, reviews, and rounds
@@ -98,6 +102,67 @@ Select a round to view only the changes since that review. The status bar update
 <Note>
   Snapshots only appear in the ref picker after you've submitted at least one review with **Request Changes**. If you haven't submitted yet, you'll only see commits.
 </Note>
+
+## Walkthrough: a two-round review
+
+Here's what a typical review looks like with review tracking on. Assume
+the agent just modified three files: `auth.go`, `router.go`, and
+`handlers.go`.
+
+**Round 1 — first look**
+
+You open monocle and the sidebar shows:
+
+```
+Files                 0 / 3
+  ○ auth.go          M
+  ○ router.go        M
+  ○ handlers.go      M
+```
+
+You read each diff. `auth.go` looks good, so you press `r` to mark it
+reviewed. You notice a bug in `router.go` and leave a comment. You mark
+it reviewed too, so you can track that you've seen it:
+
+```
+Files                 2 / 3
+  ✓ auth.go          M
+  ✓ router.go        M   1 comment
+  ○ handlers.go      M
+```
+
+`handlers.go` has a small nit. You comment and leave it unreviewed —
+you'll come back to it after you see the agent's response. You press
+`S`, submit with **Request Changes**. Monocle captures a snapshot and
+sends your review to the agent.
+
+**Round 2 — focusing on what's new**
+
+The agent fixes the bug in `router.go` and touches up `handlers.go` to
+address your nit. The sidebar updates:
+
+```
+Files                 1 / 3
+  ✓ auth.go          M
+  ○ router.go        M   1 comment
+  ○ handlers.go      M
+```
+
+`auth.go` is still marked reviewed because its content didn't change
+since the snapshot. `router.go` and `handlers.go` are back to
+unreviewed because the agent changed them — exactly the two files that
+need your attention this round.
+
+Press `/` to filter to **Unreviewed** and you see only those two files.
+You review the fixes, resolve the comments, and submit again — this
+time with **Approve**. Monocle clears the snapshot history; the review
+is complete.
+
+<Tip>
+  This is the loop: submit **Request Changes** each round to lock in a
+  snapshot, let monocle auto-unmark what changed, filter to
+  **Unreviewed**, and repeat.
+</Tip>
 
 ## Edge cases
 

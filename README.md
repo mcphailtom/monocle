@@ -42,14 +42,14 @@ Download from [GitHub Releases](https://github.com/josephschmitt/monocle/release
 ```bash
 # Apple Silicon
 # x-release-please-start-version
-curl -Lo monocle.tar.gz https://github.com/josephschmitt/monocle/releases/download/v0.45.0/monocle_darwin_arm64.tar.gz
+curl -Lo monocle.tar.gz https://github.com/josephschmitt/monocle/releases/download/v0.43.0/monocle_darwin_arm64.tar.gz
 # x-release-please-end
 tar xzf monocle.tar.gz
 sudo mv monocle /usr/local/bin/
 
 # Intel
 # x-release-please-start-version
-curl -Lo monocle.tar.gz https://github.com/josephschmitt/monocle/releases/download/v0.45.0/monocle_darwin_amd64.tar.gz
+curl -Lo monocle.tar.gz https://github.com/josephschmitt/monocle/releases/download/v0.43.0/monocle_darwin_amd64.tar.gz
 # x-release-please-end
 tar xzf monocle.tar.gz
 sudo mv monocle /usr/local/bin/
@@ -59,14 +59,14 @@ sudo mv monocle /usr/local/bin/
 ```bash
 # x86_64
 # x-release-please-start-version
-curl -Lo monocle.tar.gz https://github.com/josephschmitt/monocle/releases/download/v0.45.0/monocle_linux_amd64.tar.gz
+curl -Lo monocle.tar.gz https://github.com/josephschmitt/monocle/releases/download/v0.43.0/monocle_linux_amd64.tar.gz
 # x-release-please-end
 tar xzf monocle.tar.gz
 sudo mv monocle /usr/local/bin/
 
 # ARM64
 # x-release-please-start-version
-curl -Lo monocle.tar.gz https://github.com/josephschmitt/monocle/releases/download/v0.45.0/monocle_linux_arm64.tar.gz
+curl -Lo monocle.tar.gz https://github.com/josephschmitt/monocle/releases/download/v0.43.0/monocle_linux_arm64.tar.gz
 # x-release-please-end
 tar xzf monocle.tar.gz
 sudo mv monocle /usr/local/bin/
@@ -88,20 +88,11 @@ devbox run -- make build
 ### 1. Register Monocle with your agent
 
 ```bash
-monocle register          # interactive wizard
+monocle register          # interactive picker
 monocle register claude   # or: opencode, codex, gemini, all
 ```
 
-Without an agent argument, `monocle register` launches an interactive TUI wizard that walks you through picking agents, integration modes, and (for Claude Code) the hooks-vs-channels tradeoff. Pass `--no-tui` to skip the wizard and register every supported agent with defaults.
-
-The wizard configures MCP tools or skills depending on the agent. Claude Code gets an MCP server and slash commands; other agents get skill files. Use `--global` to write to the user-level config directory instead of the project. Override the default with `--integration-mode mcp` or `--integration-mode skills`.
-
-For Claude Code, `monocle register` also installs four hooks in `.claude/settings.json`:
-
-- `PreToolUse:ExitPlanMode` + `PermissionRequest:ExitPlanMode` — plan review. When Claude exits plan mode, the proposed plan is automatically sent to Monocle; the agent blocks until you approve, and "request changes" feedback is delivered straight back as the rejection reason. Opt out with `--no-plan-hook` or by unchecking the wizard row.
-- `PostToolUse:Edit|Write|NotebookEdit|MultiEdit` + `Stop` — turn-end review gate. After any turn that touches files, Claude blocks at turn-end until you approve or request changes. Pure-chat turns (no write-tools) are not interrupted. Opt out with `--no-review-gate` or by unchecking the wizard row.
-
-The hooks pause Claude at the right moments so your review lands before Claude keeps going — the plan-mode hooks route `ExitPlanMode` through the reviewer, and the turn-end review gate forcibly pauses Claude at the end of any turn that touched files. Heads up: hooks don't fire when Claude is launched with `--dangerously-load-development-channels` (the flag needed for MCP channel push notifications). If you rely on channels, the hook toggles are no-ops at runtime.
+This configures MCP tools or skills depending on the agent. Claude Code gets an MCP server and slash commands; other agents get skill files. Use `--global` to write to the user-level config directory instead of the project. Override the default with `--integration-mode mcp` or `--integration-mode skills`.
 
 #### Other agents
 
@@ -155,8 +146,6 @@ This means you can review the agent's *thinking* before it writes code — not j
 - **Pull-based feedback** — Agents without channel support retrieve feedback via `/get-feedback` or `monocle review get-feedback`; multiple reviews queue up and are delivered together
 - **Plan & architecture review** — Your agent can submit plans, architecture decisions, and other content for review with markdown rendering. When iterating, Monocle shows diffs between plan versions so you can see exactly what changed. Use focus mode (`F`) for distraction-free reading
 - **Review gating** — `/review-plan-wait` blocks the agent until you approve the submitted content before it proceeds
-- **Automatic plan review (Claude Code)** — Registers hooks on `ExitPlanMode` so every plan the agent produces in plan mode is automatically sent to Monocle; the agent blocks until you approve, and "request changes" feedback is delivered straight back as the rejection reason
-- **Turn-end review gate (Claude Code)** — After any turn that includes file edits (`Edit`/`Write`/`NotebookEdit`/`MultiEdit`), Claude blocks at turn-end until the reviewer approves or requests changes. Pure-chat turns are not interrupted. Works without MCP channels.
 - **Pause flow** — Ask your agent to stop and wait while you review, then release it when ready (requires MCP channel support)
 - **Live diff viewer** — Unified and split (side-by-side) views with syntax highlighting and intra-line diffs
 - **Structured comments** — Tag feedback as issues, suggestions, notes, or praise with line-level or file-level precision
@@ -229,6 +218,7 @@ Monocle exposes review operations via **MCP tools** (default for Claude Code) or
 | `Ctrl+y`               | Copy review to clipboard                                  |
 | `P` / `:pause`         | Pause the agent (wait for your review)                    |
 | `D` / `:clear`         | Clear review (all comments, plans, reviewed states)       |
+| `x`                    | Dismiss focused artifact (sidebar, confirm required)      |
 | `F`                    | Toggle focus mode (hide sidebar, enable wrap)             |
 | `:mark-all-reviewed`   | Mark all files as reviewed                                |
 | `:mark-all-unreviewed` | Mark all files as unreviewed                              |
@@ -266,19 +256,12 @@ The comment editor supports standard emacs-style shortcuts:
 
 ```
 monocle [--socket PATH]              Start a review session
-monocle register [agent] [--global] [--integration-mode auto|mcp|skills]
-                 [--no-plan-hook] [--no-review-gate] [--no-tui]
-                                     Register Monocle for an agent
-monocle unregister [agent] [--global] [--keep-plan-hook] [--keep-review-gate]
-                 [--no-tui]          Remove Monocle registration
+monocle register [agent] [--global]  Register Monocle for an agent
+monocle unregister [agent] [--global] Remove Monocle registration
 monocle --version                    Print version
 ```
 
-The `agent` argument is one of `claude`, `opencode`, `codex`, `gemini`, or `all`. If omitted, an interactive TUI wizard walks you through the options; pass `--no-tui` to skip the wizard and run headlessly. The `--global` flag writes to the user-level config directory instead of the project.
-
-Register flags: `--no-plan-hook` skips installation of the Claude Code `ExitPlanMode` hooks; `--no-review-gate` skips the `PostToolUse`+`Stop` review-gate hooks (default: both installed).
-
-Unregister flags: `--keep-plan-hook` leaves the `ExitPlanMode` hook entries behind in `settings.json`; `--keep-review-gate` leaves the `PostToolUse`+`Stop` entries behind. Everything else (MCP server entry, permissions, skills, commands) is removed.
+The `agent` argument is one of `claude`, `opencode`, `codex`, `gemini`, or `all`. If omitted, an interactive picker lets you select which agents to register. The `--global` flag writes to the user-level config directory instead of the project.
 
 ### Agent-Facing Commands
 
@@ -328,6 +311,7 @@ Monocle loads settings from JSON config files:
   "auto_focus_mode": false,
   "comment_expand": true,
   "comment_expand_delay": 2000,
+  "review_tracking": true,
   "mark_reviewed_on_submit": "all",
   "review_format": {
     "include_snippets": true,
@@ -351,7 +335,8 @@ Monocle loads settings from JSON config files:
 | `auto_focus_mode`                    | `true`, `false`                            | `false`      | Auto-enter focus mode (hide sidebar, enable wrap) when reviewing plans   |
 | `comment_expand`                     | `true`, `false`                            | `true`       | Auto-expand comments on hover                                            |
 | `comment_expand_delay`               | integer (ms)                               | `2000`       | Delay before auto-expanding a selected comment (0 = instant)             |
-| `mark_reviewed_on_submit`            | `"all"`, `"commented"`, `"manual"`         | `"all"`      | Which files to mark as reviewed when submitting a review                  |
+| `review_tracking`                    | `true`, `false`                            | `true`       | Enable review state tracking, snapshots, and change detection. Set to `false` to get raw diffs with no reviewed indicators. |
+| `mark_reviewed_on_submit`            | `"all"`, `"commented"`, `"manual"`         | `"all"`      | Which files to mark as reviewed when submitting (requires `review_tracking`) |
 | `keybindings`                        | object                                     | `{}`         | Custom key overrides (see below)                                         |
 | `review_format.include_snippets`     | `true`, `false`                            | `true`       | Include code snippets in formatted reviews                               |
 | `review_format.max_snippet_lines`    | integer                                    | `10`         | Truncate snippets longer than this                                       |
