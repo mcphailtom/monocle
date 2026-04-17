@@ -12,6 +12,7 @@ type confirmAction int
 const (
 	confirmDiscard confirmAction = iota
 	confirmClear
+	confirmDismissArtifact
 )
 
 type confirmModel struct {

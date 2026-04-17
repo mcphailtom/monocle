@@ -8,12 +8,13 @@ import (
 )
 
 type helpModel struct {
-	active       bool
-	width        int
-	height       int
-	scrollOffset int
-	theme        Theme
-	keys         *KeyMap
+	active         bool
+	width          int
+	height         int
+	scrollOffset   int
+	theme          Theme
+	keys           *KeyMap
+	reviewTracking bool
 }
 
 func newHelpModel(theme Theme, keys *KeyMap) helpModel {
@@ -83,53 +84,71 @@ func (m helpModel) View() string {
 	b.WriteString("\n\n")
 
 	km := m.keys
+
+	navKeys := []struct{ key, desc string }{
+		{Label(km.Down) + "/" + Label(km.Up), "Move up/down"},
+		{Label(km.HalfDown) + "/" + Label(km.HalfUp), "Scroll diff half page (any pane)"},
+		{Label(km.Top) + "/" + Label(km.Bottom), "Top/bottom"},
+		{Label(km.ScrollDown) + "/" + Label(km.ScrollUp), "Scroll diff up/down (any pane)"},
+		{"h/l", "Scroll diff left/right"},
+		{Label(km.ScrollLeft) + "/" + Label(km.ScrollRight), "Scroll diff left/right (any pane)"},
+		{Label(km.ScrollHome), "Scroll to column 0 (any pane)"},
+		{Label(km.ScrollFirstChar), "Scroll to first non-space (any pane)"},
+		{Label(km.ScrollEnd), "Scroll to line end (any pane)"},
+		{Label(km.Wrap), "Toggle line wrapping (any pane)"},
+		{Label(km.PrevFile) + "/" + Label(km.NextFile), "Previous/next file (any pane)"},
+		{Label(km.PrevSection) + "/" + Label(km.NextSection), "Previous/next section (any pane)"},
+		{Label(km.Select), "Focus diff pane / toggle dir"},
+		{Label(km.FocusSwap), "Switch pane focus"},
+		{Label(km.ToggleSidebar), "Toggle sidebar"},
+		{"1/2", "Jump to pane"},
+		{Label(km.BaseRef), "Change base ref"},
+		{Label(km.TreeMode), "Toggle flat/tree view"},
+		{Label(km.CollapseAll) + "/" + Label(km.ExpandAll), "Collapse/expand all (tree)"},
+	}
+	if m.reviewTracking {
+		navKeys = append(navKeys, struct{ key, desc string }{Label(km.FilterReviewed), "Hide/show reviewed files"})
+	}
+
+	reviewKeys := []struct{ key, desc string }{
+		{Label(km.Comment), "Add comment at cursor"},
+		{Label(km.Suggest), "Suggest edit at cursor"},
+		{Label(km.FileComment), "Add file comment"},
+		{Label(km.Visual), "Visual select mode"},
+		{"x", "Toggle comment resolved (on comment)"},
+		{Label(km.DismissArtifact), "Dismiss artifact (in sidebar)"},
+		{"d", "Delete comment (on comment)"},
+	}
+	if m.reviewTracking {
+		reviewKeys = append(reviewKeys, struct{ key, desc string }{Label(km.Reviewed), "Toggle file reviewed"})
+	}
+	reviewKeys = append(reviewKeys, []struct{ key, desc string }{
+		{Label(km.Submit) + " / :submit", "Submit review"},
+		{"Ctrl+g", "Open external editor (comment/submit modal)"},
+		{"Ctrl+y", "Copy review to clipboard"},
+		{Label(km.Pause) + " / :pause", "Toggle pause (ask Claude Code to wait)"},
+		{Label(km.ClearReview) + " / :clear", "Clear review (comments, plans, reviewed)"},
+		{Label(km.ToggleFocusMode), "Toggle focus mode"},
+	}...)
+	if m.reviewTracking {
+		reviewKeys = append(reviewKeys, []struct{ key, desc string }{
+			{":mark-all-reviewed", "Mark all files as reviewed"},
+			{":mark-all-unreviewed", "Mark all files as unreviewed"},
+		}...)
+	}
+	reviewKeys = append(reviewKeys, []struct{ key, desc string }{
+		{":discard", "Discard all pending comments"},
+		{":history", "View submission history"},
+		{Label(km.ArtifactVersions) + " / :base-artifact-version", "Base artifact version to diff against"},
+		{":base-ref", "Base ref to diff against (same as " + Label(km.BaseRef) + ")"},
+	}...)
+
 	sections := []struct {
 		title string
 		keys  []struct{ key, desc string }
 	}{
-		{"Navigation", []struct{ key, desc string }{
-			{Label(km.Down) + "/" + Label(km.Up), "Move up/down"},
-			{Label(km.HalfDown) + "/" + Label(km.HalfUp), "Scroll diff half page (any pane)"},
-			{Label(km.Top) + "/" + Label(km.Bottom), "Top/bottom"},
-			{Label(km.ScrollDown) + "/" + Label(km.ScrollUp), "Scroll diff up/down (any pane)"},
-			{"h/l", "Scroll diff left/right"},
-			{Label(km.ScrollLeft) + "/" + Label(km.ScrollRight), "Scroll diff left/right (any pane)"},
-			{Label(km.ScrollHome), "Scroll to column 0 (any pane)"},
-			{Label(km.ScrollFirstChar), "Scroll to first non-space (any pane)"},
-			{Label(km.ScrollEnd), "Scroll to line end (any pane)"},
-			{Label(km.Wrap), "Toggle line wrapping (any pane)"},
-			{Label(km.PrevFile) + "/" + Label(km.NextFile), "Previous/next file (any pane)"},
-			{Label(km.PrevSection) + "/" + Label(km.NextSection), "Previous/next section (any pane)"},
-			{Label(km.Select), "Focus diff pane / toggle dir"},
-			{Label(km.FocusSwap), "Switch pane focus"},
-			{Label(km.ToggleSidebar), "Toggle sidebar"},
-			{"1/2", "Jump to pane"},
-			{Label(km.BaseRef), "Change base ref"},
-			{Label(km.TreeMode), "Toggle flat/tree view"},
-			{Label(km.CollapseAll) + "/" + Label(km.ExpandAll), "Collapse/expand all (tree)"},
-			{Label(km.FilterReviewed), "Hide/show reviewed files"},
-		}},
-		{"Review", []struct{ key, desc string }{
-			{Label(km.Comment), "Add comment at cursor"},
-			{Label(km.Suggest), "Suggest edit at cursor"},
-			{Label(km.FileComment), "Add file comment"},
-			{Label(km.Visual), "Visual select mode"},
-			{"x", "Toggle comment resolved"},
-			{"d", "Delete comment (on comment)"},
-			{Label(km.Reviewed), "Toggle file reviewed"},
-			{Label(km.Submit) + " / :submit", "Submit review"},
-			{"Ctrl+g", "Open external editor (comment/submit modal)"},
-			{"Ctrl+y", "Copy review to clipboard"},
-			{Label(km.Pause) + " / :pause", "Toggle pause (ask Claude Code to wait)"},
-			{Label(km.ClearReview) + " / :clear", "Clear review (comments, plans, reviewed)"},
-			{Label(km.ToggleFocusMode), "Toggle focus mode"},
-			{":mark-all-reviewed", "Mark all files as reviewed"},
-			{":mark-all-unreviewed", "Mark all files as unreviewed"},
-			{":discard", "Discard all pending comments"},
-			{":history", "View submission history"},
-			{Label(km.ArtifactVersions) + " / :base-artifact-version", "Base artifact version to diff against"},
-			{":base-ref", "Base ref to diff against (same as " + Label(km.BaseRef) + ")"},
-		}},
+		{"Navigation", navKeys},
+		{"Review", reviewKeys},
 		{"Text Editing (comment/submit)", []struct{ key, desc string }{
 			{"←/→ or Ctrl+B/F", "Move cursor left/right"},
 			{"↑/↓ or Ctrl+P/N", "Move cursor up/down"},

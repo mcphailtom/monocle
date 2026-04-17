@@ -17,6 +17,7 @@ type stubEngine struct {
 	session        *types.ReviewSession
 	contentItems   []types.ContentItem
 	cleared        bool
+	dismissCalled  bool
 }
 
 func (s *stubEngine) GetConfig() *types.Config                  { return s.cfg }
@@ -38,8 +39,34 @@ func (s *stubEngine) GetContentItem(id string) (*types.ContentItem, error) {
 	}
 	return nil, fmt.Errorf("not found")
 }
+func (s *stubEngine) GetSnapshots() ([]types.ReviewSnapshot, error)   { return nil, nil }
+func (s *stubEngine) SetSnapshotBase(snapshotID int) error             { return nil }
+func (s *stubEngine) ClearSnapshotBase()                               {}
+func (s *stubEngine) GetActiveSnapshot() *types.ReviewSnapshot         { return nil }
+func (s *stubEngine) HasSnapshots() (bool, error)                      { return false, nil }
+func (s *stubEngine) IsReviewTrackingEnabled() bool                    { return s.cfg != nil && s.cfg.ReviewTracking }
 func (s *stubEngine) ClearComments() error {
 	s.cleared = true
+	return nil
+}
+func (s *stubEngine) DismissArtifact(id string) error {
+	s.dismissCalled = true
+	filtered := s.contentItems[:0]
+	for _, item := range s.contentItems {
+		if item.ID != id {
+			filtered = append(filtered, item)
+		}
+	}
+	s.contentItems = filtered
+	if s.session != nil {
+		sessionItems := s.session.ContentItems[:0]
+		for _, item := range s.session.ContentItems {
+			if item.ID != id {
+				sessionItems = append(sessionItems, item)
+			}
+		}
+		s.session.ContentItems = sessionItems
+	}
 	return nil
 }
 func (s *stubEngine) ClearReview() error {
@@ -118,7 +145,7 @@ func TestSubmitSuccess_AgentDisconnected_ClearsComments(t *testing.T) {
 	}
 }
 
-func TestSubmitSuccess_ClearsStaleContentView(t *testing.T) {
+func TestSubmitSuccess_PreservesContentView(t *testing.T) {
 	engine := &stubEngine{
 		cfg:     &types.Config{},
 		session: newTestSession(false),
@@ -127,18 +154,23 @@ func TestSubmitSuccess_ClearsStaleContentView(t *testing.T) {
 	m.diffView.contentMode = true
 	m.diffView.contentID = "plan-1"
 	m.diffView.path = "plan-1"
+	m.diffView.comments = []types.ReviewComment{{ID: "c1"}}
 
 	result, _ := m.Update(submitSuccessMsg{agentConnected: true})
 	app := result.(appModel)
 
-	if app.diffView.contentMode {
-		t.Error("expected contentMode to be cleared after submit")
+	// Artifacts persist across rounds — keep the content view on screen so
+	// the reviewer can keep referring to the plan after submitting.
+	if !app.diffView.contentMode {
+		t.Error("expected contentMode to be preserved after submit")
 	}
-	if app.diffView.contentID != "" {
-		t.Errorf("expected contentID to be cleared, got %q", app.diffView.contentID)
+	if app.diffView.contentID != "plan-1" {
+		t.Errorf("expected contentID preserved, got %q", app.diffView.contentID)
 	}
-	if app.diffView.path != "" {
-		t.Errorf("expected path to be cleared, got %q", app.diffView.path)
+	// Inline comment annotations should be cleared — comments are frozen
+	// in the submission record.
+	if len(app.diffView.comments) != 0 {
+		t.Errorf("expected inline comments cleared, got %d", len(app.diffView.comments))
 	}
 }
 
@@ -197,18 +229,19 @@ func TestSubmitSuccess_RecalcsStackedLayout(t *testing.T) {
 	}
 
 	// Add files and content items to establish a baseline sidebar height.
-	// Files persist across submit so the sidebar remains visible.
+	item := types.ContentItem{ID: "plan-1", Title: "Plan"}
 	m.sidebar.files = []types.ChangedFile{{Path: "file.go", Status: "M"}}
-	m.sidebar.contentItems = []types.ContentItem{{ID: "plan-1", Title: "Plan"}}
+	m.sidebar.contentItems = []types.ContentItem{item}
+	engine.session.ContentItems = []types.ContentItem{item}
 	m.sidebar.rebuildTree()
 	recalcStackedLayout(&m)
 
-	// Submit feedback (clears content items)
+	// Submit feedback — artifacts persist across rounds.
 	result, _ = m.Update(submitSuccessMsg{agentConnected: true})
 	app := result.(appModel)
 
-	if len(app.sidebar.contentItems) != 0 {
-		t.Errorf("expected 0 content items, got %d", len(app.sidebar.contentItems))
+	if len(app.sidebar.contentItems) != 1 {
+		t.Errorf("expected artifact to persist after submit, got %d", len(app.sidebar.contentItems))
 	}
 	if app.sidebar.height == 0 {
 		t.Error("expected non-zero sidebar height after submit")
@@ -291,6 +324,72 @@ func TestSubmitSuccess_NoAgent_FocusModeRestoresDimensions(t *testing.T) {
 	}
 	if app.sidebar.height == 0 {
 		t.Error("expected non-zero sidebar height")
+	}
+}
+
+func TestDismissArtifact_ConfirmAcceptCallsEngine(t *testing.T) {
+	item := types.ContentItem{ID: "plan-1", Title: "Plan"}
+	engine := &stubEngine{
+		cfg: &types.Config{},
+		session: &types.ReviewSession{
+			ID:           "test",
+			ContentItems: []types.ContentItem{item},
+		},
+		contentItems: []types.ContentItem{item},
+	}
+	m := NewApp(engine)
+	m.pendingDismissArtifactID = "plan-1"
+
+	_, cmd := m.Update(confirmActionMsg{action: confirmDismissArtifact})
+	if cmd == nil {
+		t.Fatal("expected command from confirmDismissArtifact accept")
+	}
+	msg := cmd()
+	result, ok := msg.(artifactDismissedMsg)
+	if !ok {
+		t.Fatalf("expected artifactDismissedMsg, got %T", msg)
+	}
+	if result.id != "plan-1" {
+		t.Errorf("expected id plan-1, got %q", result.id)
+	}
+	if !engine.dismissCalled {
+		t.Error("expected engine.DismissArtifact to be called")
+	}
+}
+
+func TestDismissArtifact_ConfirmCancelClearsPending(t *testing.T) {
+	engine := &stubEngine{cfg: &types.Config{}, session: &types.ReviewSession{ID: "test"}}
+	m := NewApp(engine)
+	m.pendingDismissArtifactID = "plan-1"
+
+	result, _ := m.Update(cancelConfirmMsg{})
+	app := result.(appModel)
+	if app.pendingDismissArtifactID != "" {
+		t.Errorf("expected pendingDismissArtifactID cleared on cancel, got %q", app.pendingDismissArtifactID)
+	}
+	if engine.dismissCalled {
+		t.Error("expected engine.DismissArtifact NOT to be called on cancel")
+	}
+}
+
+func TestArtifactDismissed_ClearsContentViewIfViewing(t *testing.T) {
+	engine := &stubEngine{
+		cfg:     &types.Config{},
+		session: &types.ReviewSession{ID: "test"},
+	}
+	m := NewApp(engine)
+	m.diffView.contentMode = true
+	m.diffView.contentID = "plan-1"
+	m.diffView.path = "plan-1"
+
+	result, _ := m.Update(artifactDismissedMsg{id: "plan-1"})
+	app := result.(appModel)
+
+	if app.diffView.contentMode {
+		t.Error("expected contentMode cleared when the viewed artifact is dismissed")
+	}
+	if app.diffView.contentID != "" {
+		t.Errorf("expected contentID cleared, got %q", app.diffView.contentID)
 	}
 }
 

@@ -1976,6 +1976,9 @@ func (m diffViewModel) lastVisibleLine() int {
 }
 
 func (m *diffViewModel) ensureVisible() {
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
 	if m.cursor < m.offset {
 		m.offset = m.cursor
 	}
@@ -2038,6 +2041,9 @@ func (m diffViewModel) nextSelectable(from, dir int) int {
 
 // nearestSelectable finds the closest selectable line from pos, preferring the given direction.
 func (m diffViewModel) nearestSelectable(pos, dir int) int {
+	if len(m.lines) == 0 {
+		return 0
+	}
 	if pos < 0 {
 		pos = 0
 	}

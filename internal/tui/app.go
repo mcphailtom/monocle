@@ -1,3 +1,4 @@
+// app.go is the main Bubble Tea application model and event loop.
 package tui
 
 import (
@@ -136,6 +137,11 @@ type reviewClearedMsg struct {
 	isAdditionalFile bool
 }
 
+type artifactDismissedMsg struct {
+	id  string
+	err error
+}
+
 type resolveCommentMsg struct {
 	commentID string
 }
@@ -211,6 +217,8 @@ type appModel struct {
 	mcpRegisterFn    func(global bool) error
 	registerPrompt   registerPromptModel
 
+	pendingDismissArtifactID string // set while the dismiss-artifact confirm modal is open
+
 	focusModeActive       bool // currently in focus mode
 	focusModeSavedSidebar bool // sidebar visibility before entering focus mode
 	focusModeSavedWrap    bool // wrap state before entering focus mode
@@ -226,7 +234,7 @@ type appModel struct {
 	infoBanner infoBannerModel  // info modal for non-git startup
 }
 
-// NewApp creates the root appModel.
+// NewApp creates the root appModel and wires up all subsystems.
 func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 	var o AppOptions
 	if len(opts) > 0 {
@@ -237,6 +245,7 @@ func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 	keys := DefaultKeyMap()
 	sidebar := newSidebarModel(&keys)
 	sidebar.focused = true
+	help := newHelpModel(theme, &keys)
 	dv := newDiffViewModel(&theme, &keys)
 	var layoutCfg string
 
@@ -282,6 +291,8 @@ func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 			} else if cfg.CommentExpandDelay > 0 {
 				dv.commentExpandDelay = time.Duration(cfg.CommentExpandDelay) * time.Millisecond
 			}
+			sidebar.reviewTracking = cfg.ReviewTracking
+			help.reviewTracking = cfg.ReviewTracking
 		}
 	}
 
@@ -296,7 +307,7 @@ func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 		statusBar:     newStatusBarModel(theme),
 		commentEditor: newCommentEditorModel(theme),
 		reviewSummary: newReviewSummaryModel(theme),
-		help:          newHelpModel(theme, &keys),
+		help:          help,
 		refPicker:     newRefPickerModel(theme),
 		confirm:        newConfirmModel(theme),
 		connectionInfo: newConnectionInfoModel(theme),
@@ -320,7 +331,7 @@ func NewApp(engine core.EngineAPI, opts ...AppOptions) appModel {
 	}
 }
 
-// Init loads the initial file list from the engine and starts the refresh tick.
+// Init loads the initial file list from the engine, starts the refresh tick, and kicks off the TUI event loop.
 func (m appModel) Init() tea.Cmd {
 	cmds := []tea.Cmd{refreshTick()}
 
@@ -474,14 +485,18 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	// Periodic refresh
+	// Periodic refresh — fires on a timer to keep the file list and diff in sync.
 	case refreshTickMsg:
 		return m, tea.Batch(m.refreshFiles(), refreshTick())
 
 	case refreshResultMsg:
+		prevKind, prevID := m.sidebar.currentItemKey()
+
 		m.sidebar.files = msg.files
 		m.sidebar.applyReviewedFilter()
 		m.sidebar.rebuildTree()
+
+		m.sidebar.selectByKey(prevKind, prevID)
 		m.sidebar.clampOffset()
 		recalcStackedLayout(&m)
 		m.statusBar.fileCount = len(msg.files)
@@ -503,12 +518,14 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					autoSwitchDiff: msg.contentItem.VersionCount > 1 && m.diffView.contentMode,
 				})
 			}
-		} else if msg.path != "" && msg.result != nil {
-			m.diffView, diffCmd = m.diffView.Update(loadDiffMsg{
-				path:     msg.path,
-				result:   msg.result,
-				comments: msg.comments,
-			})
+		} else if msg.path != "" && msg.result != nil && msg.path == m.diffView.path {
+			if fileDiffChanged(msg.result, msg.comments, &m.diffView) {
+				m.diffView, diffCmd = m.diffView.Update(loadDiffMsg{
+					path:     msg.path,
+					result:   msg.result,
+					comments: msg.comments,
+				})
+			}
 		}
 		// Auto-select first file if current view is stale
 		if len(msg.files) > 0 && !m.diffViewShowsValidFile() {
@@ -655,6 +672,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case openRefPickerMsg:
 		m.refPicker.entries = msg.entries
+		m.refPicker.snapshots = msg.snapshots
 		m.refPicker.autoActive = msg.autoActive
 		m.refPicker.active = true
 		m.refPicker.width = m.width
@@ -663,9 +681,21 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refPicker.hasMore = len(msg.entries) >= refPickerPageSize
 		m.refPicker.loading = false
 
-		// Pre-select the currently active ref
-		m.refPicker.cursor = 0
-		if !msg.autoActive {
+		// Pre-select the currently active ref or snapshot
+		m.refPicker.cursor = m.refPicker.workingTreeCursor()
+		m.refPicker.snapshotActive = false
+		m.refPicker.activeSnapshotID = 0
+		if snap := m.engine.GetActiveSnapshot(); snap != nil {
+			m.refPicker.snapshotActive = true
+			m.refPicker.activeSnapshotID = snap.ID
+			// Find the active snapshot in the list
+			for i, s := range msg.snapshots {
+				if s.ID == snap.ID {
+					m.refPicker.cursor = i
+					break
+				}
+			}
+		} else if !msg.autoActive {
 			// Use the user's selected ref for matching (not the parent used for diffing)
 			displayRef := m.engine.SelectedBaseRef()
 			if displayRef == "" {
@@ -674,9 +704,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			if displayRef != "" {
+				commitStart := m.refPicker.commitStartCursor()
 				for i, entry := range msg.entries {
 					if strings.HasPrefix(entry.Hash, displayRef) || strings.HasPrefix(displayRef, entry.Hash) {
-						m.refPicker.cursor = i + 1
+						m.refPicker.cursor = commitStart + i
 						break
 					}
 				}
@@ -689,10 +720,25 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case selectRefMsg:
 		m.overlay = overlayNone
 		m.refPicker.active = false
+		// Selecting a git ref clears snapshot mode
+		m.engine.ClearSnapshotBase()
 		if msg.auto {
 			return m, m.executeCommand("ref auto")
 		}
 		return m, m.executeCommand("ref " + msg.hash)
+
+	case selectSnapshotMsg:
+		m.overlay = overlayNone
+		m.refPicker.active = false
+		if err := m.engine.SetSnapshotBase(msg.snapshotID); err != nil {
+			return m, nil
+		}
+		// Refresh to show snapshot-based diff
+		session := m.engine.GetSession()
+		if session != nil {
+			m.statusBar.baseRef = m.displayBaseRef(session)
+		}
+		return m, m.refreshFiles()
 
 	case loadMoreRefsMsg:
 		m.refPicker, _ = m.refPicker.Update(msg)
@@ -1091,24 +1137,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Agent was connected — round was advanced.
-		// Only clear content items and comments. Don't touch sidebar files
-		// or call applyReviewedFilter — the periodic refresh handles that.
-		m.sidebar.contentItems = nil
-		m.sidebar.rebuildTree()
-		m.sidebar.clampOffset()
+		m.syncArtifactsAfterSubmit(session)
 
-		// Clear stale content view after round advance
-		if m.diffView.contentMode {
-			m.diffView.contentMode = false
-			m.diffView.contentID = ""
-			m.diffView.path = ""
-			m.diffView.hunks = nil
-			m.diffView.lines = nil
-			m.diffView.comments = nil
-		}
-
-		// Clear comments — they're now frozen in the submission record
 		if session != nil && len(session.Comments) > 0 {
 			_ = m.engine.ClearComments()
 			m.statusBar.commentCount = 0
@@ -1136,19 +1166,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusBar.feedbackStatus = "delivered"
 		session := m.engine.GetSession()
 
-		// Same cleanup as push-mode delivery
-		m.sidebar.contentItems = nil
-		m.sidebar.rebuildTree()
-		m.sidebar.clampOffset()
-
-		if m.diffView.contentMode {
-			m.diffView.contentMode = false
-			m.diffView.contentID = ""
-			m.diffView.path = ""
-			m.diffView.hunks = nil
-			m.diffView.lines = nil
-			m.diffView.comments = nil
-		}
+		m.syncArtifactsAfterSubmit(session)
 
 		if session != nil {
 			m.statusBar.commentCount = 0
@@ -1191,6 +1209,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, func() tea.Msg {
 				_ = engine.ClearReview()
 				return reviewClearedMsg{reloadPath: currentPath, isContent: isContent, isAdditionalFile: isAdditional}
+			}
+		case confirmDismissArtifact:
+			id := m.pendingDismissArtifactID
+			m.pendingDismissArtifactID = ""
+			if id == "" {
+				return m, nil
+			}
+			return m, func() tea.Msg {
+				err := engine.DismissArtifact(id)
+				return artifactDismissedMsg{id: id, err: err}
 			}
 		}
 		return m, nil
@@ -1241,6 +1269,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case cancelConfirmMsg:
 		m.overlay = overlayNone
+		m.pendingDismissArtifactID = ""
 		return m, nil
 
 	case openHistoryMsg:
@@ -1307,6 +1336,30 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.reloadPath, isAdditionalFile: true})
 		} else if msg.reloadPath != "" {
 			return m, m.handleSidebarSelect(sidebarSelectMsg{path: msg.reloadPath})
+		}
+		return m, nil
+
+	case artifactDismissedMsg:
+		if msg.err != nil {
+			m.statusBar.feedbackStatus = fmt.Sprintf("dismiss artifact failed: %v", msg.err)
+			return m, nil
+		}
+		m.sidebar.contentItems = m.engine.GetContentItems()
+		m.sidebar.applyReviewedFilter()
+		m.sidebar.rebuildTree()
+		m.sidebar.clampOffset()
+		recalcStackedLayout(&m)
+		session := m.engine.GetSession()
+		if session != nil {
+			m.statusBar.commentCount = len(session.Comments)
+		}
+		if m.diffView.contentMode && m.diffView.contentID == msg.id {
+			m.diffView.contentMode = false
+			m.diffView.contentID = ""
+			m.diffView.path = ""
+			m.diffView.hunks = nil
+			m.diffView.lines = nil
+			m.diffView.comments = nil
 		}
 		return m, nil
 
@@ -1503,9 +1556,15 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 
 	case Matches(key, km.Reviewed):
+		if !m.sidebar.reviewTracking {
+			return m, nil
+		}
 		return m, m.handleMarkReviewed()
 
 	case Matches(key, km.FilterReviewed):
+		if !m.sidebar.reviewTracking {
+			return m, nil
+		}
 		m.sidebar.cycleReviewFilter()
 		m.sidebar.files = m.engine.GetChangedFiles()
 		m.sidebar.contentItems = m.engine.GetContentItems()
@@ -1525,6 +1584,17 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	case Matches(key, km.ClearReview):
 		return m, m.executeCommand("clear")
+
+	case Matches(key, km.DismissArtifact) && m.focus == focusSidebar && m.sidebar.selectedContentItem() != nil:
+		item := m.sidebar.selectedContentItem()
+		m.pendingDismissArtifactID = item.ID
+		m.confirm.open(
+			"Dismiss artifact?",
+			fmt.Sprintf("Remove %q from the sidebar. Version history and comments will be deleted. This can't be undone.", item.Title),
+			confirmDismissArtifact,
+		)
+		m.overlay = overlayConfirm
+		return m, nil
 
 	case Matches(key, km.ToggleFocusMode):
 		if m.focusModeActive {
@@ -1607,8 +1677,10 @@ func (m appModel) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if err != nil {
 				return nil
 			}
+			snapshots, _ := engine.GetSnapshots()
 			return openRefPickerMsg{
 				entries:    entries,
+				snapshots:  snapshots,
 				autoActive: engine.IsAutoAdvanceRef(),
 			}
 		}
@@ -1928,8 +2000,10 @@ func (m appModel) executeCommand(cmd string) tea.Cmd {
 			if err != nil {
 				return nil
 			}
+			snapshots, _ := engine.GetSnapshots()
 			return openRefPickerMsg{
 				entries:    entries,
+				snapshots:  snapshots,
 				autoActive: engine.IsAutoAdvanceRef(),
 			}
 		}
@@ -1964,6 +2038,9 @@ type baseRefChangedMsg struct {
 // Prefers the user's selected ref over the internal diff baseline (which is
 // the parent commit used for git diff).
 func (m appModel) displayBaseRef(session *types.ReviewSession) string {
+	if snap := m.engine.GetActiveSnapshot(); snap != nil {
+		return fmt.Sprintf("R%d (%s)", snap.ReviewRound, relativeTime(snap.CreatedAt))
+	}
 	if selected := m.engine.SelectedBaseRef(); selected != "" {
 		return selected
 	}
@@ -2127,6 +2204,19 @@ func (m appModel) diffViewShowsValidFile() bool {
 // sidebarHasItems returns true if the sidebar has any displayable items.
 func (m appModel) sidebarHasItems() bool {
 	return len(m.sidebar.files) > 0 || len(m.sidebar.contentItems) > 0 || len(m.sidebar.additionalFiles) > 0
+}
+
+// syncArtifactsAfterSubmit refreshes the sidebar's artifact list from the
+// session so it reflects reviewed-state changes applied during submit, and
+// clears inline comment annotations from the active view (comments are
+// frozen in the submission record once submitted).
+func (m *appModel) syncArtifactsAfterSubmit(session *types.ReviewSession) {
+	if session != nil {
+		m.sidebar.contentItems = session.ContentItems
+	}
+	m.sidebar.rebuildTree()
+	m.sidebar.clampOffset()
+	m.diffView.comments = nil
 }
 
 // autoToggleSidebar hides the sidebar when it has no items, or shows it when
@@ -2477,12 +2567,43 @@ func contentItemChanged(item *types.ContentItem, comments []types.ReviewComment,
 	if item.Content != dv.contentDiffContent {
 		return true
 	}
-	if len(comments) != len(dv.comments) {
+	return commentsChanged(comments, dv.comments)
+}
+
+// fileDiffChanged reports whether a refreshed file diff differs from what the
+// diff view is currently showing (hunks or comment state).
+func fileDiffChanged(result *types.DiffResult, comments []types.ReviewComment, dv *diffViewModel) bool {
+	if result == nil {
+		return len(dv.hunks) != 0
+	}
+	if len(result.Hunks) != len(dv.hunks) {
 		return true
 	}
-	for i, c := range comments {
-		prev := dv.comments[i]
-		if c.ID != prev.ID || c.Body != prev.Body || c.Resolved != prev.Resolved {
+	for i, h := range result.Hunks {
+		prev := dv.hunks[i]
+		if h.OldStart != prev.OldStart || h.OldCount != prev.OldCount ||
+			h.NewStart != prev.NewStart || h.NewCount != prev.NewCount ||
+			h.Header != prev.Header || len(h.Lines) != len(prev.Lines) {
+			return true
+		}
+		for j, l := range h.Lines {
+			pl := prev.Lines[j]
+			if l.Kind != pl.Kind || l.OldLineNum != pl.OldLineNum ||
+				l.NewLineNum != pl.NewLineNum || l.Content != pl.Content {
+				return true
+			}
+		}
+	}
+	return commentsChanged(comments, dv.comments)
+}
+
+func commentsChanged(next, prev []types.ReviewComment) bool {
+	if len(next) != len(prev) {
+		return true
+	}
+	for i, c := range next {
+		p := prev[i]
+		if c.ID != p.ID || c.Body != p.Body || c.Resolved != p.Resolved {
 			return true
 		}
 	}

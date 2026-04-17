@@ -285,9 +285,9 @@ func TestSidebarItemAtLineWithContentItems(t *testing.T) {
 		height: 20,
 	}
 
-	// Line 0: "Review Items" header
+	// Line 0: "Artifacts" header
 	if got := s.itemAtLine(0); got != -1 {
-		t.Errorf("line 0 (Review Items header) = %d, want -1", got)
+		t.Errorf("line 0 (Artifacts header) = %d, want -1", got)
 	}
 	// Line 1: first content item (item 0)
 	if got := s.itemAtLine(1); got != 0 {
