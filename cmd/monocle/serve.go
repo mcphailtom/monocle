@@ -22,7 +22,7 @@ import (
 type ServeCmd struct {
 	WorkDirFlag
 	Socket      string        `help:"Override socket path" env:"MONOCLE_SOCKET" default:""`
-	IdleTimeout time.Duration `help:"Exit after this idle interval past the 60s grace window (0 disables)" name:"idle-timeout" default:""`
+	IdleTimeout time.Duration `help:"Exit after this idle interval past the 60s grace window (0 disables)" name:"idle-timeout"`
 }
 
 // StopCmd sends SIGTERM to a running `monocle serve` process for the target

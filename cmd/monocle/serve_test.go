@@ -4,7 +4,27 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/alecthomas/kong"
 )
+
+// TestCLIParsesWithoutIdleTimeoutFlag guards against a regression where
+// ServeCmd.IdleTimeout had a default:"" tag that Kong rejected as an
+// invalid duration during CLI setup — breaking every subcommand, not
+// just `monocle serve`, because Kong validates all defaults upfront.
+func TestCLIParsesWithoutIdleTimeoutFlag(t *testing.T) {
+	// Building the parser exercises default-tag validation on every
+	// field. If ServeCmd's --idle-timeout regressed to an invalid default
+	// this call would fail.
+	var cli CLI
+	parser, err := kong.New(&cli)
+	if err != nil {
+		t.Fatalf("kong setup failed (likely a bad default on some flag): %v", err)
+	}
+	if _, err := parser.Parse([]string{"hooks", "on-stop", "--agent", "claude"}); err != nil {
+		t.Fatalf("parse hooks on-stop: %v", err)
+	}
+}
 
 func TestPidFilePath(t *testing.T) {
 	cases := []struct {
