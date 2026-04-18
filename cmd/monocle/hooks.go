@@ -263,23 +263,23 @@ func (cmd *EnterPlanHookCmd) runClaude(in hookInput) error {
 		return nil
 	}
 
-	// Start with the base context. If the engine is reachable, layer on any
-	// pending reviewer state. Timeout here is strict because the PreToolUse
-	// hook runs with a 5-second timeout.
-	context := "Monocle is running for this session. When you submit a plan via ExitPlanMode, it will be sent to a human reviewer who can approve or request changes — the approval flow is automatic, you do not need to run any review commands yourself."
-
+	// If the engine isn't reachable, stay out of Claude's way — the user
+	// isn't running monocle and doesn't want plan-mode injection.
 	c, err := client.Connect(socketPath)
-	if err == nil {
-		resp, err := c.Request(
-			&protocol.GetReviewStatusMsg{Type: protocol.TypeGetReviewStatus},
-			2*time.Second,
-		)
-		c.Close()
-		if err == nil {
-			if status, ok := resp.(*protocol.GetReviewStatusResponse); ok {
-				if status.Status == "pending" || status.CommentCount > 0 {
-					context += fmt.Sprintf(" There are %d unaddressed reviewer comment(s) — read them before finalizing the plan.", status.CommentCount)
-				}
+	if err != nil {
+		return nil
+	}
+	resp, reqErr := c.Request(
+		&protocol.GetReviewStatusMsg{Type: protocol.TypeGetReviewStatus},
+		2*time.Second,
+	)
+	c.Close()
+
+	context := "Monocle is running for this session. When you submit a plan via ExitPlanMode, it will be sent to a human reviewer who can approve or request changes — the approval flow is automatic, you do not need to run any review commands yourself."
+	if reqErr == nil {
+		if status, ok := resp.(*protocol.GetReviewStatusResponse); ok {
+			if status.Status == "pending" || status.CommentCount > 0 {
+				context += fmt.Sprintf(" There are %d unaddressed reviewer comment(s) — read them before finalizing the plan.", status.CommentCount)
 			}
 		}
 	}

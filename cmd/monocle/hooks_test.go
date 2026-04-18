@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -149,6 +152,57 @@ func TestEmitClaudeStopBlock_FallbackReasonWhenEmpty(t *testing.T) {
 	json.Unmarshal(buf.Bytes(), &out)
 	if out["reason"] == nil || out["reason"] == "" {
 		t.Error("empty reason should be replaced with a non-empty fallback")
+	}
+}
+
+// captureStdout runs fn with os.Stdout redirected to an in-memory buffer
+// and returns what fn wrote. Used to assert hooks stay silent when the
+// monocle engine isn't running.
+func captureStdout(t *testing.T, fn func()) string {
+	t.Helper()
+	orig := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stdout = w
+	done := make(chan []byte, 1)
+	go func() {
+		b, _ := io.ReadAll(r)
+		done <- b
+	}()
+	fn()
+	w.Close()
+	os.Stdout = orig
+	return string(<-done)
+}
+
+// TestEnterPlanHook_SilentWhenEngineDown verifies that the enter-plan hook
+// exits 0 with no stdout when monocle isn't running. Without the quiet
+// exit Claude would see "Monocle is running for this session..." even in
+// repos where the user never launched monocle.
+func TestEnterPlanHook_SilentWhenEngineDown(t *testing.T) {
+	// Use a workdir whose derived socket cannot exist.
+	tmp := t.TempDir()
+	cmd := &EnterPlanHookCmd{
+		WorkDirFlag: WorkDirFlag{WorkDir: tmp},
+		Agent:       "claude",
+		Socket:      filepath.Join(tmp, "definitely-not-running.sock"),
+	}
+
+	stdin := strings.NewReader(`{"session_id":"s","cwd":"` + tmp + `","tool_name":"ExitPlanMode","tool_input":{"plan":"# x"}}`)
+	in, err := decodeHookInput(stdin)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := cmd.runClaude(in); err != nil {
+			t.Errorf("runClaude returned error (should degrade silently): %v", err)
+		}
+	})
+	if strings.TrimSpace(out) != "" {
+		t.Errorf("expected empty stdout when engine down, got: %q", out)
 	}
 }
 
