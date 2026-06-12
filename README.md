@@ -104,7 +104,7 @@ monocle register          # interactive picker
 monocle register claude   # or: opencode, codex, gemini, pi, all
 ```
 
-This configures MCP tools or skills depending on the agent. Claude Code gets an MCP server and slash commands; Pi gets `pi-mcp-adapter` plus prompt templates; other agents get skill files. Use `--global` to write to the user-level config directory instead of the project. Override the default with `--integration-mode mcp` or `--integration-mode skills`. If Pi is already running, restart it or run `/reload` after registering.
+This configures MCP tools or skills depending on the agent. Claude Code gets an MCP server and slash commands. Pi uses existing `pi-mcp-adapter` setups automatically, otherwise it falls back to skills plus prompt templates; pass `--integration-mode mcp` to add the adapter explicitly. Other agents get skill files by default. Use `--global` to write to the user-level config directory instead of the project. If Pi is already running, restart it or run `/reload` after registering.
 
 #### Other agents
 
@@ -121,7 +121,7 @@ Start your agent and Monocle in separate terminals:
 monocle
 ```
 
-For Claude Code, Monocle registers an MCP server that exposes review tools directly — no bash permissions or skills needed. For Pi, Monocle registers its MCP server through `pi-mcp-adapter` and installs prompt templates. Other agents get [skills](#agent-operations) that instruct them to run CLI commands.
+For Claude Code, Monocle registers an MCP server that exposes review tools directly — no bash permissions or skills needed. For Pi, Monocle uses `pi-mcp-adapter` only when it is already configured, or when you explicitly request MCP mode; otherwise Pi uses prompts and skills that run CLI commands. Other agents get [skills](#agent-operations) that instruct them to run CLI commands.
 
 #### Push notifications (Claude Code only)
 
@@ -180,7 +180,7 @@ This means you can review the agent's *thinking* before it writes code — not j
 
 ## Agent Operations
 
-Monocle exposes review operations via **MCP tools** (default for Claude Code and Pi) or **skills** (default for other agents). Both are configured automatically by `monocle register`.
+Monocle exposes review operations via **MCP tools** (default for Claude Code, and for Pi when `pi-mcp-adapter` is already configured) or **skills** (default for other agents, and Pi's fallback). Both are configured automatically by `monocle register`.
 
 | Operation | MCP tool | Skill | Description |
 |-----------|----------|-------|-------------|

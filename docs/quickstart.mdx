@@ -18,7 +18,7 @@ description: "Get monocle running alongside your AI coding agent in minutes."
 
     The interactive picker lets you select which agents to register. Pass a named agent — `claude`, `opencode`, `codex`, `gemini`, `pi`, or `all` — to skip the picker. Use `--global` to write to your user-level config directory instead of the current project.
 
-    Claude Code and Pi default to MCP tools. Pi uses `pi-mcp-adapter` and writes Pi-owned MCP config. OpenCode, Codex CLI, and Gemini CLI default to skills. If Pi is already running, restart it or run `/reload` after registering.
+    Claude Code defaults to MCP tools. Pi uses MCP tools when `pi-mcp-adapter` is already configured; otherwise it falls back to skills plus prompt templates and does not add the adapter package. OpenCode, Codex CLI, and Gemini CLI default to skills. If Pi is already running, restart it or run `/reload` after registering.
 
     | Agent | Skills/prompts | MCP/prompts config |
     |---|---|---|

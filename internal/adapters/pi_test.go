@@ -94,6 +94,62 @@ func TestPiRegister_SkillsMode(t *testing.T) {
 	}
 }
 
+func TestPiRegister_AutoModeFallsBackToSkillsWhenAdapterMissing(t *testing.T) {
+	setupTestSkills(t)
+	projDir := setupPiProject(t)
+
+	adapter := &PiAdapter{}
+	if err := adapter.Register(false); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(projDir, ".pi", "skills", "get-feedback", "SKILL.md")); err != nil {
+		t.Fatalf("auto mode without pi-mcp-adapter should install skills: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(projDir, ".pi", "mcp.json")); !os.IsNotExist(err) {
+		t.Fatal("auto mode without pi-mcp-adapter should not write MCP config")
+	}
+	if _, err := os.Stat(filepath.Join(projDir, ".pi", "settings.json")); !os.IsNotExist(err) {
+		t.Fatal("auto mode without pi-mcp-adapter should not add Pi packages")
+	}
+}
+
+func TestPiRegister_AutoModeUsesMCPWhenAdapterConfigured(t *testing.T) {
+	projDir := setupPiProject(t)
+	settingsPath := filepath.Join(projDir, ".pi", "settings.json")
+	if err := WriteJSONFile(settingsPath, map[string]any{"packages": []any{piMCPAdapterPackage}}); err != nil {
+		t.Fatal(err)
+	}
+
+	adapter := &PiAdapter{}
+	if err := adapter.Register(false); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(projDir, ".pi", "mcp.json")); err != nil {
+		t.Fatalf("auto mode with pi-mcp-adapter should write MCP config: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(projDir, ".pi", "skills", "get-feedback", "SKILL.md")); !os.IsNotExist(err) {
+		t.Fatal("auto mode with pi-mcp-adapter should not install skills")
+	}
+}
+
+func TestPiDefaultIntegrationModeUsesGlobalAdapterForProjectScope(t *testing.T) {
+	dir := t.TempDir()
+	home := filepath.Join(dir, "home")
+	t.Setenv("HOME", home)
+	if err := WriteJSONFile(filepath.Join(home, ".pi", "agent", "settings.json"), map[string]any{"packages": []any{piMCPAdapterPackage}}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := DefaultIntegrationModeForScope("pi", false); got != ModeMCPTools {
+		t.Fatalf("project-scope default = %s, want %s", got, ModeMCPTools)
+	}
+	if got := DefaultIntegrationModeForScope("pi", true); got != ModeMCPTools {
+		t.Fatalf("global-scope default = %s, want %s", got, ModeMCPTools)
+	}
+}
+
 func TestPiRegister_DoesNotClobberUserPrompt(t *testing.T) {
 	projDir := setupPiProject(t)
 	promptPath := filepath.Join(projDir, ".pi", "prompts", "get-feedback.md")
@@ -334,6 +390,7 @@ func TestConfigurePiPackage_IdempotentWithExistingObject(t *testing.T) {
 func setupPiProject(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
+	t.Setenv("HOME", filepath.Join(dir, "home"))
 	projDir := filepath.Join(dir, "project")
 	if err := os.MkdirAll(projDir, 0755); err != nil {
 		t.Fatal(err)

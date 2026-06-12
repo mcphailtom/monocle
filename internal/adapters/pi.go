@@ -23,16 +23,16 @@ func (a *PiAdapter) Name() string              { return "pi" }
 func (a *PiAdapter) Label() string             { return "Pi" }
 func (a *PiAdapter) SetMode(m IntegrationMode) { a.Mode = m }
 
-func (a *PiAdapter) effectiveMode() IntegrationMode {
+func (a *PiAdapter) effectiveMode(global bool) IntegrationMode {
 	if a.Mode == "" {
-		return ModeMCPTools
+		return DefaultIntegrationModeForScope(a.Name(), global)
 	}
 	return a.Mode
 }
 
 func (a *PiAdapter) ConfigPaths(global bool) []string {
 	paths := PiPromptPaths(piPromptsDir(global))
-	if a.effectiveMode() == ModeMCPTools {
+	if a.effectiveMode(global) == ModeMCPTools {
 		return append([]string{piSettingsPath(global), piMCPConfigPath(global)}, paths...)
 	}
 	return append(SkillPaths(piSkillsDir(global)), paths...)
@@ -51,7 +51,7 @@ func (a *PiAdapter) HasConfig(global bool) bool {
 }
 
 func (a *PiAdapter) Register(global bool) error {
-	mode := a.effectiveMode()
+	mode := a.effectiveMode(global)
 	if err := InstallPiPrompts(piPromptsDir(global), mode); err != nil {
 		return fmt.Errorf("install prompts: %w", err)
 	}
@@ -123,6 +123,33 @@ func piPromptsDir(global bool) string {
 		}
 	}
 	return filepath.Join(".pi", "prompts")
+}
+
+// PiMCPAdapterConfigured reports whether pi-mcp-adapter is already configured for Pi.
+func PiMCPAdapterConfigured(global bool) bool {
+	if hasPiMCPAdapterPackage(piSettingsPath(global)) {
+		return true
+	}
+	// Project Pi sessions also load user-level packages, so a globally configured
+	// adapter means project-local auto registration can use MCP without adding it.
+	return !global && hasPiMCPAdapterPackage(piSettingsPath(true))
+}
+
+func hasPiMCPAdapterPackage(path string) bool {
+	data, err := ReadJSONFile(path)
+	if err != nil {
+		return false
+	}
+	packagesRaw, ok := data["packages"].([]any)
+	if !ok {
+		return false
+	}
+	for _, entry := range packagesRaw {
+		if isPiMCPAdapterPackage(entry) {
+			return true
+		}
+	}
+	return false
 }
 
 func configurePiPackage(path string) error {

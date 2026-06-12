@@ -173,14 +173,14 @@ func NewWizardState(opts Options) WizardState {
 
 // resolveIntegrationMode converts an agent's stored IntegrationChoice to the
 // adapter-facing IntegrationMode, respecting per-adapter defaults under "auto".
-func resolveIntegrationMode(agent string, choice IntegrationChoice) adapters.IntegrationMode {
+func resolveIntegrationMode(agent string, choice IntegrationChoice, global bool) adapters.IntegrationMode {
 	switch choice {
 	case IntegrationMCP:
 		return adapters.ModeMCPTools
 	case IntegrationSkills:
 		return adapters.ModeSkills
 	default:
-		return adapters.DefaultIntegrationMode(agent)
+		return adapters.DefaultIntegrationModeForScope(agent, global)
 	}
 }
 

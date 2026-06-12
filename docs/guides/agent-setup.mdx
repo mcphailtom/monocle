@@ -5,7 +5,7 @@ description: "Connect monocle to Claude Code, OpenCode, Codex CLI, Gemini CLI, o
 
 monocle connects to your agent through one of two integration modes: **MCP tools** or **skills**. Run `monocle register` to configure the connection.
 
-- **MCP tools mode** configures an MCP server that exposes monocle's review operations as tools the agent can call directly. This is the default for Claude Code and Pi. Pi uses `pi-mcp-adapter` for this path.
+- **MCP tools mode** configures an MCP server that exposes monocle's review operations as tools the agent can call directly. This is the default for Claude Code. Pi uses this path only when `pi-mcp-adapter` is already configured, or when you explicitly request `--integration-mode mcp`.
 - **Skills mode** installs skill files — small instruction files that tell the agent which CLI commands to run. This is the default for OpenCode, Codex CLI, and Gemini CLI.
 
 ## Register monocle with your agent
@@ -102,17 +102,17 @@ See the [CLI reference](/reference/cli#monocle-register) for a full list of flag
     monocle register pi
     ```
 
-    By default, this adds the pinned package `npm:pi-mcp-adapter@2.9.0` to `.pi/settings.json`, registers monocle in `.pi/mcp.json`, and installs prompt templates in `.pi/prompts/`. Pi calls monocle through the adapter's MCP gateway or direct `monocle_*` tools when available.
+    By default, this uses MCP mode only if `pi-mcp-adapter` is already configured in Pi. In that case, monocle registers itself in `.pi/mcp.json` and installs prompt templates in `.pi/prompts/`; Pi calls monocle through the adapter's MCP gateway or direct `monocle_*` tools when available. If the adapter is not already configured, monocle falls back to skills/prompts and does not add the adapter package.
 
     Restart Pi or run `/reload` after registering so the package, MCP config, and prompt templates are loaded.
 
-    To use CLI-based skills instead, pass `--integration-mode skills`:
+    To force CLI-based skills, pass `--integration-mode skills`:
 
     ```bash
     monocle register pi --integration-mode skills
     ```
 
-    Skills mode installs `SKILL.md` files in `.pi/skills/` plus the same prompt templates in `.pi/prompts/`. Pi still uses pull-based feedback; Claude MCP channels are not involved.
+    Skills mode installs `SKILL.md` files in `.pi/skills/` plus the same prompt templates in `.pi/prompts/`. To add `pi-mcp-adapter` and use MCP tools explicitly, pass `--integration-mode mcp`. Pi still uses pull-based feedback; Claude MCP channels are not involved.
   </Tab>
   <Tab title="All agents">
     Register monocle for every supported agent at once:

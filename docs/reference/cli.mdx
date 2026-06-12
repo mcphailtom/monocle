@@ -79,7 +79,7 @@ Heads up: hooks don't fire when Claude is launched with `--dangerously-load-deve
 
 | Mode | Description |
 |------|-------------|
-| `auto` | Uses the recommended default for each agent. Claude Code and Pi use `mcp`; OpenCode, Codex CLI, and Gemini CLI use `skills`. |
+| `auto` | Uses the recommended default for each agent. Claude Code uses `mcp`; Pi uses `mcp` only when `pi-mcp-adapter` is already configured and otherwise uses `skills`; OpenCode, Codex CLI, and Gemini CLI use `skills`. |
 | `mcp` | Configures an MCP server that exposes monocle's review tools. Pi uses `pi-mcp-adapter` and prompt templates for this path. |
 | `skills` | Installs skill files that wrap monocle CLI commands. For Pi, also installs prompt templates. For Claude Code, also configures MCP channels for push notifications. |
 
@@ -87,7 +87,7 @@ Heads up: hooks don't fire when Claude is launched with `--dangerously-load-deve
 
 The files written by `register` depend on the integration mode:
 
-**MCP tools mode** (default for Claude Code and Pi)
+**MCP tools mode** (default for Claude Code; default for Pi only when `pi-mcp-adapter` is already configured)
 
 | Agent | MCP config | Commands/prompts |
 |-------|------------|-----------------|

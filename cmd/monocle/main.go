@@ -159,9 +159,12 @@ func (cmd *RegisterCmd) Run() error {
 // runWizard launches the register TUI, letting the user pick agents and
 // options, then runs the registrations from within the wizard.
 func (cmd *RegisterCmd) runWizard(allAdapters []adapters.AgentAdapter) error {
-	// Pre-apply modes so ConfigPaths() previews correctly in the wizard.
-	for _, a := range allAdapters {
-		a.SetMode(cmd.resolveMode(a))
+	// Pre-apply explicitly requested modes so ConfigPaths() previews correctly.
+	// Leave auto mode unset; adapters like Pi resolve it from the selected scope.
+	if cmd.IntegrationMode != "auto" {
+		for _, a := range allAdapters {
+			a.SetMode(cmd.resolveMode(a, cmd.Global))
+		}
 	}
 	opts := register.Options{
 		Mode:                  register.ModeRegister,
@@ -188,7 +191,7 @@ func (cmd *RegisterCmd) runWizard(allAdapters []adapters.AgentAdapter) error {
 // runHeadless preserves the pre-wizard behavior for scripted use.
 func (cmd *RegisterCmd) runHeadless(allAdapters []adapters.AgentAdapter) error {
 	for _, a := range allAdapters {
-		a.SetMode(cmd.resolveMode(a))
+		a.SetMode(cmd.resolveMode(a, cmd.Global))
 	}
 
 	agents, err := resolveAgentsFrom(allAdapters, cmd.Agent)
@@ -222,7 +225,7 @@ func (cmd *RegisterCmd) runHeadless(allAdapters []adapters.AgentAdapter) error {
 		if wasRegistered {
 			action = "updated"
 		}
-		mode := cmd.resolveMode(a)
+		mode := cmd.resolveMode(a, cmd.Global)
 		modeLabel := "skills"
 		if mode == adapters.ModeMCPTools {
 			modeLabel = "mcp tools"
@@ -236,15 +239,15 @@ func (cmd *RegisterCmd) runHeadless(allAdapters []adapters.AgentAdapter) error {
 }
 
 // resolveMode returns the integration mode for the given agent.
-// "auto" uses per-agent defaults: Claude/Pi → MCP tools, others → skills.
-func (cmd *RegisterCmd) resolveMode(a adapters.AgentAdapter) adapters.IntegrationMode {
+// "auto" uses per-agent defaults: Claude → MCP tools; Pi → MCP tools only when pi-mcp-adapter is already configured; others → skills.
+func (cmd *RegisterCmd) resolveMode(a adapters.AgentAdapter, global bool) adapters.IntegrationMode {
 	switch cmd.IntegrationMode {
 	case "mcp":
 		return adapters.ModeMCPTools
 	case "skills":
 		return adapters.ModeSkills
 	default: // auto
-		return adapters.DefaultIntegrationMode(a.Name())
+		return adapters.DefaultIntegrationModeForScope(a.Name(), global)
 	}
 }
 

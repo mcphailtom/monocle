@@ -33,11 +33,21 @@ func ValidAgentList() string {
 	return strings.Join(ValidAgentNames, ", ")
 }
 
-// DefaultIntegrationMode returns the recommended integration mode for an agent.
+// DefaultIntegrationMode returns the recommended project-scope integration mode for an agent.
 func DefaultIntegrationMode(agent string) IntegrationMode {
+	return DefaultIntegrationModeForScope(agent, false)
+}
+
+// DefaultIntegrationModeForScope returns the recommended integration mode for an agent at a config scope.
+func DefaultIntegrationModeForScope(agent string, global bool) IntegrationMode {
 	switch agent {
-	case "claude", "pi":
+	case "claude":
 		return ModeMCPTools
+	case "pi":
+		if PiMCPAdapterConfigured(global) {
+			return ModeMCPTools
+		}
+		return ModeSkills
 	default:
 		return ModeSkills
 	}

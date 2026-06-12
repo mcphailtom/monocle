@@ -5,7 +5,7 @@ description: "How monocle connects to your AI coding agent via MCP tools, skills
 
 Monocle integrates with your agent through one of two modes: **MCP tools** or **skills**. Both expose the same operations — the difference is how the agent invokes them.
 
-- **MCP tools mode** runs a built-in MCP server (`monocle serve-mcp`) that exposes review operations as tools. This is the default for Claude Code and Pi. Pi reaches the server through `pi-mcp-adapter`.
+- **MCP tools mode** runs a built-in MCP server (`monocle serve-mcp`) that exposes review operations as tools. This is the default for Claude Code. Pi reaches the server through `pi-mcp-adapter` when the adapter is already configured, or when you explicitly request MCP mode.
 - **Skills mode** installs `SKILL.md` instruction files ([agentskills.io](https://agentskills.io) format) that tell the agent which `monocle review` CLI commands to run. This is the default for OpenCode, Codex CLI, and Gemini CLI.
 
 You can override the default with `--integration-mode` when registering. See [agent setup](/guides/agent-setup) for details.
@@ -73,10 +73,13 @@ monocle register gemini
 ```
 
 ```bash Pi
-# Default: MCP tools mode through pi-mcp-adapter
+# Auto: use existing pi-mcp-adapter when configured, otherwise skills/prompts
 monocle register pi
 
-# To use skills/prompts mode instead:
+# Force MCP tools mode and add pi-mcp-adapter if needed:
+monocle register pi --integration-mode mcp
+
+# Force skills/prompts mode:
 monocle register pi --integration-mode skills
 ```
 
