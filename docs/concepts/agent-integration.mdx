@@ -19,7 +19,7 @@ These operations are available as both MCP tools and skills:
 | Get feedback | `get_feedback` | `/get-feedback` | Retrieve pending review feedback |
 | Get feedback (blocking) | `get_feedback` with `wait: true` | `/get-feedback-wait` | Block until the reviewer submits feedback |
 | Send artifact | `send_artifact` | `/review-plan` | Submit content (plans, decisions, summaries) for review |
-| Send artifact (blocking) | `send_artifact` with `wait: true` | `/review-plan-wait` | Submit content and iterate on feedback until approved |
+| Send artifact (blocking) | `send_artifact`, then `get_feedback` with `wait: true` | `/review-plan-wait` | Submit content and iterate on feedback until approved |
 | Check status | `review_status` | — | Check if feedback is pending or a pause was requested |
 | Add files | `add_files` | — | Add files to the current review session |
 
@@ -39,7 +39,7 @@ Tells the agent to send content to monocle for review using `monocle review send
 
 ### Send artifact (blocking)
 
-Same as send artifact, but the agent blocks after submitting and waits for your response. If you request changes, the agent updates and resubmits — iterating until you approve (submit with no comments).
+Same as send artifact, but the agent blocks after submitting and waits for your response. In MCP tools mode, the agent submits with `send_artifact`, then calls `get_feedback` with `wait: true`. If you request changes, the agent updates and resubmits — iterating until you approve (submit with no comments).
 
 This is what enables [review gating](/guides/review-gating): the agent cannot move forward until you sign off.
 
@@ -76,7 +76,7 @@ monocle register gemini
 # Auto: use existing pi-mcp-adapter when configured, otherwise skills/prompts
 monocle register pi
 
-# Force MCP tools mode and add pi-mcp-adapter if needed:
+# Force MCP tools mode and add the pinned pi-mcp-adapter package if needed:
 monocle register pi --integration-mode mcp
 
 # Force skills/prompts mode:

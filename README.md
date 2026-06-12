@@ -104,7 +104,7 @@ monocle register          # interactive picker
 monocle register claude   # or: opencode, codex, gemini, pi, all
 ```
 
-This configures MCP tools or skills depending on the agent. Claude Code gets an MCP server and slash commands. Pi uses existing `pi-mcp-adapter` setups automatically, otherwise it falls back to skills plus prompt templates; pass `--integration-mode mcp` to add the adapter explicitly. Other agents get skill files by default. Use `--global` to write to the user-level config directory instead of the project. If Pi is already running, restart it or run `/reload` after registering.
+This configures MCP tools or skills depending on the agent. Claude Code gets an MCP server and slash commands. Pi uses existing project or global `pi-mcp-adapter` setups automatically, otherwise it falls back to skills plus prompt templates; pass `--integration-mode mcp` to add the pinned adapter explicitly. Other agents get skill files by default. Use `--global` to write to the user-level config directory instead of the project. If Pi is already running, restart it or run `/reload` after registering.
 
 #### Other agents
 
@@ -186,7 +186,7 @@ Monocle exposes review operations via **MCP tools** (default for Claude Code, an
 |-----------|----------|-------|-------------|
 | Get feedback | `get_feedback` | `/get-feedback` | Retrieve pending review feedback |
 | Send artifact | `send_artifact` | `/review-plan` | Submit content (plans, decisions, summaries) for review |
-| Send artifact (blocking) | `send_artifact` with `wait: true` | `/review-plan-wait` | Submit content and iterate on feedback until approved |
+| Send artifact (blocking) | `send_artifact`, then `get_feedback` with `wait: true` | `/review-plan-wait` | Submit content and iterate on feedback until approved |
 | Check status | `review_status` | — | Check if feedback is pending or a pause was requested |
 | Add files | `add_files` | — | Add files to the current review session |
 
