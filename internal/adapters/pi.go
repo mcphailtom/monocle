@@ -33,7 +33,11 @@ func (a *PiAdapter) effectiveMode(global bool) IntegrationMode {
 func (a *PiAdapter) ConfigPaths(global bool) []string {
 	paths := PiPromptPaths(piPromptsDir(global))
 	if a.effectiveMode(global) == ModeMCPTools {
-		return append([]string{piSettingsPath(global), piMCPConfigPath(global)}, paths...)
+		configPaths := []string{piMCPConfigPath(global)}
+		if a.Mode == ModeMCPTools {
+			configPaths = append([]string{piSettingsPath(global)}, configPaths...)
+		}
+		return append(configPaths, paths...)
 	}
 	return append(SkillPaths(piSkillsDir(global)), paths...)
 }
@@ -52,18 +56,29 @@ func (a *PiAdapter) HasConfig(global bool) bool {
 
 func (a *PiAdapter) Register(global bool) error {
 	mode := a.effectiveMode(global)
+
+	if mode == ModeMCPTools {
+		if err := checkPiPromptsWritable(piPromptsDir(global), mode); err != nil {
+			return fmt.Errorf("install prompts: %w", err)
+		}
+		if a.Mode == ModeMCPTools {
+			if err := configurePiPackage(piSettingsPath(global)); err != nil {
+				return fmt.Errorf("configure pi package: %w", err)
+			}
+		}
+		if err := configurePiMCP(piMCPConfigPath(global), ResolveCommand(global)); err != nil {
+			return fmt.Errorf("configure mcp: %w", err)
+		}
+		if err := InstallPiPrompts(piPromptsDir(global), mode); err != nil {
+			return fmt.Errorf("install prompts: %w", err)
+		}
+		RemoveSkills(piSkillsDir(global))
+		return nil
+	}
+
 	if err := InstallPiPrompts(piPromptsDir(global), mode); err != nil {
 		return fmt.Errorf("install prompts: %w", err)
 	}
-
-	if mode == ModeMCPTools {
-		RemoveSkills(piSkillsDir(global))
-		if err := configurePiPackage(piSettingsPath(global)); err != nil {
-			return fmt.Errorf("configure pi package: %w", err)
-		}
-		return configurePiMCP(piMCPConfigPath(global), ResolveCommand(global))
-	}
-
 	_ = unconfigurePiMCP(piMCPConfigPath(global))
 	return InstallSkills(piSkillsDir(global))
 }
@@ -203,13 +218,12 @@ func configurePiMCP(path, command string) error {
 		return err
 	}
 
-	servers := piMCPServers(data)
-
+	servers := piMCPServersForWrite(data)
 	servers["monocle"] = map[string]any{
 		"command":     command,
 		"args":        []any{"serve-mcp"},
 		"lifecycle":   "lazy",
-		"directTools": []any{"review_status", "get_feedback", "send_artifact", "add_files"},
+		"directTools": []any{"review_status", "get_feedback", "send_artifact"},
 	}
 
 	return WriteJSONFile(path, data)
@@ -220,11 +234,21 @@ func unconfigurePiMCP(path string) error {
 	if err != nil {
 		return err
 	}
+	if !hasPiMCPEntryInConfig(data) {
+		return nil
+	}
 
-	servers := piMCPServers(data)
-	delete(servers, "monocle")
-	if len(servers) == 0 {
-		delete(data, "mcpServers")
+	for _, key := range []string{"mcpServers", "mcp-servers"} {
+		servers, ok := data[key].(map[string]any)
+		if !ok {
+			continue
+		}
+		if entry, ok := servers["monocle"].(map[string]any); ok && isPiMCPEntry(entry) {
+			delete(servers, "monocle")
+		}
+		if len(servers) == 0 {
+			delete(data, key)
+		}
 	}
 	if len(data) == 0 {
 		return RemoveFileIfExists(path)
@@ -237,10 +261,24 @@ func hasPiMCPEntry(path string) bool {
 	if err != nil {
 		return false
 	}
-	entry, ok := piMCPServers(data)["monocle"].(map[string]any)
-	if !ok {
-		return false
+	return hasPiMCPEntryInConfig(data)
+}
+
+func hasPiMCPEntryInConfig(data map[string]any) bool {
+	for _, key := range []string{"mcpServers", "mcp-servers"} {
+		servers, ok := data[key].(map[string]any)
+		if !ok {
+			continue
+		}
+		entry, ok := servers["monocle"].(map[string]any)
+		if ok && isPiMCPEntry(entry) {
+			return true
+		}
 	}
+	return false
+}
+
+func isPiMCPEntry(entry map[string]any) bool {
 	args, _ := entry["args"].([]any)
 	if len(args) == 0 {
 		return false
@@ -249,19 +287,17 @@ func hasPiMCPEntry(path string) bool {
 	return arg == "serve-mcp"
 }
 
-func piMCPServers(data map[string]any) map[string]any {
+// piMCPServersForWrite returns the MCP server map Monocle should edit.
+// pi-mcp-adapter 2.9.0 reads both mcpServers and the compatibility mcp-servers key;
+// keep user-owned sibling servers in their existing key instead of migrating them.
+func piMCPServersForWrite(data map[string]any) map[string]any {
+	if servers, ok := data["mcpServers"].(map[string]any); ok {
+		return servers
+	}
+	if servers, ok := data["mcp-servers"].(map[string]any); ok {
+		return servers
+	}
 	servers := map[string]any{}
-	if legacy, ok := data["mcp-servers"].(map[string]any); ok {
-		for name, entry := range legacy {
-			servers[name] = entry
-		}
-	}
-	if modern, ok := data["mcpServers"].(map[string]any); ok {
-		for name, entry := range modern {
-			servers[name] = entry
-		}
-	}
-	delete(data, "mcp-servers")
 	data["mcpServers"] = servers
 	return servers
 }
@@ -275,8 +311,21 @@ type piPromptDef struct {
 
 // InstallPiPrompts writes Pi prompt templates with a Monocle ownership marker.
 func InstallPiPrompts(dir string, mode IntegrationMode) error {
-	defs := piPromptDefs(mode)
-	for _, prompt := range defs {
+	if err := checkPiPromptsWritable(dir, mode); err != nil {
+		return err
+	}
+
+	for _, prompt := range piPromptDefs(mode) {
+		path := filepath.Join(dir, prompt.Name+".md")
+		if err := WriteFileAtomic(path, []byte(renderPiPrompt(prompt))); err != nil {
+			return fmt.Errorf("write prompt %s: %w", prompt.Name, err)
+		}
+	}
+	return nil
+}
+
+func checkPiPromptsWritable(dir string, mode IntegrationMode) error {
+	for _, prompt := range piPromptDefs(mode) {
 		path := filepath.Join(dir, prompt.Name+".md")
 		content, err := os.ReadFile(path)
 		if err != nil {
@@ -287,13 +336,6 @@ func InstallPiPrompts(dir string, mode IntegrationMode) error {
 		}
 		if !strings.Contains(string(content), piPromptMarker) {
 			return fmt.Errorf("%s already exists and is not managed by monocle", path)
-		}
-	}
-
-	for _, prompt := range defs {
-		path := filepath.Join(dir, prompt.Name+".md")
-		if err := WriteFileAtomic(path, []byte(renderPiPrompt(prompt))); err != nil {
-			return fmt.Errorf("write prompt %s: %w", prompt.Name, err)
 		}
 	}
 	return nil

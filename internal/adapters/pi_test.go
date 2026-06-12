@@ -44,8 +44,13 @@ func TestPiRegister_MCPToolsMode(t *testing.T) {
 		t.Fatalf("lifecycle = %v, want lazy", monocle["lifecycle"])
 	}
 	directTools := monocle["directTools"].([]any)
-	if len(directTools) != 4 {
-		t.Fatalf("directTools = %#v, want 4 tools", directTools)
+	if len(directTools) != 3 {
+		t.Fatalf("directTools = %#v, want 3 tools", directTools)
+	}
+	for _, tool := range directTools {
+		if tool == "add_files" {
+			t.Fatal("Pi MCP mode should leave add_files behind the proxy tool")
+		}
 	}
 
 	for _, name := range CommandNames() {
@@ -131,6 +136,29 @@ func TestPiRegister_AutoModeUsesMCPWhenAdapterConfigured(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(projDir, ".pi", "skills", "get-feedback", "SKILL.md")); !os.IsNotExist(err) {
 		t.Fatal("auto mode with pi-mcp-adapter should not install skills")
+	}
+}
+
+func TestPiRegister_AutoModeUsesGlobalAdapterWithoutProjectPackage(t *testing.T) {
+	projDir := setupPiProject(t)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteJSONFile(filepath.Join(home, ".pi", "agent", "settings.json"), map[string]any{"packages": []any{piMCPAdapterPackage}}); err != nil {
+		t.Fatal(err)
+	}
+
+	adapter := &PiAdapter{}
+	if err := adapter.Register(false); err != nil {
+		t.Fatalf("register: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(projDir, ".pi", "mcp.json")); err != nil {
+		t.Fatalf("auto mode with global pi-mcp-adapter should write MCP config: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(projDir, ".pi", "settings.json")); !os.IsNotExist(err) {
+		t.Fatal("auto mode with only global pi-mcp-adapter should not add project Pi packages")
 	}
 }
 
@@ -236,6 +264,35 @@ func TestPiRegister_MCPToolsModeRemovesStaleSkills(t *testing.T) {
 	}
 }
 
+func TestPiRegister_MCPToolsModePreservesSkillsOnPackageError(t *testing.T) {
+	setupTestSkills(t)
+	projDir := setupPiProject(t)
+
+	adapter := &PiAdapter{Mode: ModeSkills}
+	if err := adapter.Register(false); err != nil {
+		t.Fatalf("skills register: %v", err)
+	}
+	staleSkill := filepath.Join(projDir, ".pi", "skills", "get-feedback", "SKILL.md")
+	if _, err := os.Stat(staleSkill); err != nil {
+		t.Fatalf("skill should exist before MCP register: %v", err)
+	}
+	settingsPath := filepath.Join(projDir, ".pi", "settings.json")
+	if err := WriteJSONFile(settingsPath, map[string]any{"packages": "not-an-array"}); err != nil {
+		t.Fatal(err)
+	}
+
+	adapter.Mode = ModeMCPTools
+	if err := adapter.Register(false); err == nil {
+		t.Fatal("expected MCP register to fail on invalid packages")
+	}
+	if _, err := os.Stat(staleSkill); err != nil {
+		t.Fatalf("skills should remain when MCP setup fails: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(projDir, ".pi", "mcp.json")); !os.IsNotExist(err) {
+		t.Fatal("MCP config should not be written after package setup fails")
+	}
+}
+
 func TestPiUnregister_RemovesLegacyMCPEntry(t *testing.T) {
 	projDir := setupPiProject(t)
 	mcpPath := filepath.Join(projDir, ".pi", "mcp.json")
@@ -266,7 +323,7 @@ func TestPiUnregister_RemovesLegacyMCPEntry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	servers := data["mcpServers"].(map[string]any)
+	servers := data["mcp-servers"].(map[string]any)
 	if _, ok := servers["monocle"]; ok {
 		t.Fatal("monocle server should be removed")
 	}
@@ -275,23 +332,96 @@ func TestPiUnregister_RemovesLegacyMCPEntry(t *testing.T) {
 	}
 }
 
-func TestConfigurePiMCP_MergesLegacyAndModernServers(t *testing.T) {
+func TestPiUnregister_PreservesUserOwnedMonocleServer(t *testing.T) {
+	projDir := setupPiProject(t)
+	mcpPath := filepath.Join(projDir, ".pi", "mcp.json")
+	existing := map[string]any{
+		"mcpServers": map[string]any{
+			"monocle": map[string]any{
+				"command": "user-monocle",
+				"args":    []any{"not-serve-mcp"},
+			},
+		},
+	}
+	if err := WriteJSONFile(mcpPath, existing); err != nil {
+		t.Fatal(err)
+	}
+
+	adapter := &PiAdapter{}
+	if adapter.HasConfig(false) {
+		t.Fatal("user-owned monocle server should not count as Monocle config")
+	}
+	if err := adapter.Unregister(false); err != nil {
+		t.Fatalf("unregister: %v", err)
+	}
+
+	data, err := ReadJSONFile(mcpPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	servers := data["mcpServers"].(map[string]any)
+	if _, ok := servers["monocle"]; !ok {
+		t.Fatal("user-owned monocle server should be preserved")
+	}
+}
+
+func TestUnconfigurePiMCP_DoesNotRewriteWhenMonocleMissing(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "mcp.json")
 	existing := map[string]any{
 		"mcp-servers": map[string]any{
-			"legacy": map[string]any{
-				"command": "legacy-mcp",
-			},
-			"shared": map[string]any{
-				"command": "legacy-shared",
+			"other": map[string]any{
+				"command": "other-mcp",
 			},
 		},
-		"mcpServers": map[string]any{
-			"modern": map[string]any{
-				"command": "modern-mcp",
+	}
+	if err := WriteJSONFile(path, existing); err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := unconfigurePiMCP(path); err != nil {
+		t.Fatalf("unconfigure mcp: %v", err)
+	}
+
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(after) != string(before) {
+		t.Fatal("unconfigure should not rewrite MCP config when monocle is absent")
+	}
+}
+
+func TestHasPiMCPEntry_DoesNotMutateLegacyConfig(t *testing.T) {
+	data := map[string]any{
+		"mcp-servers": map[string]any{
+			"monocle": map[string]any{
+				"command": "monocle",
+				"args":    []any{"serve-mcp"},
 			},
-			"shared": map[string]any{
-				"command": "modern-shared",
+		},
+	}
+
+	if !hasPiMCPEntryInConfig(data) {
+		t.Fatal("legacy Monocle MCP entry should be detected")
+	}
+	if _, ok := data["mcp-servers"]; !ok {
+		t.Fatal("read-only detection should not remove legacy key")
+	}
+	if _, ok := data["mcpServers"]; ok {
+		t.Fatal("read-only detection should not add canonical key")
+	}
+}
+
+func TestConfigurePiMCP_PreservesExistingLegacyKey(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "mcp.json")
+	existing := map[string]any{
+		"mcp-servers": map[string]any{
+			"other": map[string]any{
+				"command": "other-mcp",
 			},
 		},
 	}
@@ -307,22 +437,54 @@ func TestConfigurePiMCP_MergesLegacyAndModernServers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := data["mcp-servers"]; ok {
-		t.Fatal("legacy mcp-servers key should be migrated")
+	if _, ok := data["mcpServers"]; ok {
+		t.Fatal("legacy-only config should not be migrated to mcpServers")
 	}
-	servers := data["mcpServers"].(map[string]any)
-	if _, ok := servers["legacy"]; !ok {
-		t.Fatal("legacy server should be preserved")
-	}
-	if _, ok := servers["modern"]; !ok {
-		t.Fatal("modern server should be preserved")
-	}
-	shared := servers["shared"].(map[string]any)
-	if shared["command"] != "modern-shared" {
-		t.Fatalf("modern server should win mixed-key conflicts, got %v", shared["command"])
+	servers := data["mcp-servers"].(map[string]any)
+	if _, ok := servers["other"]; !ok {
+		t.Fatal("existing server should be preserved")
 	}
 	if _, ok := servers["monocle"]; !ok {
 		t.Fatal("monocle server should be added")
+	}
+}
+
+func TestConfigurePiMCP_PreservesMixedKeys(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "mcp.json")
+	existing := map[string]any{
+		"mcp-servers": map[string]any{
+			"legacy": map[string]any{
+				"command": "legacy-mcp",
+			},
+		},
+		"mcpServers": map[string]any{
+			"modern": map[string]any{
+				"command": "modern-mcp",
+			},
+		},
+	}
+	if err := WriteJSONFile(path, existing); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := configurePiMCP(path, "monocle"); err != nil {
+		t.Fatalf("configure mcp: %v", err)
+	}
+
+	data, err := ReadJSONFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy := data["mcp-servers"].(map[string]any)
+	if _, ok := legacy["legacy"]; !ok {
+		t.Fatal("legacy server should be preserved under legacy key")
+	}
+	modern := data["mcpServers"].(map[string]any)
+	if _, ok := modern["modern"]; !ok {
+		t.Fatal("modern server should be preserved")
+	}
+	if _, ok := modern["monocle"]; !ok {
+		t.Fatal("monocle server should be added under canonical key when present")
 	}
 }
 

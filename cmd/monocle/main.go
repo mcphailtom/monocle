@@ -190,8 +190,12 @@ func (cmd *RegisterCmd) runWizard(allAdapters []adapters.AgentAdapter) error {
 
 // runHeadless preserves the pre-wizard behavior for scripted use.
 func (cmd *RegisterCmd) runHeadless(allAdapters []adapters.AgentAdapter) error {
-	for _, a := range allAdapters {
-		a.SetMode(cmd.resolveMode(a, cmd.Global))
+	// Leave auto mode unset so adapters can distinguish auto from an explicit
+	// --integration-mode override when Register runs.
+	if cmd.IntegrationMode != "auto" {
+		for _, a := range allAdapters {
+			a.SetMode(cmd.resolveMode(a, cmd.Global))
+		}
 	}
 
 	agents, err := resolveAgentsFrom(allAdapters, cmd.Agent)
