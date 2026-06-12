@@ -9,23 +9,24 @@ description: "Get monocle running alongside your AI coding agent in minutes."
   </Step>
 
   <Step title="Register monocle with your agent">
-    Run `monocle register` from your project directory to install the skills your agent needs to interact with monocle:
+    Run `monocle register` from your project directory to configure MCP tools or skills for your agent:
 
     ```bash
     monocle register          # interactive picker
-    monocle register claude   # or: opencode, codex, gemini, all
+    monocle register claude   # or: opencode, codex, gemini, pi, all
     ```
 
-    The interactive picker lets you select which agents to register. Pass a named agent — `claude`, `opencode`, `codex`, `gemini`, or `all` — to skip the picker. Use `--global` to write to your user-level config directory instead of the current project.
+    The interactive picker lets you select which agents to register. Pass a named agent — `claude`, `opencode`, `codex`, `gemini`, `pi`, or `all` — to skip the picker. Use `--global` to write to your user-level config directory instead of the current project.
 
-    This installs skills into the agent-specific directory for your project and, for Claude Code, also writes the MCP channel config to `.mcp.json` for push notifications.
+    Claude Code defaults to MCP tools. Pi uses MCP tools when `pi-mcp-adapter` is already configured; otherwise it falls back to skills plus prompt templates and does not add the adapter package. OpenCode, Codex CLI, and Gemini CLI default to skills. If Pi is already running, restart it or run `/reload` after registering.
 
-    | Agent | Skills directory | MCP config |
+    | Agent | Skills/prompts | MCP/prompts config |
     |---|---|---|
-    | Claude Code | `.claude/skills/` | `.mcp.json` |
-    | OpenCode | `.opencode/skills/` | — |
-    | Codex CLI | `.codex/skills/` | — |
-    | Gemini CLI | `.gemini/skills/` | — |
+    | Claude Code | `.claude/skills/` when forced to skills | `.mcp.json` |
+    | OpenCode | `.opencode/skills/` | `opencode.json` when forced to MCP |
+    | Codex CLI | `.codex/skills/` | `.codex/config.toml` when forced to MCP |
+    | Gemini CLI | `.gemini/skills/` | `.gemini/settings.json` when forced to MCP |
+    | Pi | `.pi/skills/` + `.pi/prompts/` when forced to skills | `.pi/settings.json`, `.pi/mcp.json`, `.pi/prompts/` |
   </Step>
 
   <Step title="Start monocle">

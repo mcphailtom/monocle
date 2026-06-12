@@ -5,8 +5,8 @@ description: "How monocle connects to your AI coding agent via MCP tools, skills
 
 Monocle integrates with your agent through one of two modes: **MCP tools** or **skills**. Both expose the same operations — the difference is how the agent invokes them.
 
-- **MCP tools mode** runs a built-in MCP server (`monocle serve-mcp`) that exposes review operations as tools the agent calls directly. This is the default for Claude Code.
-- **Skills mode** installs `SKILL.md` instruction files ([agentskills.io](https://agentskills.io) format) that tell the agent which `monocle review` CLI commands to run. This is the default for all other agents.
+- **MCP tools mode** runs a built-in MCP server (`monocle serve-mcp`) that exposes review operations as tools. This is the default for Claude Code. Pi reaches the server through `pi-mcp-adapter` when the adapter is already configured, or when you explicitly request MCP mode.
+- **Skills mode** installs `SKILL.md` instruction files ([agentskills.io](https://agentskills.io) format) that tell the agent which `monocle review` CLI commands to run. This is the default for OpenCode, Codex CLI, and Gemini CLI.
 
 You can override the default with `--integration-mode` when registering. See [agent setup](/guides/agent-setup) for details.
 
@@ -19,7 +19,7 @@ These operations are available as both MCP tools and skills:
 | Get feedback | `get_feedback` | `/get-feedback` | Retrieve pending review feedback |
 | Get feedback (blocking) | `get_feedback` with `wait: true` | `/get-feedback-wait` | Block until the reviewer submits feedback |
 | Send artifact | `send_artifact` | `/review-plan` | Submit content (plans, decisions, summaries) for review |
-| Send artifact (blocking) | `send_artifact` with `wait: true` | `/review-plan-wait` | Submit content and iterate on feedback until approved |
+| Send artifact (blocking) | `send_artifact`, then `get_feedback` with `wait: true` | `/review-plan-wait` | Submit content and iterate on feedback until approved |
 | Check status | `review_status` | — | Check if feedback is pending or a pause was requested |
 | Add files | `add_files` | — | Add files to the current review session |
 
@@ -39,13 +39,13 @@ Tells the agent to send content to monocle for review using `monocle review send
 
 ### Send artifact (blocking)
 
-Same as send artifact, but the agent blocks after submitting and waits for your response. If you request changes, the agent updates and resubmits — iterating until you approve (submit with no comments).
+Same as send artifact, but the agent blocks after submitting and waits for your response. In MCP tools mode, the agent submits with `send_artifact`, then calls `get_feedback` with `wait: true`. If you request changes, the agent updates and resubmits — iterating until you approve (submit with no comments).
 
 This is what enables [review gating](/guides/review-gating): the agent cannot move forward until you sign off.
 
 ## Registration
 
-`monocle register` writes the appropriate config for your agent. In MCP tools mode, it configures an MCP server entry and installs slash commands. In skills mode, it writes skill files to the agent's skill directory.
+`monocle register` writes the appropriate config for your agent. In MCP tools mode, it configures an MCP server entry and installs slash commands or prompt templates where the agent supports them. In skills mode, it writes skill files to the agent's skill directory.
 
 <CodeGroup>
 
@@ -70,6 +70,17 @@ monocle register codex
 ```bash Gemini CLI
 # Default: skills mode — installs to .gemini/skills/
 monocle register gemini
+```
+
+```bash Pi
+# Auto: use existing pi-mcp-adapter when configured, otherwise skills/prompts
+monocle register pi
+
+# Force MCP tools mode and add the pinned pi-mcp-adapter package if needed:
+monocle register pi --integration-mode mcp
+
+# Force skills/prompts mode:
+monocle register pi --integration-mode skills
 ```
 
 ```bash All agents

@@ -328,5 +328,5 @@ func advanceCmd() tea.Cmd { return func() tea.Msg { return advanceMsg{} } }
 // resolveIntegrationModeForAgent returns the effective mode for an agent in
 // the wizard's current state.
 func (s WizardState) resolveIntegrationModeForAgent(a adapters.AgentAdapter) adapters.IntegrationMode {
-	return resolveIntegrationMode(a.Name(), s.integration[a.Name()])
+	return resolveIntegrationMode(a.Name(), s.integration[a.Name()], s.scope)
 }

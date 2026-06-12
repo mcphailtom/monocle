@@ -73,7 +73,11 @@ func describeMode(s WizardState, a adapters.AgentAdapter) string {
 // ConfigPaths reflects the right output. For ClaudeAdapter this sets Mode
 // and the Skip*/Keep* booleans before we render its paths.
 func applyAdapterConfiguration(s WizardState, a adapters.AgentAdapter) {
-	a.SetMode(s.resolveIntegrationModeForAgent(a))
+	if s.integration[a.Name()] == IntegrationAuto {
+		a.SetMode("")
+	} else {
+		a.SetMode(s.resolveIntegrationModeForAgent(a))
+	}
 	if claude, ok := a.(*adapters.ClaudeAdapter); ok {
 		if s.mode == ModeRegister {
 			claude.SkipPlanHook = s.planToggle

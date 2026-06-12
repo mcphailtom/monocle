@@ -1,7 +1,7 @@
 // Package register implements the interactive register/unregister TUI wizard.
 //
 // One wizard, two modes: register walks the user through picking agents,
-// integration modes, and Claude hook groups; unregister walks the user
+// scope, and Claude hook groups; unregister walks the user
 // through picking which agents to remove and which hook groups (if any) to
 // leave behind. The steps and layout are shared; only copy and adapter
 // dispatch differ.
@@ -79,7 +79,6 @@ type Options struct {
 	KeepReviewGateLocked bool
 }
 
-
 // WizardState is the full state used by every step. Steps read/write fields
 // here via the Model; there's no per-step sub-model — all state lives in one
 // place so back-navigation is trivial and the persistent "summary" column can
@@ -106,9 +105,9 @@ type WizardState struct {
 	// Claude step toggles. In register mode, these are the Skip* values; in
 	// unregister mode, they are the Keep* values. The UI copy flips but the
 	// underlying two booleans are symmetric.
-	planToggle    bool // register: skip?, unregister: keep?
-	gateToggle    bool
-	claudeCursor  int // 0 = plan, 1 = gate
+	planToggle   bool // register: skip?, unregister: keep?
+	gateToggle   bool
+	claudeCursor int // 0 = plan, 1 = gate
 
 	// Execute step
 	runIndex int
@@ -143,13 +142,13 @@ type executeDoneMsg struct{}
 // NewWizardState builds the initial state from Options.
 func NewWizardState(opts Options) WizardState {
 	s := WizardState{
-		mode:         opts.Mode,
-		opts:         opts,
-		theme:        opts.Theme,
-		keys:         opts.Keys,
-		adapters:     opts.Adapters,
-		step:         StepAgents,
-		scope:        opts.Global,
+		mode:        opts.Mode,
+		opts:        opts,
+		theme:       opts.Theme,
+		keys:        opts.Keys,
+		adapters:    opts.Adapters,
+		step:        StepAgents,
+		scope:       opts.Global,
 		selected:    make(map[string]bool),
 		integration: make(map[string]IntegrationChoice),
 		agentCursor: 0, // scope is a header toggle, not a selectable row
@@ -174,17 +173,14 @@ func NewWizardState(opts Options) WizardState {
 
 // resolveIntegrationMode converts an agent's stored IntegrationChoice to the
 // adapter-facing IntegrationMode, respecting per-adapter defaults under "auto".
-func resolveIntegrationMode(agent string, choice IntegrationChoice) adapters.IntegrationMode {
+func resolveIntegrationMode(agent string, choice IntegrationChoice, global bool) adapters.IntegrationMode {
 	switch choice {
 	case IntegrationMCP:
 		return adapters.ModeMCPTools
 	case IntegrationSkills:
 		return adapters.ModeSkills
 	default:
-		if agent == "claude" {
-			return adapters.ModeMCPTools
-		}
-		return adapters.ModeSkills
+		return adapters.DefaultIntegrationModeForScope(agent, global)
 	}
 }
 
