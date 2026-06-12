@@ -9,7 +9,7 @@
 
 Monocle is a TUI that runs alongside your AI coding agent. You review diffs in real time as the agent writes code, leave line-level comments — issues, suggestions, notes — and submit a structured review in one batch. The agent receives your feedback and starts fixing things immediately, just like a PR review but live.
 
-Monocle connects to your agent via MCP tools or CLI commands over a Unix socket. With [Claude Code](https://claude.com/claude-code) and [MCP channels](https://code.claude.com/docs/en/channels-reference), it pushes feedback directly into the agent's context the moment you submit. Other agents — [OpenCode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google/gemini-cli) — retrieve feedback on demand. MCP channels just make the process smoother.
+Monocle connects to your agent via MCP tools or CLI commands over a Unix socket. With [Claude Code](https://claude.com/claude-code) and [MCP channels](https://code.claude.com/docs/en/channels-reference), it pushes feedback directly into the agent's context the moment you submit. Other agents — [OpenCode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google/gemini-cli), and [Pi](https://pi.dev) — retrieve feedback on demand. MCP channels just make the process smoother.
 
 ## Why
 
@@ -19,7 +19,7 @@ Monocle gives you a proper review loop without slowing the agent down. It doesn'
 
 ## Requirements
 
-- A coding agent: [Claude Code](https://claude.com/claude-code), [OpenCode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google/gemini-cli), or any MCP-compatible agent
+- A coding agent: [Claude Code](https://claude.com/claude-code), [OpenCode](https://opencode.ai), [Codex CLI](https://github.com/openai/codex), [Gemini CLI](https://github.com/google/gemini-cli), [Pi](https://pi.dev), or any MCP-compatible agent
 - A terminal with 256-color or true color support
 - A [Nerd Font](https://www.nerdfonts.com/) for file icons (optional but recommended)
 
@@ -101,10 +101,10 @@ devbox run -- make build
 
 ```bash
 monocle register          # interactive picker
-monocle register claude   # or: opencode, codex, gemini, all
+monocle register claude   # or: opencode, codex, gemini, pi, all
 ```
 
-This configures MCP tools or skills depending on the agent. Claude Code gets an MCP server and slash commands; other agents get skill files. Use `--global` to write to the user-level config directory instead of the project. Override the default with `--integration-mode mcp` or `--integration-mode skills`.
+This configures MCP tools or skills depending on the agent. Claude Code gets an MCP server and slash commands; Pi gets `pi-mcp-adapter` plus prompt templates; other agents get skill files. Use `--global` to write to the user-level config directory instead of the project. Override the default with `--integration-mode mcp` or `--integration-mode skills`. If Pi is already running, restart it or run `/reload` after registering.
 
 #### Other agents
 
@@ -121,7 +121,7 @@ Start your agent and Monocle in separate terminals:
 monocle
 ```
 
-For Claude Code, Monocle registers an MCP server that exposes review tools directly — no bash permissions or skills needed. Other agents get [skills](#agent-operations) that instruct them to run CLI commands.
+For Claude Code, Monocle registers an MCP server that exposes review tools directly — no bash permissions or skills needed. For Pi, Monocle registers its MCP server through `pi-mcp-adapter` and installs prompt templates. Other agents get [skills](#agent-operations) that instruct them to run CLI commands.
 
 #### Push notifications (Claude Code only)
 
@@ -153,7 +153,7 @@ This means you can review the agent's *thinking* before it writes code — not j
 
 ## Features
 
-- **Works with any coding agent** — Claude Code, OpenCode, Codex CLI, Gemini CLI, or any MCP-compatible agent
+- **Works with any coding agent** — Claude Code, OpenCode, Codex CLI, Gemini CLI, Pi, or any MCP-compatible agent
 - **Push notifications** — With Claude Code channels, feedback is pushed directly into the agent's context the moment you submit
 - **Pull-based feedback** — Agents without channel support retrieve feedback via `/get-feedback` or `monocle review get-feedback`; multiple reviews queue up and are delivered together
 - **Plan & architecture review** — Your agent can submit plans, architecture decisions, and other content for review with markdown rendering. When iterating, Monocle shows diffs between plan versions so you can see exactly what changed. Use focus mode (`F`) for distraction-free reading
@@ -180,7 +180,7 @@ This means you can review the agent's *thinking* before it writes code — not j
 
 ## Agent Operations
 
-Monocle exposes review operations via **MCP tools** (default for Claude Code) or **skills** (default for other agents). Both are configured automatically by `monocle register`.
+Monocle exposes review operations via **MCP tools** (default for Claude Code and Pi) or **skills** (default for other agents). Both are configured automatically by `monocle register`.
 
 | Operation | MCP tool | Skill | Description |
 |-----------|----------|-------|-------------|
@@ -275,7 +275,7 @@ monocle unregister [agent] [--global] Remove Monocle registration
 monocle --version                    Print version
 ```
 
-The `agent` argument is one of `claude`, `opencode`, `codex`, `gemini`, or `all`. If omitted, an interactive picker lets you select which agents to register. The `--global` flag writes to the user-level config directory instead of the project.
+The `agent` argument is one of `claude`, `opencode`, `codex`, `gemini`, `pi`, or `all`. If omitted, an interactive picker lets you select which agents to register. The `--global` flag writes to the user-level config directory instead of the project.
 
 ### How the engine runs
 

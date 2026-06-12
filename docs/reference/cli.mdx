@@ -43,7 +43,7 @@ monocle register [agent] [--global] [--integration-mode MODE] [--no-plan-hook] [
 
 | Argument | Description |
 |----------|-------------|
-| `agent` | The agent to register. One of `claude`, `opencode`, `codex`, `gemini`, or `all`. If omitted, an interactive TUI wizard walks you through agent selection, integration mode, and (for Claude Code) the hook-group toggles. |
+| `agent` | The agent to register. One of `claude`, `opencode`, `codex`, `gemini`, `pi`, or `all`. If omitted, an interactive TUI wizard walks you through agent selection, scope, and (for Claude Code) the hook-group toggles. Use `--integration-mode` to override the selected agents' default mode. |
 
 ### Flags
 
@@ -79,31 +79,33 @@ Heads up: hooks don't fire when Claude is launched with `--dangerously-load-deve
 
 | Mode | Description |
 |------|-------------|
-| `auto` | Uses the recommended default for each agent. Claude Code uses `mcp`; all other agents use `skills`. |
-| `mcp` | Configures an MCP server that exposes monocle's review tools directly. No skill files are installed. |
-| `skills` | Installs skill files that wrap monocle CLI commands. For Claude Code, also configures MCP channels for push notifications. |
+| `auto` | Uses the recommended default for each agent. Claude Code and Pi use `mcp`; OpenCode, Codex CLI, and Gemini CLI use `skills`. |
+| `mcp` | Configures an MCP server that exposes monocle's review tools. Pi uses `pi-mcp-adapter` and prompt templates for this path. |
+| `skills` | Installs skill files that wrap monocle CLI commands. For Pi, also installs prompt templates. For Claude Code, also configures MCP channels for push notifications. |
 
 ### Agent config paths
 
 The files written by `register` depend on the integration mode:
 
-**MCP tools mode** (default for Claude Code)
+**MCP tools mode** (default for Claude Code and Pi)
 
-| Agent | MCP config | Commands |
-|-------|------------|----------|
+| Agent | MCP config | Commands/prompts |
+|-------|------------|-----------------|
 | Claude Code | `.mcp.json` | `.claude/commands/` |
 | OpenCode | `opencode.json` | `.opencode/commands/` |
 | Codex CLI | `.codex/config.toml` | — |
 | Gemini CLI | `.gemini/settings.json` | `.gemini/commands/` |
+| Pi | `.pi/settings.json` + `.pi/mcp.json` | `.pi/prompts/` |
 
 **Skills mode** (default for OpenCode, Codex CLI, Gemini CLI)
 
-| Agent | Skills directory | MCP config |
-|-------|-----------------|------------|
+| Agent | Skills directory | MCP config / prompts |
+|-------|------------------|----------------------|
 | Claude Code | `.claude/skills/` | `.mcp.json` |
 | OpenCode | `.opencode/skills/` | — |
 | Codex CLI | `.codex/skills/` | — |
 | Gemini CLI | `.gemini/skills/` | — |
+| Pi | `.pi/skills/` | `.pi/prompts/` |
 
 ---
 
@@ -119,7 +121,7 @@ monocle unregister [agent] [--global] [--keep-plan-hook] [--keep-review-gate] [-
 
 | Argument | Description |
 |----------|-------------|
-| `agent` | The agent to unregister. One of `claude`, `opencode`, `codex`, `gemini`, or `all`. If omitted, an interactive TUI wizard shows only the agents that are actually registered at the chosen scope and asks whether to keep or remove each hook group. |
+| `agent` | The agent to unregister. One of `claude`, `opencode`, `codex`, `gemini`, `pi`, or `all`. If omitted, an interactive TUI wizard shows only the agents that are actually registered at the chosen scope and asks whether to keep or remove each hook group. |
 
 ### Flags
 
@@ -129,6 +131,8 @@ monocle unregister [agent] [--global] [--keep-plan-hook] [--keep-review-gate] [-
 | `--keep-plan-hook` | Leave the Claude Code `ExitPlanMode` hook entries in `settings.json` even after the MCP server entry is removed. |
 | `--keep-review-gate` | Leave the `PostToolUse` + `Stop` review-gate hook entries in `settings.json` even after the MCP server entry is removed. |
 | `--no-tui` | Skip the interactive wizard and run headlessly. |
+
+For Pi, `unregister` removes Monocle's MCP server entry, Monocle-managed prompt templates, and Monocle skills. It leaves the pinned `npm:pi-mcp-adapter@2.9.0` package in Pi settings because other MCP servers may depend on the same adapter package.
 
 ---
 

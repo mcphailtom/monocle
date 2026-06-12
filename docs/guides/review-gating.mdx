@@ -37,7 +37,7 @@ Use this when:
 Once you've reviewed and pressed `S` to submit, the agent unblocks and receives your feedback.
 
 <Warning>
-  Pause flow requires MCP channel support and is currently only available with Claude Code. Other agents (OpenCode, Codex CLI, Gemini CLI) do not support the push notification needed to trigger the pause.
+  Pause flow requires MCP channel support and is currently only available with Claude Code. Other agents (OpenCode, Codex CLI, Gemini CLI, Pi) do not support the push notification needed to trigger the pause.
 </Warning>
 
 ## Turn-end review gate (Claude Code hooks)
@@ -70,5 +70,5 @@ To opt out of the turn-end review gate, pass `--no-review-gate` when registering
 |---|---|---|---|
 | **What it gates** | A specific plan or artifact | Every turn that edits files | The agent's entire session |
 | **When it triggers** | Agent calls `/review-plan-wait` or `ExitPlanMode` hook fires | Automatically at turn-end | You press `P` in the TUI |
-| **Agent support** | All agents (skills); Claude Code (hooks) | Claude Code only | Claude Code only |
+| **Agent support** | All agents (skills/prompts); Claude Code (hooks) | Claude Code only | Claude Code only |
 | **Use when** | You want to review the plan before the agent writes code | You want automatic review checkpoints after every code change | You want to pause everything while you catch up |

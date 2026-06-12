@@ -18,22 +18,22 @@ devbox run -- make lint               # Vet + build check
 Single binary with CLI subcommands:
 - **`monocle`** — TUI (Kong). Manages sessions, renders diffs/plans, collects comments, delivers reviews.
 - **`monocle review`** — Agent-facing CLI commands: `status`, `get-feedback`, `send-artifact`, `add-files`.
-- **`monocle register`** — Register Monocle for an agent. Claude defaults to MCP tools mode; others default to skills. Override with `--integration-mode mcp` or `--integration-mode skills`.
+- **`monocle register`** — Register Monocle for an agent. Claude and Pi default to MCP tools mode; others default to skills. Override with `--integration-mode mcp` or `--integration-mode skills`.
 - **`monocle unregister`** — Remove Monocle registration.
 - **`monocle serve-mcp`** — (hidden) Run the MCP server. Supports `--experimental-channels` (tools + push notifications) and `--experimental-channels-only` (push notifications only, for skills mode).
 
 ### Integration Model: MCP Tools + CLI + Push Notifications
 
-Agents interact with Monocle via **MCP tools** (recommended for Claude Code) or **CLI commands** (for other agents), with optional **MCP channel notifications** for push-based events.
+Agents interact with Monocle via **MCP tools** (recommended for Claude Code and Pi) or **CLI commands** (for skills-mode agents), with optional **MCP channel notifications** for Claude push-based events.
 
-- **MCP tools** (Claude Code, MCP tools mode) — `review_status`, `get_feedback`, `send_artifact`, `add_files`. The MCP server connects to the engine's Unix socket and handles all operations.
+- **MCP tools** (Claude Code and Pi MCP tools mode) — `review_status`, `get_feedback`, `send_artifact`, `add_files`. The MCP server connects to the engine's Unix socket and handles all operations. Pi reaches this path through `pi-mcp-adapter`.
 - **CLI commands** — `monocle review status`, `get-feedback`, `send-artifact`, `add-files` connect to the engine's Unix socket, send a request, print the response, and exit. Used by agents in skills mode.
 - **MCP channels** (Claude Code only, experimental) — push notifications (`feedback_submitted`, `pause_requested`) forwarded as MCP channel events.
 - **Skills** — standardized `SKILL.md` files (agentskills.io format) embedded in the binary. Skills instruct agents to run CLI commands. Used in skills mode.
 
 **Key design:**
-- **MCP tools mode** — Claude Code calls MCP tools directly + receives push notifications. No skills or bash permissions needed.
-- **Skills mode** — Agent runs CLI commands via skills + receives push notifications via MCP channels.
+- **MCP tools mode** — Claude Code calls MCP tools directly and can receive push notifications; Pi calls MCP tools through `pi-mcp-adapter` and remains pull-based. No skills or bash permissions needed.
+- **Skills mode** — Agent runs CLI commands via skills; Claude can still receive push notifications via MCP channels.
 - **User-initiated review** — reviewer works at their own pace, submits when ready
 - **Pause flow** — reviewer can request a pause; agent blocks until feedback is ready
 

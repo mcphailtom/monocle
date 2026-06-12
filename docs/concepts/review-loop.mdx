@@ -7,13 +7,15 @@ The review loop is the core interaction pattern in monocle: your agent writes co
 
 ## Architecture
 
-Monocle connects to your agent over a Unix socket. For Claude Code, a native MCP server sits in between, exposing review tools and enabling push notifications:
+Monocle connects to your agent over a Unix socket. In MCP tools mode, a native MCP server sits in between and exposes review tools:
 
 ```
 Agent <--stdio/MCP--> monocle serve-mcp (MCP server) <---socket---> monocle (TUI)
 ```
 
-For all other agents, the connection goes directly over the socket, and feedback is retrieved on demand via the `/get-feedback` skill or `monocle review get-feedback`.
+Claude Code can also use MCP channels for push notifications. Pi reaches the same MCP server through `pi-mcp-adapter`; that is pull-based and does not use Claude MCP channels.
+
+For skills-mode agents, the connection goes directly over the socket, and feedback is retrieved on demand via the `/get-feedback` skill or `monocle review get-feedback`.
 
 ## How the loop works
 

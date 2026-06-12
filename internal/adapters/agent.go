@@ -9,7 +9,7 @@ import (
 
 // AgentAdapter handles MCP registration for a specific coding agent.
 type AgentAdapter interface {
-	// Name returns the agent identifier (claude, opencode, codex, gemini).
+	// Name returns the agent identifier (claude, opencode, codex, gemini, pi).
 	Name() string
 	// Label returns a human-readable name (e.g. "Claude Code").
 	Label() string
@@ -26,7 +26,22 @@ type AgentAdapter interface {
 }
 
 // ValidAgentNames lists the accepted agent identifiers for the CLI.
-var ValidAgentNames = []string{"claude", "opencode", "codex", "gemini"}
+var ValidAgentNames = []string{"claude", "opencode", "codex", "gemini", "pi"}
+
+// ValidAgentList returns the accepted agent identifiers for CLI help and errors.
+func ValidAgentList() string {
+	return strings.Join(ValidAgentNames, ", ")
+}
+
+// DefaultIntegrationMode returns the recommended integration mode for an agent.
+func DefaultIntegrationMode(agent string) IntegrationMode {
+	switch agent {
+	case "claude", "pi":
+		return ModeMCPTools
+	default:
+		return ModeSkills
+	}
+}
 
 // AllAdapters returns an adapter for each supported agent.
 func AllAdapters() []AgentAdapter {
@@ -35,6 +50,7 @@ func AllAdapters() []AgentAdapter {
 		&OpenCodeAdapter{},
 		&CodexAdapter{},
 		&GeminiAdapter{},
+		&PiAdapter{},
 	}
 }
 
@@ -45,7 +61,7 @@ func GetAdapter(name string) (AgentAdapter, error) {
 			return a, nil
 		}
 	}
-	return nil, fmt.Errorf("unknown agent %q (valid: claude, opencode, codex, gemini)", name)
+	return nil, fmt.Errorf("unknown agent %q (valid: %s)", name, ValidAgentList())
 }
 
 // ResolveCommand returns the monocle binary path for config files.

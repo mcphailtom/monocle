@@ -91,7 +91,7 @@ type RunCmd struct {
 }
 
 type RegisterCmd struct {
-	Agent           string `arg:"" optional:"" help:"Agent to register (claude, opencode, codex, gemini, all)"`
+	Agent           string `arg:"" optional:"" help:"Agent to register (claude, opencode, codex, gemini, pi, all)"`
 	Global          bool   `help:"Register in user-level config instead of project" default:"false"`
 	IntegrationMode string `help:"Override the default integration mode (auto, mcp, or skills)" enum:"auto,mcp,skills" default:"auto"`
 	NoPlanHook      bool   `help:"Skip installing the Claude Code ExitPlanMode hook" name:"no-plan-hook" default:"false"`
@@ -100,7 +100,7 @@ type RegisterCmd struct {
 }
 
 type UnregisterCmd struct {
-	Agent          string `arg:"" optional:"" help:"Agent to unregister (claude, opencode, codex, gemini, all)"`
+	Agent          string `arg:"" optional:"" help:"Agent to unregister (claude, opencode, codex, gemini, pi, all)"`
 	Global         bool   `help:"Remove from user-level config instead of project" default:"false"`
 	KeepPlanHook   bool   `help:"Leave the Claude Code ExitPlanMode hook entries in settings.json" name:"keep-plan-hook" default:"false"`
 	KeepReviewGate bool   `help:"Leave the Claude Code turn-end review-gate hooks in settings.json" name:"keep-review-gate" default:"false"`
@@ -117,12 +117,12 @@ type ServeMCPCmd struct {
 type ServeMCPChannelCmd struct{}
 
 type InstallCmd struct {
-	Agent  string `arg:"" optional:"" help:"Agent to register (claude, opencode, codex, gemini, all)"`
+	Agent  string `arg:"" optional:"" help:"Agent to register (claude, opencode, codex, gemini, pi, all)"`
 	Global bool   `help:"Register in user-level config instead of project" default:"false"`
 }
 
 type UninstallCmd struct {
-	Agent  string `arg:"" optional:"" help:"Agent to unregister (claude, opencode, codex, gemini, all)"`
+	Agent  string `arg:"" optional:"" help:"Agent to unregister (claude, opencode, codex, gemini, pi, all)"`
 	Global bool   `help:"Remove from user-level config instead of project" default:"false"`
 }
 
@@ -236,7 +236,7 @@ func (cmd *RegisterCmd) runHeadless(allAdapters []adapters.AgentAdapter) error {
 }
 
 // resolveMode returns the integration mode for the given agent.
-// "auto" uses per-agent defaults: Claude → MCP tools, others → skills.
+// "auto" uses per-agent defaults: Claude/Pi → MCP tools, others → skills.
 func (cmd *RegisterCmd) resolveMode(a adapters.AgentAdapter) adapters.IntegrationMode {
 	switch cmd.IntegrationMode {
 	case "mcp":
@@ -244,10 +244,7 @@ func (cmd *RegisterCmd) resolveMode(a adapters.AgentAdapter) adapters.Integratio
 	case "skills":
 		return adapters.ModeSkills
 	default: // auto
-		if a.Name() == "claude" {
-			return adapters.ModeMCPTools
-		}
-		return adapters.ModeSkills
+		return adapters.DefaultIntegrationMode(a.Name())
 	}
 }
 
@@ -370,7 +367,7 @@ func resolveAgentsFrom(agents []adapters.AgentAdapter, name string) ([]adapters.
 				return []adapters.AgentAdapter{a}, nil
 			}
 		}
-		return nil, fmt.Errorf("unknown agent %q (valid: claude, opencode, codex, gemini)", name)
+		return nil, fmt.Errorf("unknown agent %q (valid: %s)", name, adapters.ValidAgentList())
 	}
 }
 
